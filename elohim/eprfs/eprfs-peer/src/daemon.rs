@@ -34,6 +34,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use elohim_epr_rea::{FlowRecord, FlowStore, ParticipantRow, SidecarFlowStore, SignatureVerifier};
 use eprfs_core::{EprfsStorage, TreeLimits};
 use futures_lite::StreamExt;
+use iroh::endpoint::{Connection, VarInt};
 use iroh::protocol::Router;
 use iroh::{Endpoint, NodeAddr, NodeId};
 use iroh_gossip::api::{Event, GossipReceiver, GossipSender};
@@ -49,7 +50,7 @@ use crate::blob_mount::{
     rfc3339_utc, BlobMount, DeviceScope, ServedDraw, SharedServePolicy, INDEX_RETRY_FIRST,
 };
 use crate::channel::{channel_tier_id, project_channel_with_nacks, ChannelStore};
-use crate::connections::ConnectionBook;
+use crate::connections::{ConnectionBook, RECOVERY_RESET};
 use crate::endpoint::bind_on;
 use crate::error::PeerError;
 use crate::fetch::{
@@ -66,7 +67,8 @@ use crate::key::PeerKey;
 use crate::local_blob::LocalBlobContext;
 use crate::rules::{Rules, RulesDigest, RulesState};
 use crate::tier::{
-    is_peer_stream_refusal, tier_call, TierAnswer, TierLimits, TierProtocol, TierRequest, TIER_ALPN,
+    is_peer_stream_refusal, tier_request, TierAnswer, TierLimits, TierProtocol, TierRequest,
+    TIER_ALPN,
 };
 
 /// How often the daemon looks at its roster and flow store and asks whether a head is due.
@@ -120,7 +122,9 @@ pub struct ProbeStatus {
 #[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DeviceRecoveryStatus {
-    pub last_head_at: Option<u64>,
+    /// This device's clock when it last admitted a verified head, including a replay.
+    #[serde(default, alias = "lastHeadAt")]
+    pub last_heard_at: Option<u64>,
     pub rejoins_since_head: u32,
     pub neighbor_up_after_last_join: bool,
     pub last_probe: Option<ProbeStatus>,
@@ -221,8 +225,22 @@ struct DeviceRecovery {
 #[derive(Debug)]
 enum TierProbe {
     Answered(Option<Vec<u8>>),
-    Unsupported,
-    Unreachable(String),
+    Unsupported(Connection),
+    Unreachable {
+        error: String,
+        connection: Option<Connection>,
+    },
+}
+
+#[derive(Debug)]
+enum ResubscribeRequest {
+    Rung {
+        requested: Instant,
+        device: Option<String>,
+    },
+    StreamFailure {
+        requested: Instant,
+    },
 }
 
 impl DeviceRecovery {
@@ -234,6 +252,26 @@ impl DeviceRecovery {
             last_logged_reset_delay: None,
         }
     }
+}
+
+fn next_due_silence_probe(
+    recovery: &HashMap<NodeId, DeviceRecovery>,
+    cursor: Option<NodeId>,
+    now: Instant,
+) -> Option<NodeId> {
+    let mut due: Vec<NodeId> = recovery
+        .iter()
+        .filter_map(|(node, state)| {
+            state
+                .probe_due
+                .is_none_or(|probe_due| now >= probe_due)
+                .then_some(*node)
+        })
+        .collect();
+    due.sort_unstable();
+    cursor
+        .and_then(|cursor| due.iter().copied().find(|node| *node > cursor))
+        .or_else(|| due.first().copied())
 }
 
 impl RejoinState {
@@ -288,6 +326,14 @@ struct RunStats {
     index_flow_reads: AtomicU64,
     #[cfg(feature = "testing")]
     ticks: AtomicU64,
+    #[cfg(feature = "testing")]
+    recovery_saves: AtomicU64,
+    #[cfg(feature = "testing")]
+    resubscriptions: AtomicU64,
+    #[cfg(feature = "testing")]
+    recovery_status: std::sync::Mutex<PeerRecoveryStatus>,
+    #[cfg(feature = "testing")]
+    force_gossip_lag: std::sync::atomic::AtomicBool,
     #[cfg(feature = "testing")]
     fail_index_flow_reads: std::sync::atomic::AtomicBool,
     #[cfg(feature = "testing")]
@@ -559,9 +605,12 @@ impl PeerDaemon {
             last_rejoin_sweep: clock_now,
             recovery,
             recovery_status,
-            recovery_dirty: true,
+            recovery_dirty: false,
+            recovery_observed_since_save: false,
+            last_recovery_save: None,
             last_gossip_event: clock_now,
             last_silence_probe: None,
+            silence_probe_cursor: None,
             last_resubscribe: None,
             resubscribe_requested: None,
             resubscriptions: 0,
@@ -631,6 +680,34 @@ impl PeerDaemon {
     #[cfg(feature = "testing")]
     pub fn ticks(&self) -> u64 {
         self.stats.ticks.load(Ordering::Relaxed)
+    }
+
+    /// Successful writes of `recovery.json` in this run.
+    #[cfg(feature = "testing")]
+    pub fn recovery_saves(&self) -> u64 {
+        self.stats.recovery_saves.load(Ordering::Relaxed)
+    }
+
+    /// Successful gossip subscription replacements in this run.
+    #[cfg(feature = "testing")]
+    pub fn resubscriptions(&self) -> u64 {
+        self.stats.resubscriptions.load(Ordering::Relaxed)
+    }
+
+    /// The loop's current recovery evidence, before its rate-limited persistence boundary.
+    #[cfg(feature = "testing")]
+    pub fn recovery_status(&self) -> PeerRecoveryStatus {
+        self.stats
+            .recovery_status
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone()
+    }
+
+    /// Make the loop observe one gossip lag on its next timer tick.
+    #[cfg(feature = "testing")]
+    pub fn lag_gossip_stream(&self) {
+        self.stats.force_gossip_lag.store(true, Ordering::Relaxed);
     }
 
     /// Make artifact-index flow reads fail persistently at the test seam.
@@ -878,10 +955,14 @@ struct Run {
     recovery: HashMap<NodeId, DeviceRecovery>,
     recovery_status: PeerRecoveryStatus,
     recovery_dirty: bool,
+    /// HEARD and gossip timestamps changed; they remain memory-only until the bounded flush.
+    recovery_observed_since_save: bool,
+    last_recovery_save: Option<Instant>,
     last_gossip_event: Instant,
     last_silence_probe: Option<Instant>,
+    silence_probe_cursor: Option<NodeId>,
     last_resubscribe: Option<Instant>,
-    resubscribe_requested: Option<(Instant, Option<String>)>,
+    resubscribe_requested: Option<ResubscribeRequest>,
     /// Successful in-process replacements of the gossip subscription.
     resubscriptions: u64,
     served_head: Arc<RwLock<Option<ChannelHead>>>,
@@ -985,6 +1066,21 @@ impl Run {
                     if let Err(e) = tick_result {
                         break Err(e);
                     }
+                    #[cfg(feature = "testing")]
+                    if receiver.is_some()
+                        && self
+                            .stats
+                            .force_gossip_lag
+                            .swap(false, Ordering::Relaxed)
+                    {
+                        receiver = None;
+                        self.sender = None;
+                        stream_failure_logged = true;
+                        resubscribe_failure_logged = false;
+                        stream_retry.reset();
+                        self.request_stream_resubscribe(now);
+                        stream_retry.schedule(now);
+                    }
                     if receiver.is_some() && self.resubscribe_due(now) {
                         receiver = None;
                         self.sender = None;
@@ -1047,7 +1143,7 @@ impl Run {
                         resubscribe_failure_logged = false;
                         stream_retry.reset();
                         let now = (self.now)();
-                        self.request_resubscribe(now, None);
+                        self.request_stream_resubscribe(now);
                         stream_retry.schedule(now);
                     }
                 },
@@ -1060,7 +1156,7 @@ impl Run {
             task.abort();
         }
         // Best effort on the way out: the counters are worth keeping, the head is already saved.
-        self.save_recovery();
+        self.save_recovery((self.now)(), true);
         let _ = self.save();
         ended
     }
@@ -1069,8 +1165,15 @@ impl Run {
         (self.config.log)(line);
     }
 
-    fn save_recovery(&mut self) {
-        if !self.recovery_dirty {
+    fn save_recovery(&mut self, now: Instant, force: bool) {
+        if !force && !self.recovery_dirty && !self.recovery_observed_since_save {
+            return;
+        }
+        if !force
+            && self
+                .last_recovery_save
+                .is_some_and(|saved| now.duration_since(saved) < TOPIC_SILENCE_AFTER)
+        {
             return;
         }
         let path = self.config.state_dir.join(RECOVERY_STATUS_FILE);
@@ -1083,7 +1186,13 @@ impl Run {
             .and_then(|bytes| std::fs::write(&tmp, bytes))
             .and_then(|()| std::fs::rename(&tmp, &path));
         match saved {
-            Ok(()) => self.recovery_dirty = false,
+            Ok(()) => {
+                self.recovery_dirty = false;
+                self.recovery_observed_since_save = false;
+                self.last_recovery_save = Some(now);
+                #[cfg(feature = "testing")]
+                self.stats.recovery_saves.fetch_add(1, Ordering::Relaxed);
+            }
             Err(error) => self.log(&format!("peer recovery status not saved: {error}")),
         }
     }
@@ -1091,32 +1200,45 @@ impl Run {
     fn note_gossip_event(&mut self, now: Instant) {
         self.last_gossip_event = now;
         self.recovery_status.last_gossip_event_at = Some(unix_ms());
-        self.recovery_dirty = true;
+        self.recovery_observed_since_save = true;
     }
 
-    fn request_resubscribe(&mut self, now: Instant, device: Option<String>) {
+    fn request_rung_resubscribe(&mut self, now: Instant, device: Option<String>) {
         if self.resubscribe_requested.is_none() {
-            self.resubscribe_requested = Some((now, device));
+            self.resubscribe_requested = Some(ResubscribeRequest::Rung {
+                requested: now,
+                device,
+            });
         }
     }
 
+    fn request_stream_resubscribe(&mut self, now: Instant) {
+        // Stream loss is urgent even when a rung request was waiting for its silence window.
+        self.resubscribe_requested = Some(ResubscribeRequest::StreamFailure { requested: now });
+    }
+
     fn resubscribe_due(&self, now: Instant) -> bool {
-        let Some((requested, _)) = self.resubscribe_requested else {
-            return false;
-        };
-        now >= requested
-            && self
-                .last_resubscribe
-                .is_none_or(|last| now.duration_since(last) >= TOPIC_SILENCE_AFTER)
+        match &self.resubscribe_requested {
+            Some(ResubscribeRequest::Rung { requested, .. }) => {
+                now >= *requested
+                    && self
+                        .last_resubscribe
+                        .is_none_or(|last| now.duration_since(last) >= TOPIC_SILENCE_AFTER)
+            }
+            Some(ResubscribeRequest::StreamFailure { requested }) => now >= *requested,
+            None => false,
+        }
     }
 
     fn resubscribe_succeeded(&mut self, now: Instant) {
-        let device = self
-            .resubscribe_requested
-            .take()
-            .and_then(|(_, device)| device);
+        let device = match self.resubscribe_requested.take() {
+            Some(ResubscribeRequest::Rung { device, .. }) => device,
+            Some(ResubscribeRequest::StreamFailure { .. }) | None => None,
+        };
         self.last_resubscribe = Some(now);
         self.resubscriptions = self.resubscriptions.saturating_add(1);
+        #[cfg(feature = "testing")]
+        self.stats.resubscriptions.fetch_add(1, Ordering::Relaxed);
         self.recovery_status.resubscriptions = self.resubscriptions;
         if let Some(device) = device {
             let status = self.recovery_status.devices.entry(device).or_default();
@@ -1163,7 +1285,6 @@ impl Run {
                     .entry(recovery.device.clone())
                     .or_default()
                     .neighbor_up_after_last_join = true;
-                self.recovery_dirty = true;
             }
         }
         self.channel.neighbor_up((self.now)());
@@ -1197,10 +1318,10 @@ impl Run {
             .devices
             .entry(device.to_string())
             .or_default();
-        status.last_head_at = Some(unix_ms());
+        status.last_heard_at = Some(unix_ms());
         status.rejoins_since_head = 0;
         status.neighbor_up_after_last_join = true;
-        self.recovery_dirty = true;
+        self.recovery_observed_since_save = true;
         let nodes = self
             .admission
             .read()
@@ -1214,13 +1335,21 @@ impl Run {
             .unwrap_or_default();
         for node in nodes {
             self.rejoins.remove(&node);
-            if let Some(recovery) = self.recovery.get_mut(&node) {
-                recovery.probe_due = None;
-                recovery.reset_retry.reset();
-            }
             if !self.joined.contains(&node) {
                 self.joined.push(node);
             }
+        }
+    }
+
+    fn reset_probe_backoff(&mut self, device: &str) {
+        for recovery in self
+            .recovery
+            .values_mut()
+            .filter(|recovery| recovery.device == device)
+        {
+            recovery.probe_due = None;
+            recovery.reset_retry.reset();
+            recovery.last_logged_reset_delay = None;
         }
     }
 
@@ -1235,23 +1364,86 @@ impl Run {
     }
 
     async fn probe(&self, node: NodeId) -> TierProbe {
-        let call = tier_call(
-            &self.endpoint,
-            self.peer_addr(node),
-            TierRequest::Head,
-            &self.tree,
-        );
-        match tokio::time::timeout(PROBE_DEADLINE, call).await {
+        let deadline = tokio::time::Instant::now() + PROBE_DEADLINE;
+        let connection = match tokio::time::timeout_at(
+            deadline,
+            self.endpoint.connect(self.peer_addr(node), TIER_ALPN),
+        )
+        .await
+        {
+            Ok(Ok(connection)) => connection,
+            Ok(Err(error)) => {
+                return TierProbe::Unreachable {
+                    error: error.to_string(),
+                    connection: None,
+                }
+            }
+            Err(_) => {
+                return TierProbe::Unreachable {
+                    error: format!("no tier connection within {PROBE_DEADLINE:?}"),
+                    connection: None,
+                }
+            }
+        };
+        match tokio::time::timeout_at(
+            deadline,
+            tier_request(&connection, &TierRequest::Head, &self.tree),
+        )
+        .await
+        {
             Ok(Ok(TierAnswer::Head { head })) => {
+                connection.close(VarInt::from_u32(0), b"");
                 TierProbe::Answered(head.map(|head| head.to_vec()))
             }
-            Ok(Ok(_)) => TierProbe::Unreachable(
-                "the tier answered the head probe with another answer".into(),
-            ),
-            Ok(Err(error)) if is_peer_stream_refusal(&error) => TierProbe::Unsupported,
-            Ok(Err(error)) => TierProbe::Unreachable(error.to_string()),
-            Err(_) => TierProbe::Unreachable(format!("no tier answer within {PROBE_DEADLINE:?}")),
+            Ok(Ok(_)) => TierProbe::Unreachable {
+                error: "the tier answered the head probe with another answer".into(),
+                connection: Some(connection),
+            },
+            Ok(Err(error)) if is_peer_stream_refusal(&error) => TierProbe::Unsupported(connection),
+            Ok(Err(error)) => TierProbe::Unreachable {
+                error: error.to_string(),
+                connection: Some(connection),
+            },
+            Err(_) => TierProbe::Unreachable {
+                error: format!("no tier answer within {PROBE_DEADLINE:?}"),
+                connection: Some(connection),
+            },
         }
+    }
+
+    fn close_outbound_probe(connection: Option<Connection>) -> usize {
+        let Some(connection) = connection else {
+            return 0;
+        };
+        if connection.close_reason().is_some() {
+            return 0;
+        }
+        // Close the connection this device dialed. Closing ConnectionBook's accepted inbound
+        // side instead can abort a sibling's fetch from us; leaving inbound alone lets that
+        // in-flight fetch finish while our next probe negotiates a fresh outbound path.
+        connection.close(VarInt::from_u32(RECOVERY_RESET), b"peer recovery");
+        1
+    }
+
+    fn schedule_probe_backoff(&mut self, node: NodeId, now: Instant) -> (Duration, bool) {
+        let Some(recovery) = self.recovery.get_mut(&node) else {
+            return (RESET_RETRY_FIRST, true);
+        };
+        let delay = recovery.reset_retry.schedule(now);
+        recovery.probe_due = Some(now + delay);
+        let log = recovery.last_logged_reset_delay != Some(delay);
+        recovery.last_logged_reset_delay = Some(delay);
+        (delay, log)
+    }
+
+    async fn rejoin_after_reset(&mut self, node: NodeId, now: Instant) {
+        self.joined.retain(|joined| *joined != node);
+        self.rejoins
+            .entry(node)
+            .or_insert_with(|| RejoinState::immediate(now))
+            .retry
+            .schedule_now(now);
+        self.join_node(node, now).await;
     }
 
     async fn join_node(&mut self, node: NodeId, now: Instant) {
@@ -1282,7 +1474,7 @@ impl Run {
                         .or_default();
                     status.rejoins_since_head = status.rejoins_since_head.saturating_add(1);
                     status.neighbor_up_after_last_join = false;
-                    self.recovery_dirty = true;
+                    self.recovery_observed_since_save = true;
                 }
             }
             Err(error) => {
@@ -1320,26 +1512,30 @@ impl Run {
                     unsupported: false,
                     at: unix_ms(),
                 });
-                if let Some(recovery) = self.recovery.get_mut(&node) {
-                    recovery.probe_due = None;
-                    recovery.reset_retry.reset();
-                    recovery.last_logged_reset_delay = None;
-                }
                 self.recovery_dirty = true;
                 if changed {
                     self.log(&format!(
                         "peer {device} tier probe ok; steward gossip is reachable but mute"
                     ));
                 }
-                if let Some(head) = head {
+                let folded_new = if let Some(head) = head {
                     // EXACTLY the gossip admission path: decode, signature, current admission,
                     // rollback and replay judgment, then fold only on HeadVerdict::Fold.
-                    self.heard(&head, now)?;
+                    matches!(self.heard(&head, now)?, Some(HeadVerdict::Fold))
+                } else {
+                    false
+                };
+                if folded_new {
+                    self.reset_probe_backoff(&device);
+                } else {
+                    // A reachable but unchanged head does not prove gossip recovered. Space the
+                    // next direct probe with the same capped backoff as a failed path.
+                    self.schedule_probe_backoff(node, now);
                 }
-                self.request_resubscribe(now, Some(device));
+                self.request_rung_resubscribe(now, Some(device));
                 Ok(true)
             }
-            TierProbe::Unsupported => {
+            TierProbe::Unsupported(connection) => {
                 let status = self
                     .recovery_status
                     .devices
@@ -1353,20 +1549,23 @@ impl Run {
                     unsupported: true,
                     at: unix_ms(),
                 });
-                if let Some(recovery) = self.recovery.get_mut(&node) {
-                    recovery.probe_due = None;
-                    recovery.reset_retry.reset();
-                    recovery.last_logged_reset_delay = None;
-                }
+                status.connection_resets = status.connection_resets.saturating_add(1);
+                status.neighbor_up_after_last_join = false;
+                let closed = Self::close_outbound_probe(Some(connection));
+                let (delay, log_delay) = self.schedule_probe_backoff(node, now);
                 self.recovery_dirty = true;
-                if changed {
-                    self.log(&format!("peer {device} probe unsupported (older peer)"));
+                if changed || log_delay {
+                    self.log(&format!(
+                        "peer {device} probe unsupported (older peer); reset {closed} outbound \
+                         connection(s), next probe in {}s",
+                        delay.as_secs()
+                    ));
                 }
-                self.request_resubscribe(now, Some(device));
-                Ok(true)
+                self.rejoin_after_reset(node, now).await;
+                Ok(false)
             }
-            TierProbe::Unreachable(error) => {
-                let closed = self.book.reset(node);
+            TierProbe::Unreachable { error, connection } => {
+                let closed = Self::close_outbound_probe(connection);
                 let status = self
                     .recovery_status
                     .devices
@@ -1380,30 +1579,16 @@ impl Run {
                 });
                 status.connection_resets = status.connection_resets.saturating_add(1);
                 status.neighbor_up_after_last_join = false;
-                let (delay, log_delay) = if let Some(recovery) = self.recovery.get_mut(&node) {
-                    let delay = recovery.reset_retry.schedule(now);
-                    recovery.probe_due = Some(now + delay);
-                    let log = recovery.last_logged_reset_delay != Some(delay);
-                    recovery.last_logged_reset_delay = Some(delay);
-                    (delay, log)
-                } else {
-                    (RESET_RETRY_FIRST, true)
-                };
+                let (delay, log_delay) = self.schedule_probe_backoff(node, now);
                 self.recovery_dirty = true;
                 if changed || log_delay {
                     self.log(&format!(
-                        "peer {device} tier probe failed ({error}); reset {closed} connection(s), \
-                         next probe in {}s",
+                        "peer {device} tier probe failed ({error}); reset {closed} outbound \
+                         connection(s), next probe in {}s",
                         delay.as_secs()
                     ));
                 }
-                self.joined.retain(|joined| *joined != node);
-                self.rejoins
-                    .entry(node)
-                    .or_insert_with(|| RejoinState::immediate(now))
-                    .retry
-                    .schedule_now(now);
-                self.join_node(node, now).await;
+                self.rejoin_after_reset(node, now).await;
                 Ok(false)
             }
         }
@@ -1502,8 +1687,11 @@ impl Run {
         if topic_silent && probed_any {
             self.last_silence_probe = Some(now);
         } else if topic_silent && silence_probe_due {
-            self.last_silence_probe = Some(now);
-            if let Some(node) = self.recovery.keys().copied().next() {
+            if let Some(node) =
+                next_due_silence_probe(&self.recovery, self.silence_probe_cursor, now)
+            {
+                self.last_silence_probe = Some(now);
+                self.silence_probe_cursor = Some(node);
                 self.probe_node(node, now).await?;
             }
         }
@@ -1517,7 +1705,19 @@ impl Run {
         self.record_serves();
         self.fetch_queued();
         self.maintain_rejoins().await?;
-        self.save_recovery();
+        #[cfg(feature = "testing")]
+        {
+            *self
+                .stats
+                .recovery_status
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner) = self.recovery_status.clone();
+        }
+        // A probe-requested subscription change is one transition: persist it after the fresh
+        // subscription succeeds, not halfway through with only the probe recorded.
+        if self.resubscribe_requested.is_none() {
+            self.save_recovery((self.now)(), false);
+        }
         // Refused connections reach the head table `epr peer status` reads: kept in memory every
         // tick, written with the next announce, or on their own at most once per re-announce
         // interval — never once per refused connection.
@@ -1643,7 +1843,7 @@ impl Run {
                 self.recovery_status.devices.entry(device).or_default();
             }
         }
-        self.recovery_dirty = true;
+        self.recovery_observed_since_save = true;
         seed_endpoint(
             &self.endpoint,
             self.config.relay.as_ref(),
@@ -2261,7 +2461,10 @@ impl Run {
             self.heard_device(&head.device, now);
         }
         match verdict {
-            HeadVerdict::Fold => self.fold(head),
+            HeadVerdict::Fold => {
+                self.reset_probe_backoff(&head.device);
+                self.fold(head);
+            }
             HeadVerdict::Own => return Ok(Some(verdict)),
             refused => self.log(&format!(
                 "head from {} seq {} dropped: {refused:?}",
@@ -2622,6 +2825,40 @@ mod tests {
         retry.schedule(now);
         retry.reset();
         assert_eq!(retry.schedule(now), REJOIN_RETRY_FIRST);
+    }
+
+    #[test]
+    fn topic_silence_probes_due_nodes_round_robin_and_skips_backing_off_nodes() {
+        let node = |seed: u8| iroh::SecretKey::from_bytes(&[seed; 32]).public();
+        let now = Instant::now();
+        let nodes = [node(1), node(2), node(3)];
+        let mut recovery: HashMap<NodeId, DeviceRecovery> = nodes
+            .into_iter()
+            .enumerate()
+            .map(|(index, node)| (node, DeviceRecovery::new(format!("device-{index}"))))
+            .collect();
+        let mut ordered = nodes;
+        ordered.sort_unstable();
+
+        recovery
+            .get_mut(&ordered[1])
+            .expect("middle node")
+            .probe_due = Some(now + Duration::from_secs(90));
+        let first = next_due_silence_probe(&recovery, None, now).expect("first due node");
+        assert_eq!(first, ordered[0]);
+        let second = next_due_silence_probe(&recovery, Some(first), now).expect("next due node");
+        assert_eq!(second, ordered[2]);
+        let wrapped = next_due_silence_probe(&recovery, Some(second), now).expect("wrapped node");
+        assert_eq!(wrapped, ordered[0]);
+
+        for state in recovery.values_mut() {
+            state.probe_due = Some(now + Duration::from_secs(90));
+        }
+        assert_eq!(
+            next_due_silence_probe(&recovery, Some(wrapped), now),
+            None,
+            "the topic-wide rung is skipped while every node backs off"
+        );
     }
 
     #[test]

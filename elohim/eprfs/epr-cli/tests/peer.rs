@@ -366,7 +366,7 @@ async fn flow_fold_folds_a_devices_channel_root_once_and_status_reads_it() {
     recovery.devices.insert(
         b_did.clone(),
         DeviceRecoveryStatus {
-            last_head_at: Some(2_000),
+            last_heard_at: Some(2_000),
             rejoins_since_head: 3,
             neighbor_up_after_last_join: false,
             last_probe: Some(ProbeStatus {
@@ -397,6 +397,8 @@ async fn flow_fold_folds_a_devices_channel_root_once_and_status_reads_it() {
     assert_eq!(devices[0]["eventsFolded"], 1);
     assert_eq!(devices[0]["probeOk"], true);
     assert_eq!(devices[0]["probeUnsupported"], true);
+    assert!(devices[0]["heardAgeS"].is_u64(), "{json}");
+    assert!(devices[0]["foldedAgeS"].is_u64(), "{json}");
     assert_eq!(devices[0]["resubscriptions"], 2);
     assert_eq!(devices[0]["connectionResets"], 1);
     // Refused connections, by the device the roster names for the node id; strangers in a total.
@@ -422,6 +424,8 @@ async fn flow_fold_folds_a_devices_channel_root_once_and_status_reads_it() {
     let text = String::from_utf8_lossy(&text.stdout).to_string();
     assert!(text.contains("artifact gate since"), "{text}");
     assert!(text.contains("head seq 4"), "{text}");
+    assert!(text.contains("HEARD "), "{text}");
+    assert!(text.contains("FOLDED "), "{text}");
     assert!(text.contains("probe unsupported (older peer)"), "{text}");
     assert!(text.contains("resubscribes 2  resets 1"), "{text}");
     assert!(

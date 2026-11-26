@@ -1099,8 +1099,10 @@ struct DeviceStatus {
     node_id: String,
     seq: Option<u64>,
     root: Option<String>,
-    /// Seconds since this device folded the head (this device's clock).
-    age_s: Option<u64>,
+    /// Seconds since any verified head was heard, including a replay (this device's clock).
+    heard_age_s: Option<u64>,
+    /// Seconds since a head folded new records (this device's clock).
+    folded_age_s: Option<u64>,
     probe_ok: Option<bool>,
     probe_unsupported: Option<bool>,
     probe_age_s: Option<u64>,
@@ -1413,10 +1415,10 @@ fn status(options: &Options) -> PeerResult<ExitCode> {
             node_id: node.to_string(),
             seq: head.map(|h| h.seq),
             root: head.map(|h| h.root.to_string()),
-            age_s: recovered
-                .and_then(|state| state.last_head_at)
-                .map(|at| now.saturating_sub(at) / 1000)
-                .or_else(|| head.map(|h| now.saturating_sub(h.folded_at) / 1000)),
+            heard_age_s: recovered
+                .and_then(|state| state.last_heard_at)
+                .map(|at| now.saturating_sub(at) / 1000),
+            folded_age_s: head.map(|h| now.saturating_sub(h.folded_at) / 1000),
             probe_ok: recovered.and_then(|state| state.last_probe.map(|probe| probe.ok)),
             probe_unsupported: recovered
                 .and_then(|state| state.last_probe.map(|probe| probe.unsupported)),
@@ -1572,12 +1574,15 @@ fn render(outcome: &StatusOutcome) {
         println!("no other device is admitted on this roster");
     }
     for device in &outcome.devices {
-        match (device.seq, &device.root, device.age_s) {
-            (Some(seq), Some(root), Some(age)) => println!(
-                "device  {}  head seq {seq}  root {}  {age}s ago  {} events folded  acks ours to \
-                 seq {}",
+        match (device.seq, &device.root, device.folded_age_s) {
+            (Some(seq), Some(root), Some(folded_age)) => println!(
+                "device  {}  head seq {seq}  root {}  HEARD {}  FOLDED {folded_age}s ago  {} \
+                 events folded  acks ours to seq {}",
                 short(&device.device),
                 short(root),
+                device
+                    .heard_age_s
+                    .map_or_else(|| "unknown".to_string(), |age| format!("{age}s ago")),
                 device.events_folded,
                 device
                     .acked
@@ -3208,7 +3213,8 @@ mod status_contract {
                 node_id: "node".into(),
                 seq: Some(1),
                 root: None,
-                age_s: None,
+                heard_age_s: None,
+                folded_age_s: None,
                 probe_ok: None,
                 probe_unsupported: None,
                 probe_age_s: None,

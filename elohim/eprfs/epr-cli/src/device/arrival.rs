@@ -416,7 +416,7 @@ fn sibling_check(root: &Path, current: &actor::DeviceState) -> Check {
         );
     };
     let siblings = actor::roster_siblings(root, &standing.handle, &standing.device);
-    exchange_check(&siblings, &standing.device, saved_heads())
+    exchange_check(&siblings, &standing.device, saved_heads(), saved_recovery())
 }
 
 /// The peer daemon's saved head table: `Ok(None)` when none has been saved.
@@ -429,6 +429,13 @@ fn saved_heads() -> Result<Option<eprfs_peer::HeadTable>, String> {
     eprfs_peer::HeadTable::load(&dir)
         .map(Some)
         .map_err(|e| e.to_string())
+}
+
+/// The peer daemon's bounded HEARD evidence. A missing file is an empty snapshot.
+#[cfg(feature = "peer")]
+fn saved_recovery() -> Result<eprfs_peer::PeerRecoveryStatus, String> {
+    let dir = crate::peer::peer_dir().map_err(|e| e.to_string())?;
+    Ok(eprfs_peer::PeerRecoveryStatus::load(&dir))
 }
 
 #[cfg(feature = "peer")]
@@ -484,7 +491,17 @@ fn saved_heads() -> Result<Option<()>, String> {
 }
 
 #[cfg(not(feature = "peer"))]
-fn exchange_check(siblings: &[String], _did: &str, heads: Result<Option<()>, String>) -> Check {
+fn saved_recovery() -> Result<(), String> {
+    Err("this epr was built without the peer feature, so it cannot read the peer's status".into())
+}
+
+#[cfg(not(feature = "peer"))]
+fn exchange_check(
+    siblings: &[String],
+    _did: &str,
+    heads: Result<Option<()>, String>,
+    _recovery: Result<(), String>,
+) -> Check {
     if siblings.is_empty() {
         return no_sibling();
     }
@@ -511,6 +528,7 @@ fn exchange_check(
     siblings: &[String],
     did: &str,
     heads: Result<Option<eprfs_peer::HeadTable>, String>,
+    recovery: Result<eprfs_peer::PeerRecoveryStatus, String>,
 ) -> Check {
     if siblings.is_empty() {
         return no_sibling();
@@ -535,10 +553,33 @@ fn exchange_check(
             )
         }
     };
+    let recovery = match recovery {
+        Ok(recovery) => recovery,
+        Err(why) => {
+            return Check::new(
+                SIBLING_CHECK,
+                State::Unknown,
+                why,
+                Some("restore access to the epr peer directory".into()),
+            )
+        }
+    };
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |d| u64::try_from(d.as_millis()).unwrap_or(u64::MAX));
     let ago = |at: u64| now.saturating_sub(at) / 1000;
+    let heard_at = |device: &str| {
+        recovery
+            .devices
+            .get(device)
+            .and_then(|state| state.last_heard_at)
+    };
+    let heard = |device: &str| {
+        heard_at(device).map_or_else(
+            || "HEARD unknown".to_string(),
+            |at| format!("HEARD {}s ago", ago(at)),
+        )
+    };
     let heads: Vec<(&String, &eprfs_peer::DeviceHead)> = siblings
         .iter()
         .filter_map(|sibling| table.devices.get(sibling).map(|head| (sibling, head)))
@@ -546,16 +587,17 @@ fn exchange_check(
     let acking = heads
         .iter()
         .filter_map(|(sibling, head)| head.folded.get(did).map(|seq| (sibling, head, seq)))
-        .max_by_key(|(_, head, _)| head.folded_at);
+        .max_by_key(|(sibling, head, _)| (heard_at(sibling).unwrap_or(0), head.folded_at));
     if let Some((sibling, head, seq)) = acking {
         return Check::new(
             SIBLING_CHECK,
             State::Ok,
             format!(
                 "{} acknowledges this device's head to seq {seq}; its own head (seq {}) was \
-                 folded here {}s ago",
+                 last {}, FOLDED {}s ago",
                 actor::short_did(sibling),
                 head.seq,
+                heard(sibling),
                 ago(head.folded_at)
             ),
             None,
@@ -583,10 +625,11 @@ fn exchange_check(
             SIBLING_CHECK,
             State::Degraded,
             format!(
-                "{} has a verified head here (seq {}, folded {}s ago), but no sibling \
+                "{} has a verified head here (seq {}, last {}, FOLDED {}s ago), but no sibling \
                  acknowledges this device's head",
                 actor::short_did(sibling),
                 head.seq,
+                heard(sibling),
                 ago(head.folded_at)
             ),
             Some(format!(
@@ -2792,10 +2835,10 @@ mod tests {
         let sibling = "did:key:z6MkSiblingDevice0000000000000000000".to_owned();
         let siblings = vec![sibling.clone()];
         assert_eq!(
-            exchange_check(&[], ours, Ok(None)).detail,
+            exchange_check(&[], ours, Ok(None), Ok(Default::default())).detail,
             "this device has no sibling in the roster"
         );
-        let unsaved = exchange_check(&siblings, ours, Ok(None));
+        let unsaved = exchange_check(&siblings, ours, Ok(None), Ok(Default::default()));
         assert_eq!(unsaved.state, State::Unknown);
         assert_eq!(
             unsaved.cure.as_deref(),
@@ -2803,7 +2846,12 @@ mod tests {
         );
         // Known endpoints and an empty table: nothing exchanged, never ok.
         let mut table = eprfs_peer::HeadTable::default();
-        let silent = exchange_check(&siblings, ours, Ok(Some(table.clone())));
+        let silent = exchange_check(
+            &siblings,
+            ours,
+            Ok(Some(table.clone())),
+            Ok(Default::default()),
+        );
         assert_eq!(silent.state, State::Degraded);
         assert!(silent.detail.contains("no verified head"), "{silent}");
         let now = std::time::SystemTime::now()
@@ -2811,6 +2859,14 @@ mod tests {
             .unwrap()
             .as_millis();
         let now = u64::try_from(now).unwrap();
+        let mut recovery = eprfs_peer::PeerRecoveryStatus::default();
+        recovery.devices.insert(
+            sibling.clone(),
+            eprfs_peer::DeviceRecoveryStatus {
+                last_heard_at: Some(now.saturating_sub(5_000)),
+                ..Default::default()
+            },
+        );
         let mut head = eprfs_peer::DeviceHead {
             seq: 4,
             root: eprfs_core::BlobCid::compute_bytes(b"sibling root"),
@@ -2822,7 +2878,12 @@ mod tests {
             coverage: None,
         };
         table.devices.insert(sibling.clone(), head.clone());
-        let unacked = exchange_check(&siblings, ours, Ok(Some(table.clone())));
+        let unacked = exchange_check(
+            &siblings,
+            ours,
+            Ok(Some(table.clone())),
+            Ok(recovery.clone()),
+        );
         assert_eq!(unacked.state, State::Degraded);
         assert!(
             unacked.detail.contains("no sibling acknowledges"),
@@ -2830,17 +2891,20 @@ mod tests {
         );
         head.folded.insert(ours.to_owned(), 2);
         table.devices.insert(sibling.clone(), head);
-        let exchanging = exchange_check(&siblings, ours, Ok(Some(table)));
+        let exchanging = exchange_check(&siblings, ours, Ok(Some(table)), Ok(recovery));
         assert_eq!(exchanging.state, State::Ok, "{exchanging}");
         assert!(exchanging.detail.contains(&actor::short_did(&sibling)));
         assert!(exchanging.detail.contains("to seq 2"));
+        assert!(exchanging.detail.contains("HEARD 5s ago"), "{exchanging}");
+        assert!(exchanging.detail.contains("FOLDED 90s ago"), "{exchanging}");
         assert!(exchanging.detail.contains("90s ago"), "{exchanging}");
         // A head from a device that is not this person's sibling is no exchange.
         assert_eq!(
             exchange_check(
                 &["did:key:z6MkSomeoneElse000000000000000000000".into()],
                 ours,
-                Ok(Some(eprfs_peer::HeadTable::default()))
+                Ok(Some(eprfs_peer::HeadTable::default())),
+                Ok(Default::default()),
             )
             .state,
             State::Degraded
