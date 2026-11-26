@@ -931,9 +931,18 @@ mod tests {
     use super::*;
 
     fn committed_fixture() -> tempfile::TempDir {
+        // The fixture is its own repository, so it stays out of the system temp directory.
+        // A device gate names the target directory; CI's nextest run does not (the eprfs
+        // pipeline was red on this one test from 2026-11-24), so the directory that holds
+        // this test binary, which is always inside the target directory, stands in.
         let target = std::env::var_os("CARGO_TARGET_DIR")
             .map(std::path::PathBuf::from)
-            .expect("the eprfs test contract supplies CARGO_TARGET_DIR");
+            .or_else(|| {
+                std::env::current_exe()
+                    .ok()
+                    .and_then(|exe| exe.parent().map(std::path::Path::to_path_buf))
+            })
+            .expect("a target directory: CARGO_TARGET_DIR or the test binary's own directory");
         let dir = tempfile::tempdir_in(target).unwrap();
         std::fs::create_dir_all(dir.path().join(".epr-meta")).unwrap();
         std::fs::write(

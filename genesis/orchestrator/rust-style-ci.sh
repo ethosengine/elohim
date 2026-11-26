@@ -19,6 +19,20 @@ else
     exit 2
   fi
 fi
+# The job clones 200 commits deep. A baseline older than that is outside the clone,
+# and an integration job whose baseline advances only on success could then never
+# measure again (orchestrator/dev #2474 onward, 2026-11-26: the baseline was 251
+# commits behind). Deepen to full history before calling the object missing; the
+# comparison below walks baseline..HEAD, so the baseline alone is not enough.
+if ! git rev-parse --verify --quiet "$style_base^{commit}" >/dev/null; then
+  if [[ "$(git rev-parse --is-shallow-repository 2>/dev/null)" == true ]]; then
+    echo "Rust style: baseline $style_base is outside the shallow clone; fetching full history." >&2
+    # No credential is bound in this stage: the forge serves this repository publicly,
+    # as the build-plan stage's own unshallow fetch relies on. Bounded, so a slow link
+    # ends in the refusal below and not in a hung job.
+    timeout 600 git fetch --no-tags --quiet --unshallow origin || true
+  fi
+fi
 if ! style_base="$(git rev-parse --verify "$style_base^{commit}")"; then
   echo 'Rust style UNMEASURED: trusted baseline object missing; restore integration history in the checkout.' >&2
   exit 2
