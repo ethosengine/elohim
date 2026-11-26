@@ -1529,86 +1529,79 @@ fn reingesting_an_existing_release_keeps_its_first_ingested_at() {
             && source.ingested_at != reingested.provenance.ingested_at
     }));
     assert_eq!(
-        reingested.extra[LAST_INGESTED_AT_FIELD],
-        json!(reingested.last_ingested_at())
+        reingested.last_ingested_at(),
+        reingested
+            .sources
+            .iter()
+            .map(|source| source.ingested_at.as_str())
+            .max()
+            .unwrap()
     );
 }
 
 #[test]
-fn saved_last_ingested_at_is_visible_to_pre_field_readers_as_extra() {
-    #[derive(serde::Deserialize)]
-    #[serde(rename_all = "camelCase")]
-    struct PreFieldRelease {
-        ingested_at: String,
-        #[serde(flatten)]
-        extra: serde_json::Map<String, Value>,
-    }
-
+fn saved_release_does_not_store_derived_or_legacy_last_ingested_at() {
     let mut f = Fixture::new("epr");
     f.store = f.store.clone().with_now("2026-11-26T08:00:00Z");
-    let release = f.release("pre-field-reader");
-    let bytes = fs::read(f.store.root.join(&release.cid).join("record.json")).unwrap();
-    let old: PreFieldRelease = serde_json::from_slice(&bytes).unwrap();
+    let mut release = f.release("derived-recency");
+    release
+        .extra
+        .insert("lastIngestedAt".into(), json!("2099-01-01T00:00:00Z"));
+    f.store.save(&release).unwrap();
 
-    assert_eq!(old.ingested_at, "2026-11-26T08:00:00Z");
-    assert_eq!(
-        old.extra[LAST_INGESTED_AT_FIELD],
-        json!("2026-11-26T08:00:00Z")
-    );
+    let record: Value =
+        files::read_json(&f.store.root.join(&release.cid).join("record.json")).unwrap();
+    assert_eq!(record["ingestedAt"], json!("2026-11-26T08:00:00Z"));
+    assert!(record.get("lastIngestedAt").is_none());
 }
 
+// gate-reads(eprfs): elohim/eprfs/device-runtime/tests/fixtures/release-recency
 #[test]
-fn gate_preflight_recency_matches_store_order_after_real_reingest() {
-    let mut f = Fixture::new("epr");
-    let runner = f.store.runner.clone();
-    f.store = Store::new(f.path("device-store/epr"), "epr", &f.registry)
-        .unwrap()
-        .with_runner(runner);
-    f.store = f.store.clone().with_now("2026-11-20T00:00:00Z");
-    let reingested = f.release("script-reingested");
-    f.store = f.store.clone().with_now("2026-11-21T00:00:00Z");
-    let other = f.release("script-other");
-    f.store = f.store.clone().with_now("2026-11-22T00:00:00Z");
-    let refreshed = f.release("script-reingested");
+fn shared_release_recency_fixtures_match_expected_times_and_cid_tie_order() {
+    #[derive(serde::Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct ExpectedCase {
+        name: String,
+        last_ingested_at: String,
+    }
+    #[derive(serde::Deserialize)]
+    struct Expected {
+        cases: Vec<ExpectedCase>,
+        order: Vec<String>,
+    }
 
-    let ordered = f.store.records();
-    assert_eq!(ordered[0].cid, refreshed.cid);
-    assert_eq!(ordered[1].cid, other.cid);
-    assert_eq!(refreshed.cid, reingested.cid);
+    let fixture_path = ["tests", "fixtures", "release-recency"].join(std::path::MAIN_SEPARATOR_STR);
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join(fixture_path);
+    let expected: Expected = files::read_json(&root.join("expected.json")).unwrap();
+    let mut records = expected
+        .cases
+        .into_iter()
+        .map(|case| {
+            let record: Release = files::read_json(&root.join(&case.name).join("record.json"))
+                .unwrap_or_else(|| panic!("missing recency fixture {}", case.name));
+            assert_eq!(
+                record.last_ingested_at(),
+                case.last_ingested_at,
+                "{}",
+                case.name
+            );
+            (case.name, record)
+        })
+        .collect::<Vec<_>>();
+    records.sort_by(|(_, left), (_, right)| {
+        right
+            .last_ingested_at()
+            .cmp(left.last_ingested_at())
+            .then_with(|| left.cid.cmp(&right.cid))
+    });
 
-    let script = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../genesis/orchestrator/gate-preflight.mjs");
-    let run = |head: &Release, inherited: &Release| {
-        f.head(head);
-        std::process::Command::new("node")
-            .arg(&script)
-            .arg("--epr-bin")
-            .env("EPR_STORE", f.store.root())
-            .env(
-                "EPR_BIN",
-                f.store.artifact(&inherited.cid).unwrap().join("epr"),
-            )
-            .env("GATE_ALLOW_EPR_BIN", "0")
-            .output()
-            .unwrap()
-    };
-
-    let newer = run(&other, &refreshed);
-    assert!(
-        newer.status.success(),
-        "{}",
-        String::from_utf8_lossy(&newer.stdout)
-    );
-    assert!(String::from_utf8_lossy(&newer.stdout).contains("WARN epr-bin"));
-    let older = run(&refreshed, &other);
     assert_eq!(
-        older.status.code(),
-        Some(3),
-        "stdout={} stderr={}",
-        String::from_utf8_lossy(&older.stdout),
-        String::from_utf8_lossy(&older.stderr)
+        records
+            .into_iter()
+            .map(|(name, _)| name)
+            .collect::<Vec<_>>(),
+        expected.order
     );
-    assert!(String::from_utf8_lossy(&older.stdout).contains("REFUSED epr-bin"));
 }
 
 #[test]
@@ -2293,6 +2286,30 @@ fn adopting_a_held_but_tampered_release_records_repair_without_changing_provenan
     assert_eq!(events[0]["kind"], "repair");
     assert_eq!(events[0]["path"], json!(f.path("cargo-bin/epr")));
     assert_eq!(events[0]["cid"], held.cid);
+}
+
+#[test]
+fn a_second_repair_from_the_same_path_appends_a_second_repair_event() {
+    let f = Fixture::new("epr");
+    let held = f.release("held-before-two-repairs");
+    let current = f.release("current-while-repairing-held-twice");
+    f.head(&current);
+    let original = fs::read(f.path("held-before-two-repairs/epr")).unwrap();
+    let held_path = f.store.root.join(&held.cid).join("epr");
+    let adopted_path = f.path("cargo-bin/epr");
+
+    for tamper in [b"first tamper".as_slice(), b"second tamper".as_slice()] {
+        atomic_bytes(&held_path, tamper, 0o755).unwrap();
+        atomic_bytes(&adopted_path, &original, 0o755).unwrap();
+        f.install().unwrap();
+    }
+
+    let events = adoption_events(&f, &held.cid);
+    assert_eq!(events.len(), 2);
+    assert!(events.iter().all(|event| event["kind"] == "repair"));
+    assert!(events
+        .iter()
+        .all(|event| event["path"] == json!(adopted_path)));
 }
 
 #[test]

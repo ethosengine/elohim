@@ -1,0 +1,13 @@
+{
+  "cid": "bafyreizzzzz",
+  "rcid": "bafyreizzzzz",
+  "tool": "epr",
+  "bins": {},
+  "version": null,
+  "sourceCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "treeClean": true,
+  "gateRun": null,
+  "ingestedAt": "2026-11-24T00:00:00Z",
+  "sources": [],
+  "ring": "dev-context"
+}

@@ -1,0 +1,16 @@
+{
+  "cases": [
+    { "name": "provenance-only", "lastIngestedAt": "2026-11-23T00:00:00Z" },
+    { "name": "newer-source", "lastIngestedAt": "2026-11-26T00:00:00Z" },
+    { "name": "older-source", "lastIngestedAt": "2026-11-25T00:00:00Z" },
+    { "name": "equal-time-low-cid", "lastIngestedAt": "2026-11-24T00:00:00Z" },
+    { "name": "equal-time-high-cid", "lastIngestedAt": "2026-11-24T00:00:00Z" }
+  ],
+  "order": [
+    "newer-source",
+    "older-source",
+    "equal-time-low-cid",
+    "equal-time-high-cid",
+    "provenance-only"
+  ]
+}

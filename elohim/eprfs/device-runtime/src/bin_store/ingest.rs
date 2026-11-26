@@ -327,7 +327,6 @@ impl Store {
                     Value::String(format!("failed: {reason}")),
                 );
             }
-            release.record_last_ingested_at();
             self.save(&release)?;
             Ok(release)
         })();
@@ -578,8 +577,9 @@ impl Store {
     }
 }
 
-/// Append at most one event for an adopted path beneath this release CID. The caller holds the
-/// store lock, so checking and appending form one decision with held-release verification.
+/// Append an event for a path beneath this release CID. Adoption is once per path; every repair
+/// remains visible. The caller holds the store lock, so checking and appending form one decision
+/// with held-release verification.
 fn append_adoption_event(
     events: &Path,
     kind: &str,
@@ -588,16 +588,18 @@ fn append_adoption_event(
     tool: &str,
     at: &str,
 ) -> Result<()> {
-    if fs::read_to_string(events).is_ok_and(|contents| {
-        contents.lines().any(|line| {
-            serde_json::from_str::<Value>(line)
-                .ok()
-                .is_some_and(|event| {
-                    event["path"] == json!(adopted_path)
-                        && event["kind"].as_str().unwrap_or("adoption") == kind
-                })
+    if kind == "adoption"
+        && fs::read_to_string(events).is_ok_and(|contents| {
+            contents.lines().any(|line| {
+                serde_json::from_str::<Value>(line)
+                    .ok()
+                    .is_some_and(|event| {
+                        event["path"] == json!(adopted_path)
+                            && event["kind"].as_str().unwrap_or("adoption") == kind
+                    })
+            })
         })
-    }) {
+    {
         return Ok(());
     }
     let existed = events.exists();
