@@ -121,7 +121,7 @@ test('cargo-deny: a push that changes no cargo input or deny.toml probes nothing
   assert.equal(thin.level, 'ok');
   assert.match(thin.why, /^not run: the push changes no deny\.toml, Cargo\.toml, Cargo\.lock/);
   assert.deepEqual(calls, [], 'not even the `command -v cargo-deny` probe');
-  for (const path of ['deny.toml', 'elohim/deny.toml', 'elohim/eprfs/Cargo.toml', 'elohim/Cargo.lock', 'rust-toolchain.toml', '.cargo/config.toml', 'genesis/agentic/pool-policy.json', 'sophia', '.gitmodules']) {
+  for (const path of ['deny.toml', 'elohim/deny.toml', 'elohim/eprfs/Cargo.toml', 'elohim/Cargo.lock', 'rust-toolchain.toml', '.cargo/config.toml', 'genesis/agentic/pool-policy.json', 'sophia', '.gitmodules', 'elohim/eprfs/build-manifest.json']) {
     const warn = checkCargoDeny({ root, projects: [app], spawn: absent, changed: ['a.md', path] });
     assert.equal(warn.level, 'WARN', path);
     assert.match(warn.cure, /cargo install --locked cargo-deny/);
@@ -218,7 +218,9 @@ test('cargo-locks: any cargo input in the push, no change list, or an unreadable
   const root = cargoTree(t);
   put(root, '.gitmodules', '[submodule "elohim/brit"]\n\tpath = elohim/brit\n');
   for (const path of ['ws/a/Cargo.toml', 'ws/Cargo.lock', 'Cargo.toml', 'elohim/epr/rust-toolchain.toml', 'rust-toolchain',
-    '.cargo/config.toml', 'elohim/x/.cargo/config', 'genesis/agentic/pool-policy.json', '.gitmodules', 'elohim/brit']) {
+    '.cargo/config.toml', 'elohim/x/.cargo/config', 'genesis/agentic/pool-policy.json', '.gitmodules', 'elohim/brit',
+    // A gate project's own run.cargo.env may pin RUSTUP_TOOLCHAIN: its manifest is a cargo input.
+    'elohim/eprfs/build-manifest.json', 'build-manifest.json']) {
     let ran = 0;
     const [r] = checkCargoLocks({ root, projects: [pa], spawn: () => { ran += 1; return { status: 101, stderr: STALE }; }, changed: ['a.md', path] });
     assert.equal(ran, 1, path);
