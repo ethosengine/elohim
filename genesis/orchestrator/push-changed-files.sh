@@ -11,11 +11,14 @@ tip=${2-}
 integration_ref=${3-origin/dev}
 zero_sha=0000000000000000000000000000000000000000
 
-if [ -z "$destination" ] || [ -z "$tip" ]; then
+# An empty tip names nothing to read: refuse. An empty destination (a malformed pre-push line) is read
+# as the hook's inline block read it before this script existed: the direct diff cannot be taken, so
+# the merge-base range is used, exactly as for a new ref.
+if [ -z "$tip" ]; then
   exit 4
 fi
 
-if [ "$destination" != "$zero_sha" ]; then
+if [ -n "$destination" ] && [ "$destination" != "$zero_sha" ]; then
   if changed=$(git diff --name-only "$destination" "$tip" 2>/dev/null); then
     [ -z "$changed" ] || printf '%s\n' "$changed"
     exit 0
