@@ -420,9 +420,18 @@ export function checkReadSets({ root, projects, registry, changed = null, read =
     'declare each with `// gate-reads: <repo-relative path>` beside the read; check: node genesis/orchestrator/gate-input-audit.mjs <project>');
 }
 
-/** Moved from after ALL CLEAR, keeping its scope: any non-empty selection, whenever installed. */
-export function checkCargoDeny({ root, projects, spawn = spawnSync }) {
+/**
+ * Moved from after ALL CLEAR, keeping its scope: any non-empty selection, whenever installed.
+ * Thin-device station 3: with a change list that holds no cargo input (cargoInputChange) and no
+ * deny.toml, the dependency graph and its boundary are what the destination already holds, so
+ * neither cargo-deny nor its install is asked for and one `ok` row says so. With no change list
+ * (`just gate`) it runs as before.
+ */
+export function checkCargoDeny({ root, projects, spawn = spawnSync, changed = null, read = readFileSync }) {
   if (!projects.length) return null;
+  if (Array.isArray(changed) && cargoInputChange(changed, { root, read, extra: DENY_INPUT }) === null) {
+    return row('cargo-deny-bans', 'ok', 'not run: the push changes no deny.toml, Cargo.toml, Cargo.lock, rust-toolchain file, .cargo config, toolchain pin or submodule pin');
+  }
   const which = spawn('bash', ['-c', 'command -v cargo-deny'], { encoding: 'utf8' });
   if (which.status !== 0) {
     return row('cargo-deny-bans', 'WARN', 'cargo-deny is not installed, so the deny.toml boundary is not checked on this device (CI still checks it)',
@@ -453,6 +462,7 @@ function cargoWorkspaceOf(root, dir) {
 const LOCK_STALE = /lock file .*needs to be updated|--locked was passed/i;
 
 const POOL_POLICY = 'genesis/agentic/pool-policy.json';
+const DENY_INPUT = /(^|\/)deny\.toml$/;
 const CARGO_INPUT = /(^|\/)(Cargo\.toml|Cargo\.lock|rust-toolchain(\.toml)?)$|(^|\/)\.cargo\//;
 
 /**
@@ -636,7 +646,7 @@ export function runPreflight({ root = ROOT, projects, env = process.env, spawn =
     ...timed(() => checkNodeModules({ root, projects })),
     ...DIST_CHECKS.flatMap(check => timed(() => check({ root, projects }))),
     ...timed(() => checkArk({ projects, env })),
-    ...timed(() => checkCargoDeny({ root, projects, spawn })),
+    ...timed(() => checkCargoDeny({ root, projects, spawn, changed: exact })),
     ...timed(() => checkCargoLocks({ root, projects, spawn, env, changed: exact })),
     ...timed(() => checkCBaselineOffer({ root, projects, env, spawn, hostTriple })),
     ...timed(() => checkReadSets({ root, projects, registry, changed, read })),
