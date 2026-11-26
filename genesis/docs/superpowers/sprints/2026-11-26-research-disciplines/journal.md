@@ -45,9 +45,9 @@ by something that runs.
 |---|---|---|---|---|
 | F0 | Correct the record, open the sprint | done: judged, landed 2026-11-26 03:43Z, verified on `origin/dev` file by file | `self/ethosengine-disciplines-f0` | `6187dff08`, `ab78d3ad0`, `baeb32247` |
 | F1 | Nothing is dropped silently | done as far as this sprint takes it: judged, landed 2026-11-26 04:43Z after an independent read on shem, verified on `origin/dev` (32 of its 33 files byte-identical; the habit register re-projected there) | `self/ethosengine-disciplines-f1` (carried the cleanup pass's two commits) | tip `198a4901b` |
-| F2 | Evidence carries its age | built, said, checked and judged (changes-requested, fixed, approved); its planned exercise owed | `self/ethosengine-disciplines-f2f3f4`, one carry with F3 and F4 | |
-| F3 | Another seat chooses the failure | built, said, checked and judged (approved); **exercise owed** (no drawn run yet), so not done | same carry | |
-| F4 | The brief carries position and a stop condition | said (one part proposed, not ruled), exercised, checked and judged (changes-requested, fixed, approved) | same carry | |
+| F2 | Evidence carries its age | built, said, checked and judged (changes-requested, fixed, approved); its planned exercise owed. Landed 2026-11-26 05:31Z after an independent read on shem as instructions; verified on `origin/dev`, all 59 files of the carry byte-identical. | `self/ethosengine-disciplines-f2f3f4`, one carry with F3 and F4 | tip `e3b077c80` |
+| F3 | Another seat chooses the failure | built, said, checked and judged (approved); **exercise owed** (no drawn run yet), so not done. Build landed with F2; shem declined the drawn run for now (its household is stopped and its lane reserved) | same carry | tip `e3b077c80` |
+| F4 | The brief carries position and a stop condition | said (one part proposed, not ruled), exercised, checked and judged (changes-requested, fixed, approved). Landed with F2 | same carry | tip `e3b077c80` |
 
 ## F0 record
 
@@ -370,9 +370,9 @@ after F0 is finished in the plan's own sense, and each says why:
 | Flight | Said | Exercised | Checked | Still owed |
 |---|---|---|---|---|
 | F1 | yes | yes: 8 notes, 66 takes, 29 rows | yes: habit red on 21 owed takes | nothing; landed and verified. The habit stays red until the owed takes have homes |
-| F2 | yes | by a read-only run only | yes: tests run directly | the planned exercise (a session start on ethosengine), and its landing |
-| F3 | yes | **no** | the build only | one drawn run whose record shows a chooser other than its runner; its landing |
-| F4 | yes; one part proposed | yes: every dispatch; one arrival read, 2 of 5 | yes | the steward's ruling on section 8; its landing |
+| F2 | yes | by a read-only run only | yes: tests run directly | the planned exercise (a session start on ethosengine). Landed and verified |
+| F3 | yes | **no** | the build only | one drawn run whose record shows a chooser other than its runner. The build is landed; the draw is made and its hash announced (`ee949d34…939c`); shem declined to run it for now, and where it runs is the steward's call |
+| F4 | yes; one part proposed | yes: every dispatch; one arrival read, 2 of 5 | yes | the steward's ruling on section 8. Landed and verified |
 
 The gate `eprfs-live-corpus` passed on ethosengine on the commit that carries F2, F3 and F4
 (`a1dee8022`); the commit after it changes this journal only. Those seven commits were then
@@ -383,6 +383,14 @@ text and re-projected. Of the 59 files the stack changed, 53 are byte-identical 
 after the replay; the six that differ are those two generated surfaces. The gate was run
 again on the replayed tip; its result is in the hand-over note. A change to the mesh scripts
 selects the `elohim-app` gate, which was not run here.
+
+**After the landing (2026-11-26 05:31Z).** Shem's independent reader cleared the carry as
+instructions ("no widening and no weakened stop") and left three follow-ups, none blocking;
+all three are made in one commit on `self/ethosengine-disciplines-followups`: a drawn run
+refuses unless its runner is named, a fanout scenario keeps the cycle's rule in draw mode, and
+the source-priority skill passes `--session` beside `--as`. Shem's gate for a change to the
+mesh recovery scripts was `steward-node`, 1,176 seconds, which is the cost of each further
+change to those scripts.
 
 ## For the steward, in one read
 
