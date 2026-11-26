@@ -658,11 +658,12 @@ fn exchange_check(
             }
             (None, _) => format!("HEARD unknown, FOLDED {fold_age_s}s ago"),
         };
-        // HEARD is recovery evidence and FOLDED is head evidence. Either fresh observation
-        // proves the exchange is live; healthy HEARD snapshots are intentionally flushed less
-        // often than channel freshness.
-        let liveness_age_s = heard_age_s.map_or(fold_age_s, |heard| heard.min(fold_age_s));
-        let liveness_is_fresh = liveness_age_s < freshness_s;
+        // The folded-from direction is judged by FOLDED alone (as 2f2c9c131 did). HEARD is shown,
+        // never counted: it is also written for Rollback and Replayed heads, and for a Fold head
+        // whose fold has not finished or failed, so a fresh HEARD with a stale FOLDED means this
+        // sibling's heads are NOT folding here. Idle needs no HEARD: re-announces come every 30 s
+        // and an unchanged root refreshes folded_at at once.
+        let liveness_is_fresh = fold_age_s < freshness_s;
         let Some(&acked_seq) = head.folded.get(did) else {
             stale.push(format!(
                 "{short} {ages}; acknowledges none of this device's heads (acknowledgement \
@@ -675,7 +676,7 @@ fn exchange_check(
         if liveness_is_fresh && unacknowledged_root_seq.is_none() {
             fresh.push(format!(
                 "{short} folded-from head seq {}; {ages}; it acknowledges this device to seq \
-                 {acked_seq}, carried {liveness_age_s}s ago",
+                 {acked_seq}, carried {fold_age_s}s ago",
                 head.seq
             ));
             continue;
@@ -683,8 +684,7 @@ fn exchange_check(
         let mut directions = Vec::new();
         if !liveness_is_fresh {
             directions.push(format!(
-                "{ages}; newer liveness age is {liveness_age_s}s and acknowledgement of this \
-                 device's head was carried {liveness_age_s}s ago"
+                "{ages}; acknowledgement of this device's head was carried {fold_age_s}s ago"
             ));
         }
         if let Some(root_seq) = unacknowledged_root_seq {
@@ -3077,7 +3077,7 @@ mod tests {
             root: eprfs_core::BlobCid::compute_bytes(b"sibling root"),
             at: NOW_MS,
             folded: std::collections::BTreeMap::new(),
-            folded_at: NOW_MS - 90_000,
+            folded_at: NOW_MS - 10_000,
             events_folded: 0,
             nack: Default::default(),
             coverage: None,
@@ -3108,7 +3108,7 @@ mod tests {
         assert!(exchanging.detail.contains(&actor::short_did(&sibling)));
         assert!(exchanging.detail.contains("to seq 2"));
         assert!(exchanging.detail.contains("HEARD 5s ago"), "{exchanging}");
-        assert!(exchanging.detail.contains("FOLDED 90s ago"), "{exchanging}");
+        assert!(exchanging.detail.contains("FOLDED 10s ago"), "{exchanging}");
 
         assert_eq!(
             exchange_check(
@@ -3261,7 +3261,7 @@ mod tests {
 
     #[cfg(feature = "peer")]
     #[test]
-    fn stale_exchange_names_the_newer_of_heard_and_folded_ages() {
+    fn stale_exchange_names_the_folded_age() {
         const NOW_MS: u64 = 1_000_000;
         let ours = "did:key:z6MkThisDevice000000000000000000000";
         let sibling = "did:key:z6MkSiblingDevice0000000000000000000".to_owned();
@@ -3285,14 +3285,16 @@ mod tests {
         assert!(check.detail.contains("HEARD 500s ago"), "{check}");
         assert!(check.detail.contains("FOLDED 120s ago"), "{check}");
         assert!(
-            check.detail.contains("newer liveness age is 120s"),
+            check
+                .detail
+                .contains("acknowledgement of this device's head was carried 120s ago"),
             "{check}"
         );
     }
 
     #[cfg(feature = "peer")]
     #[test]
-    fn fresh_heard_keeps_an_old_folded_carrier_live() {
+    fn fresh_heard_does_not_stand_in_for_a_head_that_is_not_folding() {
         const NOW_MS: u64 = 1_000_000;
         let ours = "did:key:z6MkThisDevice000000000000000000000";
         let sibling = "did:key:z6MkSiblingDevice0000000000000000000".to_owned();
@@ -3312,7 +3314,9 @@ mod tests {
             Some(90),
             NOW_MS,
         );
-        assert_eq!(check.state, State::Ok, "{check}");
+        // HEARD is written for Rollback, Replayed and unfinished or failed folds too: a fresh
+        // HEARD over a 900 s old fold means this sibling's heads are not folding here.
+        assert_eq!(check.state, State::Degraded, "{check}");
         assert!(check.detail.contains("HEARD 5s ago"), "{check}");
         assert!(check.detail.contains("FOLDED 900s ago"), "{check}");
     }
