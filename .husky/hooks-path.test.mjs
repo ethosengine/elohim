@@ -133,7 +133,7 @@ test('a main checkout whose pre-push.bash differs is named with the push form fo
   const lines = r.stdout.trim().split('\n');
   assert.equal(lines.length, 2, r.stdout);
   assert.equal(lines[1], `[hooks-path] NOTE: ${join(main, '.husky/pre-push.bash')} differs from this worktree's, and a plain push from here runs the main checkout's; `
-    + `to run this worktree's own hook: brit -c core.hooksPath=${join(worktree, '.husky/_')} push origin HEAD:<ref>`);
+    + `to run this worktree's own hook: GATE_EVIDENCE=reuse brit -c core.hooksPath=${join(worktree, '.husky/_')} push origin HEAD:<ref>`);
   // Every checkout still reads the main checkout's hook; nothing was repointed.
   assert.equal(git(main, 'config', '--get', 'core.hooksPath'), join(main, '.husky/_'));
   assert.equal(git(worktree, 'config', '--get', 'core.hooksPath'), join(main, '.husky/_'));
