@@ -587,6 +587,10 @@ async function main() {
   // resolves to endTree's answer. `held` keeps the lines printed meanwhile: when the stop turns out
   // not to apply (the leader ended on its own first), they are appended after all.
   let stopping = null;
+  // A signal delivered to the tap is an outside stop of the gate boundary. This is distinct from a
+  // signal delivered only to the detached recipe tree (OOM / RAM-guard shed), which never reaches
+  // this process and therefore keeps the recipe's resulting verdict.
+  let outsideSignal = null;
   let held = [];
   // The first red's outlook is written to the run log before its sibling note is sent, so the
   // detached sender reads it there; the tap waits for that write only (bounded, below).
@@ -598,7 +602,7 @@ async function main() {
       // A gate being stopped prints its own death (cargo's `signal: 15`, a test runner's abort):
       // those lines are the stop, not reds, and none is appended or sent while it is ended.
       if (!run) return;
-      if (stopping) { held.push(event); return; }
+      if (stopping || outsideSignal) { held.push(event); return; }
       deliver(event);
     },
   });
@@ -625,6 +629,7 @@ async function main() {
   const slotInterrupt = { signal: null };
   const earlySignals = [];
   const forward = signal => () => {
+    outsideSignal ??= signal;
     if (signalGate) signalGate(signal);
     else { slotInterrupt.signal ??= signal; earlySignals.push(signal); }
   };
@@ -638,7 +643,7 @@ async function main() {
   if (slot.interrupted) {
     try {
       writeSync(3, `${JSON.stringify({ signals: recognizer.signals(), ...recognizer.summary(),
-        stopped: { by: null, signal: slot.interrupted } })}\n`);
+        stopped: { by: null, signal: slot.interrupted, outside: true } })}\n`);
     } catch { /* no fd 3: run by hand */ }
     process.exit(signalExit(slot.interrupted));
   }
@@ -758,7 +763,12 @@ async function main() {
     if (stopProbe) clearInterval(stopProbe);
     const cost = sampler.sample();
     let stopped;
-    if (stopping) {
+    if (outsideSignal) {
+      stopped = { by: null, signal: outsideSignal, outside: true };
+      stopping = null;
+      held = [];
+      process.stderr.write(`[gate-tap] ${project}: stopped from outside (${outsideSignal}); no verdict is recorded for it\n`);
+    } else if (stopping) {
       const asked = stopping;
       const ended = await asked.ended;
       if (escapeTimer) clearTimeout(escapeTimer);
@@ -799,6 +809,10 @@ async function main() {
     };
     const exit = () => {
       if (run) noteUnsentReds(run);
+      if (outsideSignal) {
+        process.exit(signalExit(outsideSignal));
+        return;
+      }
       if (signal) {
         for (const s of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.removeAllListeners(s);
         process.kill(process.pid, signal);

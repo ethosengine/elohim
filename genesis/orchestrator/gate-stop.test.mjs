@@ -4,7 +4,7 @@
 import { describe, test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { spawn, spawnSync } from 'node:child_process';
-import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import { appendFileSync, chmodSync, closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -21,6 +21,39 @@ delete process.env.GATE_LIVE_REF;
 delete process.env.GATE_LIVE_RUN;
 // No berth: a closed fixture run must not send a sibling final.
 process.env.GATE_LIVE_SIBLING = 'off';
+
+function nodeCliEnv(extra = {}) {
+  const env = { ...process.env, ...extra };
+  delete env.NODE_TEST_CONTEXT;
+  delete env.NODE_TEST_WORKER_ID;
+  return env;
+}
+
+function outputCapture(prefix) {
+  const dir = mkdtempSync(resolve(tmpdir(), prefix));
+  const path = resolve(dir, 'output');
+  const fd = openSync(path, 'w');
+  let closed = false;
+  return {
+    fd,
+    close() {
+      if (!closed) { closeSync(fd); closed = true; }
+    },
+    read() {
+      this.close();
+      const output = readFileSync(path, 'utf8');
+      rmSync(dir, { recursive: true, force: true });
+      return output;
+    },
+  };
+}
+
+function spawnNodeSync(args, options = {}) {
+  const capture = outputCapture('gate-stop-cli-');
+  const result = spawnSync(process.execPath, args, { ...options, encoding: undefined, stdio: ['ignore', capture.fd, capture.fd] });
+  const output = capture.read();
+  return { ...result, stdout: output, stderr: '' };
+}
 
 const alive = pid => {
   const stat = readStat(pid);
@@ -61,17 +94,16 @@ function scratch(t, prefix) {
 
 // The tap, started asynchronously so the test can stop it mid-gate; fd 3 carries its summary.
 function startTap(run, script, env = {}) {
+  const capture = outputCapture('gate-tap-stderr-');
   const child = spawn(process.execPath, [TAP, '--project', 'fixture', '--run', run, '--', 'bash', script], {
-    stdio: ['ignore', 'pipe', 'pipe', 'pipe'],
-    env: { ...process.env, GATE_STOP_GRACE_MS: '1500', ...env },
+    stdio: ['ignore', 'ignore', capture.fd, 'pipe'],
+    env: nodeCliEnv({ GATE_STOP_GRACE_MS: '1500', ...env }),
   });
   let fd3 = '';
-  let stderr = '';
+  capture.close();
   child.stdio[3].on('data', chunk => { fd3 += chunk; });
-  child.stderr.on('data', chunk => { stderr += chunk; });
-  child.stdout.resume();
   const done = new Promise(res => child.on('close', (code, signal) => res({
-    code, signal, stderr, summary: fd3.trim() ? JSON.parse(fd3.trim().split('\n').pop()) : null,
+    code, signal, stderr: capture.read(), summary: fd3.trim() ? JSON.parse(fd3.trim().split('\n').pop()) : null,
   })));
   return { child, done };
 }
@@ -242,6 +274,76 @@ function evidenceFixture(t, prefix, { seconds, recipe = null }) {
   return { root, pids, run, project, calls, spawnFake, env };
 }
 
+function outsideSignalFixture(t) {
+  const scratchDir = scratch(t, 'gate-outside-signal-');
+  const root = resolve(scratchDir, 'repo');
+  const ready = resolve(scratchDir, 'ready');
+  const calls = resolve(scratchDir, 'calls');
+  const eprCalls = resolve(scratchDir, 'epr-calls');
+  mkdirSync(resolve(root, 'fixture'), { recursive: true });
+  mkdirSync(resolve(root, 'genesis/orchestrator'), { recursive: true });
+  mkdirSync(resolve(root, 'genesis/agentic/bin'), { recursive: true });
+  writeFileSync(resolve(root, '.gitignore'), '.eprfs/\n');
+  writeFileSync(resolve(root, 'fixture/build-manifest.json'), JSON.stringify({
+    pipeline: 'fixture',
+    steps: { build: { inputs: { sources: ['fixture/**'], buildProcess: ['justfile', 'genesis/orchestrator/run-local-gate.sh'] } } },
+    gate: { projects: { fixture: { dir: 'fixture', steps: ['build'], run: { kind: 'root-just', recipe: '_gate-fixture' } } } },
+  }));
+  writeFileSync(resolve(root, 'justfile'), '_gate-fixture:\n    true\n');
+  writeFileSync(resolve(root, 'genesis/orchestrator/run-local-gate.sh'), [
+    '#!/usr/bin/env bash',
+    'printf ready > "$OUTSIDE_READY"',
+    'exec sleep 300',
+  ].join('\n'), { mode: 0o755 });
+  for (const path of ['genesis/orchestrator/cargo-lint.mjs', 'genesis/orchestrator/gate-steps.sh', 'genesis/agentic/bin/pool-lib.sh']) {
+    writeFileSync(resolve(root, path), '\n');
+  }
+  const gitEnv = { ...process.env, GIT_AUTHOR_NAME: 'Fixture', GIT_AUTHOR_EMAIL: 'fixture@example.test',
+    GIT_COMMITTER_NAME: 'Fixture', GIT_COMMITTER_EMAIL: 'fixture@example.test' };
+  const git = args => spawnSync('git', args, { cwd: root, env: gitEnv, encoding: 'utf8' });
+  assert.equal(git(['init', '-q']).status, 0);
+  assert.equal(git(['add', '.']).status, 0);
+  assert.equal(git(['commit', '-qm', 'fixture']).status, 0);
+
+  const brit = resolve(scratchDir, 'brit');
+  writeFileSync(brit, `#!/usr/bin/env node
+const fs = require('node:fs');
+const args = process.argv.slice(2);
+fs.appendFileSync(process.env.OUTSIDE_CALLS, args.join(' ') + '\\n');
+const at = name => args.indexOf(name);
+if (args[0] === 'build' && args[1] === 'fingerprint') {
+  const step = args[at('--step') + 1];
+  fs.writeFileSync(1, JSON.stringify({ fingerprints: [{ step, fingerprint: 'fixture-fingerprint' }] }) + '\\n');
+} else if (at('find') >= 0) fs.writeFileSync(1, '[]\\n');
+else if (at('put') >= 0) fs.writeFileSync(1, 'bafyfixture\\n');
+else if (at('signer') >= 0) fs.writeFileSync(1, JSON.stringify({ agentId: 'ab'.repeat(32) }) + '\\n');
+`, { mode: 0o755 });
+  chmodSync(brit, 0o755);
+  const epr = resolve(scratchDir, 'epr');
+  writeFileSync(epr, '#!/usr/bin/env bash\nprintf "%s\\n" "$*" >> "$OUTSIDE_EPR_CALLS"\n', { mode: 0o755 });
+  chmodSync(epr, 0o755);
+  const env = {
+    ...nodeCliEnv(),
+    GATE_ROOT: root,
+    GATE_PREFLIGHT: 'off',
+    GATE_TASK: 'off',
+    GATE_INPUTS: 'off',
+    GATE_RECIPE_KEY: 'off',
+    GATE_READ_SHADOW: 'off',
+    GATE_GRADE: 'off',
+    GATE_READING: 'off',
+    GATE_EVIDENCE: 'off',
+    GATE_LIVE_SIBLING: 'off',
+    BRIT_BIN: brit,
+    BRIT_BUILD_REF_BIN: brit,
+    EPR_BIN: epr,
+    OUTSIDE_READY: ready,
+    OUTSIDE_CALLS: calls,
+    OUTSIDE_EPR_CALLS: eprCalls,
+  };
+  return { root, ready, calls, eprCalls, env };
+}
+
 // The stop comes from another process, as the integrator's does: runProject blocks this one.
 function stopperFor(run, pids, { immediate, marker = 'grandchild', afterMs = 0 }) {
   const code = `
@@ -255,6 +357,62 @@ function stopperFor(run, pids, { immediate, marker = 'grandchild', afterMs = 0 }
 }
 
 describe('a stopped gate records no evidence', () => {
+  test('TERM delivered to the gate tap records no verdict or evidence', { timeout: 60_000 }, async t => {
+    const fx = outsideSignalFixture(t);
+    const cli = resolve(HERE, 'gate-runner.mjs');
+    const stdoutCapture = outputCapture('gate-outside-stdout-');
+    const stderrCapture = outputCapture('gate-outside-stderr-');
+    const child = spawn(process.execPath, [cli, '--target', 'fixture'], {
+      cwd: fx.root,
+      env: fx.env,
+      stdio: ['ignore', stdoutCapture.fd, stderrCapture.fd],
+    });
+    stdoutCapture.close();
+    stderrCapture.close();
+    t.after(() => { try { child.kill('SIGTERM'); } catch { /* gone */ } });
+    assert.ok(await waitFor(() => existsSync(fx.ready)), 'the fixture gate did not start');
+    const tap = [...snapshot().values()].find(stat => stat.ppid === child.pid);
+    assert.ok(tap, 'the runner had no gate-tap child');
+    process.kill(tap.pid, 'SIGTERM');
+    const result = await new Promise(resolveDone => child.once('close', (code, signal) => resolveDone({ code, signal })));
+    const stdout = stdoutCapture.read();
+    const stderr = stderrCapture.read();
+
+    assert.deepEqual(result, { code: GATE_STOPPED_EXIT, signal: null }, stderr);
+    assert.match(stdout, /\[gate\] fixture: stopped from outside \(signal 15\); no verdict recorded/, `${stdout}\n${stderr}`);
+    assert.doesNotMatch(stdout, /evidence: recorded/);
+    const evidenceCalls = readFileSync(fx.calls, 'utf8');
+    assert.match(evidenceCalls, /build find/, 'the fixture had a recordable closure before it was stopped');
+    assert.doesNotMatch(evidenceCalls, /build put/);
+    const nativeCalls = existsSync(fx.eprCalls) ? readFileSync(fx.eprCalls, 'utf8') : '';
+    assert.doesNotMatch(nativeCalls, /flow (?:note|observe)/, nativeCalls);
+    const runPath = /live failures: .* --run (.+)\n/.exec(stdout)?.[1];
+    assert.ok(runPath, stdout);
+    const events = readRun(runPath).events;
+    assert.equal(events.filter(event => event.kind === 'gate-verdict').length, 0);
+    assert.deepEqual(events.filter(event => event.kind === 'gate-stopped').map(event => ({
+      project: event.project, by: event.by, signal: event.signal, evidence: event.evidence,
+    })), [{ project: 'fixture', by: null, signal: 'SIGTERM', evidence: 'none' }]);
+    assert.equal(events.at(-1).kind, 'run-close');
+    assert.equal(events.at(-1).outcome, 'interrupted');
+  });
+
+  test('TERM delivered only to the recipe leader keeps the red verdict and evidence', { timeout: 60_000 }, t => {
+    const fx = evidenceFixture(t, 'gate-child-term-evidence-', {
+      recipe: () => ['#!/usr/bin/env bash', 'kill -TERM $$'].join('\n'),
+    });
+    let output = '';
+    const status = runProject(fx.project, false, false, { root: fx.root, spawn: fx.spawnFake, tap: true, env: fx.env,
+      readingCollector: [], write: line => { output += line; }, warn: line => { output += line; } });
+
+    assert.equal(status, 1, output);
+    assert.equal(fx.calls.puts, 1, 'the recipe-only TERM records the red it reached');
+    const events = readRun(fx.run).events;
+    assert.equal(events.filter(event => event.kind === 'gate-stopped').length, 0);
+    assert.equal(events.filter(event => event.kind === 'gate-verdict').at(-1).verdict.exit, 1);
+    assert.match(output, /evidence: recorded/);
+  });
+
   test('stop --now: no put, no verdict note, no cycle observation, no reading; the close is the stopped line', { timeout: 60_000 }, async t => {
     const fx = evidenceFixture(t, 'gate-stop-evidence-', { seconds: 300 });
     const stopper = stopperFor(fx.run, fx.pids, { immediate: true });
@@ -480,7 +638,7 @@ describe('an escaped child does not hang the run', () => {
     assert.ok(Date.now() - asked < 16_000, 'the wait for the stray is bounded with loaded-host margin');
     assert.equal(result.code, 1, 'the leader\'s own red is the tap\'s exit');
     assert.equal(result.summary.stopped, undefined, 'not stopped: the recipe ended on its own');
-    assert.match(result.stderr, new RegExp(`holds its output: pid ${escaped} \\(sleep 30\\)`));
+    assert.match(result.stderr, new RegExp(`holds its output: pid ${escaped} \\([^)]*sleep [^)]*30\\)`));
     assert.match(result.stderr, /the recipe ended on its own \(exit 1\); its verdict stands, and the push is refused/);
     assert.equal(alive(escaped), true, 'never signalled');
   });
@@ -506,14 +664,14 @@ describe('an escaped child does not hang the run', () => {
     const tookMs = Date.now() - asked;
     assert.ok(tookMs < 28_000, `the tap ended in ${tookMs} ms although pid ${escaped} still holds its output`);
     assert.equal(alive(escaped), true, 'the escaped process is outside the tree and never signalled');
-    assert.match(result.stderr, new RegExp(`a process outside the gate's tree may still be running and holds its output: pid ${escaped} \\(sleep 30\\)`));
+    assert.match(result.stderr, new RegExp(`a process outside the gate's tree may still be running and holds its output: pid ${escaped} \\([^)]*sleep [^)]*30\\)`));
     assert.equal(result.summary.stopped.signal, 'SIGTERM');
     assert.deepEqual(result.summary.stopped.escaped.map(holder => holder.pid), [escaped]);
   });
 });
 
 describe('Ctrl-C still reaches the detached gate', () => {
-  test('SIGINT to the tap ends the gate group, and no stop is reported', { timeout: 60_000 }, async t => {
+  test('SIGINT to the tap ends the gate group and reports an outside stop', { timeout: 60_000 }, async t => {
     const dir = scratch(t, 'gate-stop-int-');
     const script = resolve(dir, 'gate.sh');
     // Foreground generations, as a recipe runs cargo: SIGINT reaches each through the group.
@@ -532,7 +690,7 @@ describe('Ctrl-C still reaches the detached gate', () => {
     const result = await done;
     for (const pid of pids) assert.equal(alive(pid), false, `pid ${pid} is gone`);
     assert.ok(result.code !== 0 || result.signal !== null);
-    assert.equal(result.summary?.stopped, undefined);
+    assert.deepEqual(result.summary?.stopped, { by: null, signal: 'SIGINT', outside: true });
   });
 
   test('SIGINT at the gate\'s first line, before the tap has settled, still ends the gate', { timeout: 60_000 }, async t => {
@@ -559,12 +717,11 @@ describe('Ctrl-C still reaches the detached gate', () => {
 
 // The real stop verb, run asynchronously so the test can act on the run while it waits.
 function startCli(run, args = []) {
+  const capture = outputCapture('gate-stop-live-cli-');
   const child = spawn(process.execPath, [LIVE, 'stop', ...args, '--run', run],
-    { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, EPR_BIN: '/nonexistent/epr', ELOHIM_SESSION_ID: 'session-cli' } });
-  let out = '';
-  child.stdout.on('data', chunk => { out += chunk; });
-  child.stderr.on('data', chunk => { out += chunk; });
-  return new Promise(res => child.on('close', code => res({ code, out })));
+    { stdio: ['ignore', capture.fd, capture.fd], env: nodeCliEnv({ EPR_BIN: '/nonexistent/epr', ELOHIM_SESSION_ID: 'session-cli' }) });
+  capture.close();
+  return new Promise(res => child.on('close', code => res({ code, out: capture.read() })));
 }
 async function requestOf(run) {
   await waitFor(() => readRun(run).events.some(event => event.kind === 'stop-request'));
@@ -577,7 +734,7 @@ describe('the stop CLI', () => {
     const { path: run } = openRun({ root, sha: 'e'.repeat(40), target: 'refs/heads/dev' });
     closeRun(run, 'gates-passed');
     const before = readFileSync(run, 'utf8');
-    const result = spawnSync(process.execPath, [LIVE, 'stop', '--now', '--run', run], { encoding: 'utf8', env: { ...process.env, EPR_BIN: '/nonexistent/epr' } });
+    const result = spawnNodeSync([LIVE, 'stop', '--now', '--run', run], { env: nodeCliEnv({ EPR_BIN: '/nonexistent/epr' }) });
     assert.equal(result.status, 1);
     assert.match(result.stdout, /this run has passed its last stop point; the push is proceeding/);
     assert.equal(readFileSync(run, 'utf8'), before, 'nothing appended');
@@ -589,7 +746,7 @@ describe('the stop CLI', () => {
     const old = new Date(Date.now() - 7 * 3600 * 1000);
     utimesSync(run, old, old);
     const before = readFileSync(run, 'utf8');
-    const result = spawnSync(process.execPath, [LIVE, 'stop', '--now', '--wait', '1', '--run', run], { encoding: 'utf8', env: { ...process.env, EPR_BIN: '/nonexistent/epr' } });
+    const result = spawnNodeSync([LIVE, 'stop', '--now', '--wait', '1', '--run', run], { env: nodeCliEnv({ EPR_BIN: '/nonexistent/epr' }) });
     assert.equal(result.status, 1);
     assert.match(result.stdout, /nothing was stopped: the run looks abandoned \(no record for 7 hours, never closed\)/);
     assert.equal(readFileSync(run, 'utf8'), before, 'nothing appended');
@@ -601,7 +758,7 @@ describe('the stop CLI', () => {
     closeRun(run, 'failed');
     const before = readFileSync(run, 'utf8');
     for (const args of [['stop', '--now', '--run', run], ['stop', '--run', run]]) {
-      const result = spawnSync(process.execPath, [LIVE, ...args], { encoding: 'utf8', env: { ...process.env, EPR_BIN: '/nonexistent/epr' } });
+      const result = spawnNodeSync([LIVE, ...args], { env: nodeCliEnv({ EPR_BIN: '/nonexistent/epr' }) });
       assert.equal(result.status, 1, 'exit 0 means this request stopped this run, and nothing was requested');
       assert.match(result.stdout, /nothing was stopped: the run already ended \(failed\); nothing appended/);
     }
@@ -611,8 +768,8 @@ describe('the stop CLI', () => {
   test('a stop the run never answers is unconfirmed: exit 2, and the push may be proceeding', { timeout: 60_000 }, t => {
     const root = scratch(t, 'gate-stop-idle-');
     const { path: run } = openRun({ root, sha: '1'.repeat(40), target: 'test' });
-    const result = spawnSync(process.execPath, [LIVE, 'stop', '--now', '--wait', '1', '--run', run],
-      { encoding: 'utf8', env: { ...process.env, EPR_BIN: '/nonexistent/epr', ELOHIM_SESSION_ID: 'session-cli' }, timeout: 10_000 });
+    const result = spawnNodeSync([LIVE, 'stop', '--now', '--wait', '1', '--run', run],
+      { env: nodeCliEnv({ EPR_BIN: '/nonexistent/epr', ELOHIM_SESSION_ID: 'session-cli' }), timeout: 10_000 });
     assert.equal(result.status, 2, result.stdout + result.stderr);
     assert.match(result.stdout, /stop requested but not confirmed by the run within 1 s; the push may be proceeding/);
     const request = readRun(run).events.find(event => event.kind === 'stop-request');
@@ -626,7 +783,7 @@ describe('the stop CLI', () => {
     const exitFile = resolve(fx.pids, 'cli-exit');
     const cli = spawn('bash', ['-c', `until [ -f "${resolve(fx.pids, 'grandchild')}" ]; do sleep 0.05; done; `
       + `"${process.execPath}" "${LIVE}" stop --now --wait 20 --run "${fx.run}" > "${resolve(fx.pids, 'cli-out')}"; echo $? > "${exitFile}"`],
-      { stdio: 'ignore', env: { ...process.env, EPR_BIN: '/nonexistent/epr', ELOHIM_SESSION_ID: 'session-cli' } });
+      { stdio: 'ignore', env: nodeCliEnv({ EPR_BIN: '/nonexistent/epr', ELOHIM_SESSION_ID: 'session-cli' }) });
     t.after(() => cli.kill());
     const status = runProject(fx.project, false, false, { root: fx.root, spawn: fx.spawnFake, tap: true, env: fx.env,
       readingCollector: [], write: () => {}, warn: () => {} });

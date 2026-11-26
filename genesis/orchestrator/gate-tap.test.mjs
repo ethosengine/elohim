@@ -1,6 +1,6 @@
 import { describe, test } from 'node:test';
 import { strict as assert } from 'node:assert';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { closeSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { resolve, dirname } from 'path';
@@ -8,6 +8,35 @@ import { fileURLToPath } from 'url';
 import { attributor, createCostSampler, drainSlotSession, lineSplitter, tapChildEnv } from './gate-tap.mjs';
 
 const TAP = resolve(dirname(fileURLToPath(import.meta.url)), 'gate-tap.mjs');
+
+function nodeCliEnv(extra = {}) {
+  const env = { ...process.env, ...extra };
+  delete env.NODE_TEST_CONTEXT;
+  delete env.NODE_TEST_WORKER_ID;
+  return env;
+}
+
+function spawnWithOutput(command, args, options = {}, { fd3 = false } = {}) {
+  const dir = mkdtempSync(resolve(tmpdir(), 'gate-tap-output-'));
+  const stdoutPath = resolve(dir, 'stdout');
+  const stderrPath = resolve(dir, 'stderr');
+  const stdoutFd = openSync(stdoutPath, 'w');
+  const stderrFd = openSync(stderrPath, 'w');
+  let result;
+  try {
+    result = spawnSync(command, args, {
+      ...options,
+      stdio: ['ignore', stdoutFd, stderrFd, ...(fd3 ? ['pipe'] : [])],
+    });
+  } finally {
+    closeSync(stdoutFd);
+    closeSync(stderrFd);
+  }
+  result.stdout = readFileSync(stdoutPath, options.encoding || 'utf8');
+  result.stderr = readFileSync(stderrPath, options.encoding || 'utf8');
+  rmSync(dir, { recursive: true, force: true });
+  return result;
+}
 
 // Two failing cargo tests, a panic for each, and the binary's verdict, the way cargo prints them.
 const CARGO_RED = [
@@ -41,11 +70,12 @@ function tap(t, script, { run = true } = {}) {
   // The pre-push hook and gate-runner export GATE_REMAINING, which makes the first red append an
   // outlook event. A fixture tap is not a gate in that run: inheriting it made this suite count
   // events differently inside a push (2 !== 1) than when run alone.
-  const env = { ...process.env };
+  const env = nodeCliEnv();
   delete env.GATE_REMAINING;
   env.GATE_LIVE_SIBLING = 'off';
-  const result = spawnSync(process.execPath, [TAP, '--project', 'fixture', ...(run ? ['--run', runPath] : []), '--', 'bash', '-c', script],
-    { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe', 'pipe'], timeout: 15000, env });
+  const result = spawnWithOutput(process.execPath,
+    [TAP, '--project', 'fixture', ...(run ? ['--run', runPath] : []), '--', 'bash', '-c', script],
+    { encoding: 'utf8', timeout: 15000, env }, { fd3: true });
   const events = run ? readFileSync(runPath, 'utf8').split('\n').filter(Boolean).map(line => JSON.parse(line)) : [];
   const summary = JSON.parse(String(result.output[3]).trim());
   return { result, events, summary };
@@ -91,7 +121,7 @@ describe('gate-tap', () => {
   });
 
   test('refuses a missing command with usage', { timeout: 60_000 }, () => {
-    const result = spawnSync(process.execPath, [TAP, '--project', 'x'], { encoding: 'utf8' });
+    const result = spawnWithOutput(process.execPath, [TAP, '--project', 'x'], { encoding: 'utf8', env: nodeCliEnv() });
     assert.equal(result.status, 2);
     assert.match(result.stderr, /usage: gate-tap/);
   });
@@ -143,7 +173,7 @@ describe('gate-tap', () => {
 
   test('truncates only the recognizer input while forwarding oversized lines unchanged', { timeout: 60_000 }, t => {
     const { result, events } = tap(t,
-      `node -e 'const line = "not ok 1 - " + "x".repeat(70000) + "\\n"; process.stdout.write(line); process.stderr.write(line);'`);
+      `line() { printf 'not ok 1 - '; head -c 70000 /dev/zero | tr '\\0' x; printf '\\n'; }; line; line >&2`);
     const line = 'not ok 1 - ' + 'x'.repeat(70000) + '\n';
     assert.equal(result.status, 0);
     assert.equal(result.stdout.length, line.length);
@@ -345,8 +375,8 @@ describe('gate-tap sibling notes', () => {
     writeFileSync(bin, `#!/bin/bash\n${sleepS ? `sleep ${sleepS}\n` : ''}if [ "$1" = say ]; then ${saySleepS ? `sleep ${saySleepS}; ` : ''}printf '%s\\n' "$*" >> "${dir}/says.log"; else cat "${dir}/notes.json"; fi\nexit ${exit}\n`, { mode: 0o755 });
     const runPath = resolve(dir, 'run.jsonl');
     writeFileSync(runPath, `${JSON.stringify({ v: 1, run: 'run', seq: 0, at: new Date().toISOString(), kind: 'run-open', candidate: { sha: 'x', target: 't' }, session: 'gate-session', ref: 'refs/heads/dev' })}\n`);
-    const env = { ...process.env, GATE_LIVE_BERTH_BIN: withBerth ? bin : resolve(dir, 'no-berth'),
-      GATE_LIVE_DEVICE: HERE, EPR_BIN: resolve(dir, 'missing-epr'), GATE_REMAINING: 'app other' };
+    const env = nodeCliEnv({ GATE_LIVE_BERTH_BIN: withBerth ? bin : resolve(dir, 'no-berth'),
+      GATE_LIVE_DEVICE: HERE, EPR_BIN: resolve(dir, 'missing-epr'), GATE_REMAINING: 'app other' });
     delete env.GATE_LIVE_SIBLING;
     return { dir, runPath, env };
   }
@@ -358,8 +388,9 @@ describe('gate-tap sibling notes', () => {
   };
   const runTap = (env, runPath, script) => {
     const started = Date.now();
-    const result = spawnSync(process.execPath, [TAP, '--project', 'fixture', '--run', runPath, '--', 'bash', '-c', script],
-      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe', 'pipe'], timeout: 20000, env });
+    const result = spawnWithOutput(process.execPath,
+      [TAP, '--project', 'fixture', '--run', runPath, '--', 'bash', '-c', script],
+      { encoding: 'utf8', timeout: 20000, env }, { fd3: true });
     return { result, ms: Date.now() - started };
   };
 
@@ -461,7 +492,9 @@ describe('gate-tap sibling notes', () => {
     assert.deepEqual(bodies.map(b => b.kind), ['gate-final@1'], 'the final, never a gate-red@1');
     assert.equal(bodies[0].failures, 0);
     assert.deepEqual(bodies[0].reds, []);
-    const followed = spawnSync(process.execPath, [GATE_LIVE, 'follow', '--run', runPath, '--timeout-ms', '3000'], { encoding: 'utf8', env, timeout: 10000 });
+    const followed = spawnWithOutput(process.execPath,
+      [GATE_LIVE, 'follow', '--run', runPath, '--timeout-ms', '3000'],
+      { encoding: 'utf8', env, timeout: 10000 });
     assert.equal(followed.status, 0, followed.stderr);
     assert.ok(followed.stdout.split('\n').includes(`[gate-live] NOTICE fixture offer-withheld: ${text}`), followed.stdout);
     assert.ok(!followed.stdout.includes('RED'), followed.stdout);

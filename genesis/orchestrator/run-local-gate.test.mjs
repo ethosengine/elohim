@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
 import {
   chmodSync,
+  closeSync,
   copyFileSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
+  openSync,
   readFileSync,
   readdirSync,
   rmSync,
@@ -22,6 +24,13 @@ import { slotGateLockPath } from "./gate-runner.mjs";
 const SCRIPT = join(import.meta.dirname, "run-local-gate.sh");
 const TAP = join(import.meta.dirname, "gate-tap.mjs");
 const BASE_PATH = "/usr/local/bin:/usr/bin:/bin";
+
+function nodeCliEnv(extra = {}) {
+  const env = { ...process.env, ...extra };
+  delete env.NODE_TEST_CONTEXT;
+  delete env.NODE_TEST_WORKER_ID;
+  return env;
+}
 
 function executable(path, body = "#!/bin/sh\nexit 0\n") {
   mkdirSync(join(path, ".."), { recursive: true });
@@ -53,20 +62,31 @@ function run(
     env = {},
   } = {},
 ) {
-  return spawnSync(
+  const capture = mkdtempSync(join(tmpdir(), "run-local-gate-output-"));
+  const stdoutPath = join(capture, "stdout");
+  const stderrPath = join(capture, "stderr");
+  const stdoutFd = openSync(stdoutPath, "w");
+  const stderrFd = openSync(stderrPath, "w");
+  const result = spawnSync(
     "bash",
     [script, fx.root, projectName, projectDir, "root-just", "gate"],
     {
       encoding: "utf8",
-      env: {
-        ...process.env,
+      env: nodeCliEnv({
         PATH: BASE_PATH,
         RUSTUP_TOOLCHAIN: "",
         ARK_BIN: fx.ark,
         ...env,
-      },
+      }),
+      stdio: ["ignore", stdoutFd, stderrFd],
     },
   );
+  closeSync(stdoutFd);
+  closeSync(stderrFd);
+  result.stdout = readFileSync(stdoutPath, "utf8");
+  result.stderr = readFileSync(stderrPath, "utf8");
+  rmSync(capture, { recursive: true, force: true });
+  return result;
 }
 
 function git(cwd, ...args) {
@@ -156,14 +176,17 @@ function startSlotGate(t, fx, {
   const lock = slotGateLockPath(slot);
   const backing = lock.slice(0, -".gate.lock".length);
   const waitResult = join(fx.dir, `${label}.slot-wait.tsv`);
+  const stdoutPath = join(fx.dir, `${label}.stdout`);
+  const stderrPath = join(fx.dir, `${label}.stderr`);
+  const stdoutFd = openSync(stdoutPath, "w");
+  const stderrFd = openSync(stderrPath, "w");
   const live = env.GATE_LIVE_RUN ? ["--run", env.GATE_LIVE_RUN] : [];
   const child = spawn(process.execPath, [TAP, "--project", projectName, ...live, "--", "bash",
     SCRIPT, fx.root, projectName, fx.projectDir, "root-just", "gate",
     targetDir ? "" : workspace, targetDir, "dev", "", waitResult, lock,
   ], {
     cwd: fx.root,
-    env: {
-      ...process.env,
+    env: nodeCliEnv({
       PATH: `${fx.bin}:${BASE_PATH}`,
       RUSTUP_TOOLCHAIN: "",
       GATE_TEST_SLOT_ROOT: fx.slotRoot,
@@ -176,21 +199,19 @@ function startSlotGate(t, fx, {
       GATE_SLOT_WAIT_RESULT: waitResult,
       GATE_TEST_RUN_TAG: tag,
       ...env,
-    },
+    }),
     detached: true,
-    stdio: ["ignore", "pipe", "pipe", "pipe"],
+    stdio: ["ignore", stdoutFd, stderrFd, "pipe"],
   });
-  let stdout = "";
-  let stderr = "";
+  closeSync(stdoutFd);
+  closeSync(stderrFd);
   let fd3 = "";
-  child.stdout.setEncoding("utf8");
-  child.stderr.setEncoding("utf8");
   child.stdio[3].setEncoding("utf8");
-  child.stdout.on("data", chunk => { stdout += chunk; });
-  child.stderr.on("data", chunk => { stderr += chunk; });
   child.stdio[3].on("data", chunk => { fd3 += chunk; });
+  const stdout = () => readFileSync(stdoutPath, "utf8");
+  const stderr = () => readFileSync(stderrPath, "utf8");
   const closed = new Promise(resolve => child.once("close", (status, signal) => {
-    resolve({ status, signal, stdout, stderr,
+    resolve({ status, signal, stdout: stdout(), stderr: stderr(),
       summary: fd3.trim() ? JSON.parse(fd3.trim().split("\n").at(-1)) : null });
   }));
   t.after(() => {
@@ -202,7 +223,7 @@ function startSlotGate(t, fx, {
     // gate for 27 minutes. Every process of this gate carries the tag, so all of them end here.
     killTagged(tag);
   });
-  return { child, closed, stdout: () => stdout, stderr: () => stderr, slot, lock, waitResult };
+  return { child, closed, stdout, stderr, slot, lock, waitResult };
 }
 
 async function waitUntil(predicate, message, timeoutMs = 15000) {  // setup waits only; a loaded host (gates run beside cargo) needs headroom
@@ -275,7 +296,7 @@ test("ending a gate tap releases its outside-the-group slot holder", { timeout: 
   assert.ok(Date.now() - killedAt < 10_000, "the released slot proceeds within a loaded-host margin");
   writeFileSync(release, "release\n");
   const killed = await holder.closed;
-  assert.equal(killed.signal, "SIGTERM");
+  assert.equal(killed.status, 143);
 });
 
 test("different workspace slots never wait on each other", { timeout: 60_000 }, async (t) => {
@@ -389,7 +410,7 @@ test("SIGINT while waiting for a cargo slot aborts admission with exit 130", { t
   waiter.child.kill("SIGINT");
   const result = await waiter.closed;
   assert.equal(result.status, 130, result.stderr);
-  assert.deepEqual(result.summary.stopped, { by: null, signal: "SIGINT" });
+  assert.deepEqual(result.summary.stopped, { by: null, signal: "SIGINT", outside: true });
   assert.equal(existsSync(waiter.waitResult), false, "an interrupted wait records no completed wait");
   assert.doesNotMatch(readFileSync(fx.events, "utf8"), /interrupted-waiter/);
   writeFileSync(release, "release\n");
@@ -503,7 +524,7 @@ test("a non-slot gate starts no slot session scan", { timeout: 60_000 }, (t) => 
   const trace = join(fx.dir, "proc-scans");
   const result = spawnSync(process.execPath, [TAP, "--project", "non-slot", "--", "bash", "-c", "exit 0"], {
     encoding: "utf8", stdio: ["ignore", "pipe", "pipe", "pipe"],
-    env: { ...process.env, GATE_SLOT_PROC_TRACE: trace },
+    env: nodeCliEnv({ GATE_SLOT_PROC_TRACE: trace }),
   });
   assert.equal(result.status, 0, result.stderr);
   assert.equal(existsSync(trace), false);
