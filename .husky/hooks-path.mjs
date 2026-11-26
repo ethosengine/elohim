@@ -71,7 +71,7 @@ function skewNote(top, hooks) {
   if (!shimsReady(join(own, '_'))) {
     return `${said}; this worktree has no complete ${join(own, '_')} to run its own from: run pnpm install here first`;
   }
-  return `${said}; to run this worktree's own hook: brit -c core.hooksPath=${join(own, '_')} push origin HEAD:<ref>`;
+  return `${said}; to run this worktree's own hook: GATE_EVIDENCE=reuse brit -c core.hooksPath=${join(own, '_')} push origin HEAD:<ref>`;
 }
 
 function main(cwd) {
