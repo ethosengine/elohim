@@ -3498,40 +3498,36 @@ fn non_builder_with_no_release_refuses_and_never_calls_cargo() {
         .unwrap_err();
 
     assert_eq!(refusal.kind, "not-a-builder");
-    assert_eq!(
-        refusal.detail,
-        format!(
-            "no release for {commit}; this device does not build (build-role carrier); draw it \
-             from did:key:z6MkBuilder once it holds one: epr bin follow --repo {}",
-            f.tmp.path().display()
-        )
-    );
+    assert!(refusal.detail.contains(&format!("no release for {commit}")));
+    assert!(refusal.detail.contains("verified current unavailable"));
+    assert!(refusal.detail.contains("no verified stored candidate"));
+    assert!(refusal.detail.contains("no local closure supplied"));
+    assert!(refusal
+        .detail
+        .contains("draw it from did:key:z6MkBuilder once it holds one"));
+    assert!(refusal.detail.contains(
+        "epr device build-role builder --until <RFC3339>; retry: epr bin follow --tool epr"
+    ));
     assert_eq!(cargo_build_calls(&f), 0);
 }
 
 #[test]
-fn unknown_build_role_refuses_closed_and_never_calls_cargo() {
-    let f = follow_fixture_without_release();
+fn non_builder_bootstrap_refuses_before_calling_cargo() {
+    let f = Fixture::new("epr");
     let commit = f.commit();
     let refusal = f
         .store
-        .follow_declared_for_build(
+        .bootstrap_for_build(
             f.tmp.path(),
             None,
-            &apply_follow(),
-            &FollowBuild::unknown("a builder device"),
+            &FollowBuild::not_builder("neither", "a builder device"),
         )
         .unwrap_err();
 
     assert_eq!(refusal.kind, "not-a-builder");
-    assert_eq!(
-        refusal.detail,
-        format!(
-            "no release for {commit}; this device does not build (build-role unknown); draw it \
-             from a builder device once it holds one: epr bin follow --repo {}",
-            f.tmp.path().display()
-        )
-    );
+    assert!(refusal.detail.contains(&format!("no release for {commit}")));
+    assert!(refusal.detail.contains("build-role neither"));
+    assert!(refusal.detail.contains("epr bin follow --tool epr"));
     assert_eq!(cargo_build_calls(&f), 0);
 }
 
@@ -3567,6 +3563,38 @@ fn non_builder_with_a_drawn_release_uses_it_without_calling_cargo() {
 
     assert_eq!(f.store.head("current"), Some(candidate.cid));
     assert_eq!(cargo_build_calls(&f), 0);
+}
+
+#[test]
+fn non_builder_observe_and_pinned_follows_refuse_before_calling_cargo() {
+    use ark_core::declaration::{Follow, FollowMode};
+
+    for follow in [
+        Follow {
+            channel: "bin:epr".into(),
+            mode: FollowMode::Observe,
+            pin: None,
+        },
+        Follow {
+            channel: "bin:epr".into(),
+            mode: FollowMode::Apply,
+            pin: Some("bafyreifixturepin".into()),
+        },
+    ] {
+        let f = follow_fixture_without_release();
+        let refusal = f
+            .store
+            .follow_declared_for_build(
+                f.tmp.path(),
+                None,
+                &follow,
+                &FollowBuild::not_builder("carrier", "a builder device"),
+            )
+            .unwrap_err();
+
+        assert_eq!(refusal.kind, "not-a-builder");
+        assert_eq!(cargo_build_calls(&f), 0);
+    }
 }
 
 #[test]

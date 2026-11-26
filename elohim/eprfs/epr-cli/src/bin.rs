@@ -21,48 +21,61 @@ fn argument(detail: impl Into<String>) -> Refusal {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum LocalBuildRole {
+pub(crate) enum LocalBuildRole {
     Builder,
     Other(String),
-    Unknown,
+    Unknown(String),
 }
 
 impl LocalBuildRole {
-    fn is_builder(&self) -> bool {
-        matches!(self, Self::Builder)
+    fn may_build(&self) -> bool {
+        matches!(self, Self::Builder | Self::Unknown(_))
     }
 
-    fn follow_build(&self, draw_from: &str) -> FollowBuild {
+    pub(crate) fn follow_build(&self, draw_from: &str) -> FollowBuild {
         match self {
             Self::Builder => FollowBuild::builder(),
             Self::Other(role) => FollowBuild::not_builder(role, draw_from),
-            Self::Unknown => FollowBuild::unknown(draw_from),
+            Self::Unknown(_) => FollowBuild::builder(),
+        }
+    }
+
+    pub(crate) fn warn_if_unknown(&self) {
+        if let Self::Unknown(reason) = self {
+            eprintln!(
+                "warning: build-role {reason}; building as before; declare it: epr device \
+                 build-role builder --until <RFC3339> | carrier | neither"
+            );
         }
     }
 }
 
 /// Read the same device-local `build-role.json` that `epr device status` reports, through its own
-/// reader. Missing, malformed, unsupported and expired records are unknown, so follow fails closed.
-fn local_build_role() -> LocalBuildRole {
+/// reader. Missing, malformed, unsupported and expired records preserve the historical build
+/// fallback and are surfaced by [`LocalBuildRole::warn_if_unknown`].
+pub(crate) fn local_build_role() -> LocalBuildRole {
     let path = match elohim_device_runtime::layout::resolve()
         .and_then(|layout| layout.config_dir().map(Path::to_owned))
     {
         Ok(config_dir) => crate::device::build_role_path(&config_dir),
-        Err(_) => return LocalBuildRole::Unknown,
+        Err(error) => return LocalBuildRole::Unknown(format!("unreadable: {error}")),
     };
-    std::fs::read(path)
-        .ok()
-        .as_deref()
-        .map_or(LocalBuildRole::Unknown, build_role_from_bytes)
+    match std::fs::read(&path) {
+        Ok(bytes) => build_role_from_bytes(&bytes),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            LocalBuildRole::Unknown("missing".into())
+        }
+        Err(error) => LocalBuildRole::Unknown(format!("unreadable: {}: {error}", path.display())),
+    }
 }
 
 fn build_role_from_bytes(bytes: &[u8]) -> LocalBuildRole {
     use crate::device::BuildRole;
     match crate::device::follow_build_role(bytes) {
-        Some(BuildRole::Builder) => LocalBuildRole::Builder,
-        Some(BuildRole::Carrier) => LocalBuildRole::Other("carrier".into()),
-        Some(BuildRole::Neither) => LocalBuildRole::Other("neither".into()),
-        None => LocalBuildRole::Unknown,
+        Ok(BuildRole::Builder) => LocalBuildRole::Builder,
+        Ok(BuildRole::Carrier) => LocalBuildRole::Other("carrier".into()),
+        Ok(BuildRole::Neither) => LocalBuildRole::Other("neither".into()),
+        Err(reason) => LocalBuildRole::Unknown(reason),
     }
 }
 
@@ -182,26 +195,27 @@ fn land_transition(
 pub fn run(args: &[String]) -> i32 {
     // Stdout is this verb's JSON; a restart after a landing speaks on stderr.
     crate::device::supervise::say_on_stderr();
-    match execute_with(args, true) {
+    match execute_with(args, true, true) {
         Ok(text) => {
             println!("{text}");
             0
         }
         Err(e) => {
+            let code = if e.kind == "not-a-builder" { 3 } else { 2 };
             eprintln!("{e}");
-            2
+            code
         }
     }
 }
 /// Run one bin verb without the restart after a landing: arrival asks the device ark itself
 /// (see `device::arrival_work::after_moves`).
 pub(crate) fn execute(args: &[String]) -> Result<String, Refusal> {
-    execute_with(args, false)
+    execute_with(args, false, false)
 }
 
 /// `restart`: a `follow` or forward `land` that moved current runs the hand command `epr device
 /// supervise` for the person (row 35; see [`restart_after_landing`]).
-fn execute_with(args: &[String], restart: bool) -> Result<String, Refusal> {
+fn execute_with(args: &[String], restart: bool, warn_role: bool) -> Result<String, Refusal> {
     let mut options = BTreeMap::new();
     let mut flags = BTreeSet::new();
     let mut positional = Vec::new();
@@ -385,13 +399,18 @@ fn execute_with(args: &[String], restart: bool) -> Result<String, Refusal> {
         "source-state" => store.source_state(&repo()?)?,
         "bootstrap" => {
             let repo = repo()?;
+            let build_role = local_build_role();
+            if warn_role {
+                build_role.warn_if_unknown();
+            }
             // The first arrival of a device that cannot build is the case the draw is for.
             let drawn = if closure.is_none() {
-                sibling::before_landing(&store, tool, &repo, true)?
+                sibling::before_landing(&store, tool, &repo, build_role.may_build())?
             } else {
-                sibling::Drawn::default()
+                sibling::Drawn::for_tool(tool)
             };
-            match store.bootstrap(&repo, closure) {
+            let build = build_role.follow_build(drawn.draw_from());
+            match store.bootstrap_for_build(&repo, closure, &build) {
                 Ok(release) => {
                     let mut value = json!(release);
                     if let (Some(record), Some(map)) = (drawn.record, value.as_object_mut()) {
@@ -415,11 +434,14 @@ fn execute_with(args: &[String], restart: bool) -> Result<String, Refusal> {
                     let repo = repo()?;
                     let before = current_cid(&store);
                     let build_role = local_build_role();
+                    if warn_role {
+                        build_role.warn_if_unknown();
+                    }
                     // A closure the caller supplied is the bytes to follow; nothing is drawn.
                     let drawn = if follow.mode.applies() && closure.is_none() {
-                        sibling::before_landing(&store, tool, &repo, build_role.is_builder())?
+                        sibling::before_landing(&store, tool, &repo, build_role.may_build())?
                     } else {
-                        sibling::Drawn::default()
+                        sibling::Drawn::for_tool(tool)
                     };
                     let build = build_role.follow_build(drawn.draw_from());
                     let mut value = match store
@@ -686,6 +708,8 @@ pub(crate) mod sibling {
         pub record: Option<Value>,
         /// The sibling device(s) whose offers were read, or the generic builder source.
         draw_from: String,
+        /// Sibling-path gaps retained for the final refusal as well as the immediate line.
+        attempts: Vec<String>,
     }
 
     impl Default for Drawn {
@@ -693,20 +717,40 @@ pub(crate) mod sibling {
             Self {
                 record: None,
                 draw_from: "a builder device".into(),
+                attempts: Vec::new(),
             }
         }
     }
 
     impl Drawn {
+        pub(crate) fn for_tool(tool: &str) -> Self {
+            Self {
+                record: None,
+                draw_from: fallback_source(tool),
+                attempts: Vec::new(),
+            }
+        }
+
         pub(crate) fn draw_from(&self) -> &str {
             &self.draw_from
         }
 
-        /// Return the follow's refusal. Draw gaps have already been printed at the fallback
-        /// decision, so appending one here would print the same reason twice.
-        pub(crate) fn explain(self, refusal: Refusal) -> Refusal {
+        /// Return the follow's refusal with the sibling answers retained as attempted paths.
+        pub(crate) fn explain(self, mut refusal: Refusal) -> Refusal {
+            if !self.attempts.is_empty() {
+                refusal.detail.push_str("; sibling attempts: ");
+                refusal.detail.push_str(&self.attempts.join("; "));
+            }
             refusal
         }
+    }
+
+    pub(crate) fn fallback_source(tool: &str) -> String {
+        #[cfg(feature = "peer")]
+        if tool == "epr" {
+            return "a builder device".into();
+        }
+        format!("no sibling path for {tool}")
     }
 
     #[cfg(feature = "peer")]
@@ -892,7 +936,7 @@ pub(crate) mod sibling {
         let can_build = may_build && has_pool;
         let knob = std::env::var(FOLLOW_SIBLING_ENV).ok();
         let Some((first, mut why)) = path(tool, can_build, knob.as_deref()) else {
-            return Ok(Drawn::default());
+            return Ok(Drawn::for_tool(tool));
         };
         if !may_build {
             why = "follow: drawing epr from a sibling first: this device does not build".into();
@@ -901,7 +945,7 @@ pub(crate) mod sibling {
         // is read here that could refuse before the follow's own checks.
         if !first {
             eprintln!("{why}");
-            return Ok(Drawn::default());
+            return Ok(Drawn::for_tool(tool));
         }
         let commit = store.source_state(repo)?["head"]
             .as_str()
@@ -909,7 +953,7 @@ pub(crate) mod sibling {
             .ok_or_else(|| refused("source-mismatch", "no source HEAD"))?;
         if store.holds_verified_for(&commit) {
             eprintln!("follow: epr for {commit} is already held; nothing to draw or build");
-            return Ok(Drawn::default());
+            return Ok(Drawn::for_tool(tool));
         }
         // Row 14: the follow lands only a published HEAD, so a draw for one that is not (or for
         // one a stale remote-tracking ref hides) is bytes paid for a refusal. Nothing is fetched.
@@ -917,10 +961,11 @@ pub(crate) mod sibling {
             Ok(reference) => reference,
             Err(detail) => {
                 let gap = format!("unpublished: {detail}");
-                if may_build {
-                    eprintln!("follow: nothing drawn from a sibling ({gap})");
-                }
-                return Ok(Drawn::default());
+                eprintln!("follow: nothing drawn from a sibling ({gap})");
+                return Ok(Drawn {
+                    attempts: vec![gap],
+                    ..Drawn::for_tool(tool)
+                });
             }
         };
         // Finding 5: say which ref made HEAD published, and when it is only a local branch.
@@ -951,22 +996,24 @@ pub(crate) mod sibling {
                 Ok(Drawn {
                     record: Some(record),
                     draw_from: draw_from(&answered),
+                    attempts: Vec::new(),
                 })
             }
             Err(Draw::Gap(gap)) => {
-                if may_build {
-                    eprintln!(
-                        "follow: nothing drawn from a sibling ({gap}); {}",
-                        if can_build {
-                            "building locally"
-                        } else {
-                            "trying a local build"
-                        }
-                    );
-                }
+                eprintln!(
+                    "follow: nothing drawn from a sibling ({gap}); {}",
+                    if !may_build {
+                        "this device does not build"
+                    } else if can_build {
+                        "building locally"
+                    } else {
+                        "trying a local build"
+                    }
+                );
                 Ok(Drawn {
                     record: None,
                     draw_from: draw_from(&answered),
+                    attempts: vec![gap],
                 })
             }
             Err(Draw::Refused(refusal)) => Err(refusal),
@@ -976,11 +1023,11 @@ pub(crate) mod sibling {
     #[cfg(not(feature = "peer"))]
     pub(crate) fn before_landing(
         _store: &Store,
-        _tool: &str,
+        tool: &str,
         _repo: &Path,
         _may_build: bool,
     ) -> Result<Drawn, Refusal> {
-        Ok(Drawn::default())
+        Ok(Drawn::for_tool(tool))
     }
 
     #[cfg(feature = "peer")]
@@ -1002,9 +1049,6 @@ pub(crate) mod sibling {
         let found = crate::peer::custody_artifacts(repo, None)
             .map_err(|e| Draw::Gap(format!("no-record: {e}")))?;
         let offers = offers(&found.rows, &found.device, commit);
-        answered.extend(offers.iter().map(|offer| offer.device.clone()));
-        answered.sort();
-        answered.dedup();
         if offers.is_empty() {
             return Err(Draw::Gap(format!(
                 "no-offer: no admitted sibling recorded a crossed Produce of epr and bin-launch \
@@ -1016,21 +1060,23 @@ pub(crate) mod sibling {
         let payload_format = crate::payload::existing_format(&payload_dir)
             .map_err(|e| Draw::Gap(format!("payload-store: {e}")))?;
         let host = ark_supervisor::host::observe_host();
-        draw_first(
-            store,
-            repo,
-            commit,
-            incoming,
-            &offers,
-            &Judges {
-                payload_format,
-                admit: &|_bin, document| admit_on(&host, document),
-                fetch: &|output, dest| {
-                    crate::artifact::fetch_output(repo, output, dest).map_err(|e| e.to_string())
-                },
-                staged: &|bin, bytes| staged_admit(&host, bin, bytes),
+        let judges = Judges {
+            payload_format,
+            admit: &|_bin, document| admit_on(&host, document),
+            fetch: &|output, dest| {
+                crate::artifact::fetch_output(repo, output, dest).map_err(|e| e.to_string())
             },
-        )
+            staged: &|bin, bytes| staged_admit(&host, bin, bytes),
+        };
+        answered.extend(
+            offers
+                .iter()
+                .filter(|offer| admissible(offer, judges.payload_format, judges.admit).is_ok())
+                .map(|offer| offer.device.clone()),
+        );
+        answered.sort();
+        answered.dedup();
+        draw_first(store, repo, commit, incoming, &offers, &judges)
     }
 
     #[cfg(feature = "peer")]
@@ -1412,7 +1458,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn follow_build_role_reads_builder_non_builder_and_unknown_fail_closed() {
+    fn follow_build_role_reads_declared_roles_and_unknown_builds_with_a_warning() {
         assert_eq!(
             build_role_from_bytes(
                 br#"{"version":1,"role":"builder","until":"2999-01-01T00:00:00Z"}"#
@@ -1423,16 +1469,20 @@ mod tests {
             build_role_from_bytes(br#"{"version":1,"role":"carrier"}"#),
             LocalBuildRole::Other("carrier".into())
         );
+        assert_eq!(
+            build_role_from_bytes(
+                br#"{"version":1,"role":"builder","until":"2000-01-01T00:00:00Z"}"#
+            ),
+            LocalBuildRole::Unknown("builder expired 2000-01-01T00:00:00Z".into())
+        );
         for unreadable in [
-            br#"{"version":1,"role":"builder","until":"2000-01-01T00:00:00Z"}"#.as_slice(),
-            br#"{"version":1,"role":"builder"}"#,
+            br#"{"version":1,"role":"builder"}"#.as_slice(),
             br#"{"version":2,"role":"neither"}"#,
             br#"{"version":1,"role":"neither","extra":true}"#,
             b"not json",
         ] {
-            assert_eq!(
-                build_role_from_bytes(unreadable),
-                LocalBuildRole::Unknown,
+            assert!(
+                matches!(build_role_from_bytes(unreadable), LocalBuildRole::Unknown(reason) if reason.starts_with("unreadable: ")),
                 "{}",
                 String::from_utf8_lossy(unreadable)
             );
@@ -1451,6 +1501,7 @@ mod tests {
             sibling::draw_from(&["did:key:z6MkA".into(), "did:key:z6MkB".into()]),
             "did:key:z6MkA, did:key:z6MkB"
         );
+        assert_eq!(sibling::fallback_source("brit"), "no sibling path for brit");
     }
 
     fn flags(values: &[&'static str]) -> BTreeSet<&'static str> {
