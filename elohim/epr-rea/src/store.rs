@@ -4,6 +4,8 @@
 
 use std::collections::HashSet;
 #[cfg(feature = "sidecar")]
+use std::ffi::OsStr;
+#[cfg(feature = "sidecar")]
 use std::fs::{self, OpenOptions};
 #[cfg(feature = "sidecar")]
 use std::io::Write;
@@ -12,7 +14,7 @@ use std::path::{Path, PathBuf};
 #[cfg(feature = "sidecar")]
 use std::sync::atomic::{AtomicBool, Ordering};
 #[cfg(feature = "sidecar")]
-use std::time::UNIX_EPOCH;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use cid::Cid;
 use elohim_epr::algedonic::AlgedonicEvidence;
@@ -225,9 +227,13 @@ pub struct SidecarFlowStore {
 }
 
 #[cfg(feature = "sidecar")]
-const VERIFIED_PREFIX_CACHE_SUFFIX: &str = ".verified-prefix-cache.json";
+const VERIFIED_PREFIX_CACHE_SUBDIRECTORY: &str = "elohim/flow-verified-prefix";
 #[cfg(feature = "sidecar")]
 const VERIFIED_PREFIX_CACHE_READERS: usize = 4;
+#[cfg(feature = "sidecar")]
+const VERIFIED_PREFIX_CACHE_FILES: usize = 64;
+#[cfg(feature = "sidecar")]
+const VERIFIED_PREFIX_CACHE_EXTENSION: &str = ".json";
 
 #[cfg(feature = "sidecar")]
 static CACHE_FALLBACK_REPORTED: AtomicBool = AtomicBool::new(false);
@@ -477,10 +483,17 @@ fn decode_flow_records_with_cache(
     log_path: &Path,
     contents: &str,
 ) -> Result<Vec<(u64, Cid, FlowRecord)>> {
-    let reader = reader_identity(log_path).ok();
+    #[cfg(not(test))]
+    let cache_directory = verified_prefix_cache_directory();
+    #[cfg(test)]
+    let cache_directory = None::<PathBuf>;
+    let reader = cache_directory
+        .as_ref()
+        .and_then(|_| reader_identity(log_path).ok());
     decode_flow_records_with_reader(
         log_path,
         contents,
+        cache_directory.as_deref(),
         reader.as_ref(),
         report_cache_fallback_once,
         report_cache_write_failure_once,
@@ -491,14 +504,15 @@ fn decode_flow_records_with_cache(
 fn decode_flow_records_with_reader(
     log_path: &Path,
     contents: &str,
+    cache_directory: Option<&Path>,
     reader: Option<&ReaderIdentity>,
     report_fallback: impl Fn(&str),
     report_write_failure: impl Fn(&FabricError),
 ) -> Result<Vec<(u64, Cid, FlowRecord)>> {
-    let Some(reader) = reader else {
+    let (Some(cache_directory), Some(reader)) = (cache_directory, reader) else {
         return decode_flow_records_with_offsets(contents);
     };
-    match cached_prefix(log_path, contents, reader) {
+    match cached_prefix(cache_directory, contents, reader) {
         CacheLookup::Hit(CachedPrefix {
             prefix_len,
             mut records,
@@ -512,6 +526,7 @@ fn decode_flow_records_with_reader(
             if prefix_len_usize < contents.len() {
                 advance_verified_prefix_cache(
                     log_path,
+                    cache_directory,
                     contents,
                     records.len(),
                     reader,
@@ -524,6 +539,7 @@ fn decode_flow_records_with_reader(
             let records = decode_flow_records_with_offsets(contents)?;
             advance_verified_prefix_cache(
                 log_path,
+                cache_directory,
                 contents,
                 records.len(),
                 reader,
@@ -536,6 +552,7 @@ fn decode_flow_records_with_reader(
             let records = decode_flow_records_with_offsets(contents)?;
             advance_verified_prefix_cache(
                 log_path,
+                cache_directory,
                 contents,
                 records.len(),
                 reader,
@@ -547,10 +564,8 @@ fn decode_flow_records_with_reader(
 }
 
 #[cfg(feature = "sidecar")]
-fn cached_prefix(log_path: &Path, contents: &str, reader: &ReaderIdentity) -> CacheLookup {
-    let Some(path) = verified_prefix_cache_path(log_path) else {
-        return CacheLookup::Miss;
-    };
+fn cached_prefix(cache_directory: &Path, contents: &str, reader: &ReaderIdentity) -> CacheLookup {
+    let path = verified_prefix_cache_path(cache_directory, &reader.log_path);
     let bytes = match fs::read(path) {
         Ok(bytes) => bytes,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return CacheLookup::Miss,
@@ -604,12 +619,15 @@ fn cached_prefix(log_path: &Path, contents: &str, reader: &ReaderIdentity) -> Ca
 #[cfg(feature = "sidecar")]
 fn advance_verified_prefix_cache(
     log_path: &Path,
+    cache_directory: &Path,
     contents: &str,
     record_count: usize,
     reader: &ReaderIdentity,
     report_write_failure: impl Fn(&FabricError),
 ) {
-    if let Err(error) = write_verified_prefix_cache(log_path, contents, record_count, reader) {
+    if let Err(error) =
+        write_verified_prefix_cache(log_path, cache_directory, contents, record_count, reader)
+    {
         report_write_failure(&error);
     }
 }
@@ -617,6 +635,7 @@ fn advance_verified_prefix_cache(
 #[cfg(feature = "sidecar")]
 fn write_verified_prefix_cache(
     log_path: &Path,
+    cache_directory: &Path,
     contents: &str,
     record_count: usize,
     reader: &ReaderIdentity,
@@ -631,8 +650,7 @@ fn write_verified_prefix_cache(
         digest: sha2_digest(contents.as_bytes()),
         record_count,
     };
-    let cache_path = verified_prefix_cache_path(log_path)
-        .ok_or_else(|| FabricError::Encode("flow log path has no file name".into()))?;
+    let cache_path = verified_prefix_cache_path(cache_directory, &reader.log_path);
 
     // Serialize cache writers with appenders on the log's own lock, but never wait for this
     // optimisation. Parsing and hashing stay outside the critical section.
@@ -644,6 +662,7 @@ fn write_verified_prefix_cache(
         Err(error) => return Err(error),
     };
     let current_log_len = fs::metadata(log_path)?.len();
+    fs::create_dir_all(cache_directory)?;
     let mut cache_map = match fs::read(&cache_path) {
         Ok(bytes) => serde_json::from_slice(&bytes).unwrap_or_default(),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
@@ -699,11 +718,13 @@ fn write_verified_prefix_cache(
     temp.write_all(&encoded)?;
     temp.sync_all()?;
     fs::rename(temp_path, cache_path)?;
+    prune_verified_prefix_cache_directory(cache_directory);
     Ok(true)
 }
 
 #[cfg(feature = "sidecar")]
 fn reader_identity(log_path: &Path) -> std::io::Result<ReaderIdentity> {
+    let log_path = fs::canonicalize(log_path)?;
     let executable_path = fs::canonicalize(std::env::current_exe()?)?;
     let metadata = fs::metadata(&executable_path)?;
     let modified = metadata.modified()?;
@@ -718,7 +739,7 @@ fn reader_identity(log_path: &Path) -> std::io::Result<ReaderIdentity> {
         executable_modified_secs: modified.as_secs(),
         executable_modified_nanos: modified.subsec_nanos(),
         reader_version: env!("CARGO_PKG_VERSION").to_string(),
-        log_path: log_path.to_path_buf(),
+        log_path,
     })
 }
 
@@ -737,9 +758,82 @@ fn report_cache_write_failure_once(error: &FabricError) {
 }
 
 #[cfg(feature = "sidecar")]
-fn verified_prefix_cache_path(log_path: &Path) -> Option<PathBuf> {
-    let name = log_path.file_name()?.to_string_lossy();
-    Some(log_path.with_file_name(format!("{name}{VERIFIED_PREFIX_CACHE_SUFFIX}")))
+fn verified_prefix_cache_directory() -> Option<PathBuf> {
+    verified_prefix_cache_directory_from(
+        std::env::var_os("XDG_CACHE_HOME").as_deref(),
+        std::env::var_os("HOME").as_deref(),
+    )
+}
+
+#[cfg(feature = "sidecar")]
+fn verified_prefix_cache_directory_from(
+    xdg_cache_home: Option<&OsStr>,
+    home: Option<&OsStr>,
+) -> Option<PathBuf> {
+    let base = xdg_cache_home
+        .map(PathBuf::from)
+        .filter(|path| path.is_absolute())
+        .or_else(|| {
+            home.map(PathBuf::from)
+                .filter(|path| path.is_absolute())
+                .map(|path| path.join(".cache"))
+        })?;
+    Some(base.join(VERIFIED_PREFIX_CACHE_SUBDIRECTORY))
+}
+
+#[cfg(feature = "sidecar")]
+fn verified_prefix_cache_path(cache_directory: &Path, canonical_log_path: &Path) -> PathBuf {
+    let digest = sha2_digest(canonical_log_path.as_os_str().as_encoded_bytes());
+    let mut name = String::with_capacity(digest.len() * 2 + VERIFIED_PREFIX_CACHE_EXTENSION.len());
+    for byte in digest {
+        use std::fmt::Write as _;
+        write!(name, "{byte:02x}").expect("writing to a String cannot fail");
+    }
+    name.push_str(VERIFIED_PREFIX_CACHE_EXTENSION);
+    cache_directory.join(name)
+}
+
+#[cfg(feature = "sidecar")]
+fn is_verified_prefix_cache_file(name: &OsStr) -> bool {
+    let Some(name) = name.to_str() else {
+        return false;
+    };
+    let Some(stem) = name.strip_suffix(VERIFIED_PREFIX_CACHE_EXTENSION) else {
+        return false;
+    };
+    stem.len() == 64
+        && stem
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+#[cfg(feature = "sidecar")]
+fn prune_verified_prefix_cache_directory(cache_directory: &Path) {
+    let Ok(entries) = fs::read_dir(cache_directory) else {
+        return;
+    };
+    let mut cache_files = entries
+        .filter_map(std::result::Result::ok)
+        .filter(|entry| is_verified_prefix_cache_file(&entry.file_name()))
+        .filter_map(|entry| {
+            let metadata = entry.metadata().ok()?;
+            metadata.is_file().then(|| {
+                (
+                    metadata.modified().unwrap_or(SystemTime::UNIX_EPOCH),
+                    entry.file_name(),
+                    entry.path(),
+                )
+            })
+        })
+        .collect::<Vec<_>>();
+    if cache_files.len() <= VERIFIED_PREFIX_CACHE_FILES {
+        return;
+    }
+    cache_files.sort_by(|left, right| left.0.cmp(&right.0).then(left.1.cmp(&right.1)));
+    let remove_count = cache_files.len() - VERIFIED_PREFIX_CACHE_FILES;
+    for (_, _, path) in cache_files.into_iter().take(remove_count) {
+        let _ = fs::remove_file(path);
+    }
 }
 
 #[cfg(feature = "sidecar")]
@@ -849,14 +943,18 @@ mod tests {
     }
 
     #[cfg(feature = "sidecar")]
-    fn read_cache_map(store: &SidecarFlowStore) -> VerifiedPrefixCacheMap {
-        let path = verified_prefix_cache_path(store.log_path()).unwrap();
+    fn read_cache_map(store: &SidecarFlowStore, cache_directory: &Path) -> VerifiedPrefixCacheMap {
+        let reader = reader_identity(store.log_path()).unwrap();
+        let path = verified_prefix_cache_path(cache_directory, &reader.log_path);
         serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap()
     }
 
     #[cfg(feature = "sidecar")]
-    fn read_cache_entries(store: &SidecarFlowStore) -> Vec<VerifiedPrefixCache> {
-        read_cache_map(store)
+    fn read_cache_entries(
+        store: &SidecarFlowStore,
+        cache_directory: &Path,
+    ) -> Vec<VerifiedPrefixCache> {
+        read_cache_map(store, cache_directory)
             .entries
             .into_iter()
             .map(|encoded| serde_json::from_str(&encoded).unwrap())
@@ -864,9 +962,9 @@ mod tests {
     }
 
     #[cfg(feature = "sidecar")]
-    fn read_cache(store: &SidecarFlowStore) -> VerifiedPrefixCache {
+    fn read_cache(store: &SidecarFlowStore, cache_directory: &Path) -> VerifiedPrefixCache {
         let reader = reader_identity(store.log_path()).unwrap();
-        read_cache_entries(store)
+        read_cache_entries(store, cache_directory)
             .into_iter()
             .find(|entry| entry.reader == reader)
             .unwrap()
@@ -881,13 +979,14 @@ mod tests {
             executable_modified_secs: 1_700_000_000,
             executable_modified_nanos: u32::try_from(label.len()).unwrap(),
             reader_version: env!("CARGO_PKG_VERSION").to_string(),
-            log_path: log_path.to_path_buf(),
+            log_path: std::fs::canonicalize(log_path).unwrap(),
         }
     }
 
     #[cfg(feature = "sidecar")]
     fn records_for_test_reader(
         store: &SidecarFlowStore,
+        cache_directory: Option<&Path>,
         reader: Option<&ReaderIdentity>,
         fallback_count: &std::cell::Cell<usize>,
         write_failure_count: &std::cell::Cell<usize>,
@@ -896,6 +995,7 @@ mod tests {
         decode_flow_records_with_reader(
             store.log_path(),
             &contents,
+            cache_directory,
             reader,
             |_| fallback_count.set(fallback_count.get() + 1),
             |_| write_failure_count.set(write_failure_count.get() + 1),
@@ -903,9 +1003,214 @@ mod tests {
     }
 
     #[cfg(feature = "sidecar")]
+    fn records_for_test_cache(
+        store: &SidecarFlowStore,
+        cache_directory: &Path,
+    ) -> Result<Vec<(Cid, FlowRecord)>> {
+        let reader = reader_identity(store.log_path()).unwrap();
+        let fallbacks = std::cell::Cell::new(0);
+        let write_failures = std::cell::Cell::new(0);
+        records_for_test_reader(
+            store,
+            Some(cache_directory),
+            Some(&reader),
+            &fallbacks,
+            &write_failures,
+        )
+        .map(|records| {
+            records
+                .into_iter()
+                .map(|(_, cid, record)| (cid, record))
+                .collect()
+        })
+    }
+
+    #[cfg(feature = "sidecar")]
+    fn directory_files(path: &Path) -> std::collections::BTreeMap<std::ffi::OsString, Vec<u8>> {
+        std::fs::read_dir(path)
+            .unwrap()
+            .map(|entry| {
+                let entry = entry.unwrap();
+                (entry.file_name(), std::fs::read(entry.path()).unwrap())
+            })
+            .collect()
+    }
+
+    #[cfg(feature = "sidecar")]
+    #[test]
+    fn verified_prefix_cache_directory_resolution_obeys_xdg_and_home_fallback() {
+        let absolute_xdg = Path::new("/device/cache");
+        let absolute_home = Path::new("/device/home");
+        assert_eq!(
+            verified_prefix_cache_directory_from(
+                Some(absolute_xdg.as_os_str()),
+                Some(absolute_home.as_os_str()),
+            ),
+            Some(absolute_xdg.join(VERIFIED_PREFIX_CACHE_SUBDIRECTORY))
+        );
+        assert_eq!(
+            verified_prefix_cache_directory_from(
+                Some(OsStr::new("relative-cache")),
+                Some(absolute_home.as_os_str()),
+            ),
+            Some(
+                absolute_home
+                    .join(".cache")
+                    .join(VERIFIED_PREFIX_CACHE_SUBDIRECTORY)
+            )
+        );
+        assert_eq!(
+            verified_prefix_cache_directory_from(
+                Some(OsStr::new("relative-cache")),
+                Some(OsStr::new("relative-home")),
+            ),
+            None
+        );
+        assert_eq!(verified_prefix_cache_directory_from(None, None), None);
+    }
+
+    #[cfg(feature = "sidecar")]
+    #[test]
+    fn verified_prefix_cache_cold_and_warm_reads_leave_log_directory_unchanged() {
+        let root = tempfile::tempdir().unwrap();
+        let cache_home = tempfile::tempdir().unwrap();
+        let cache_directory = cache_home.path().join(VERIFIED_PREFIX_CACHE_SUBDIRECTORY);
+        let mut store = SidecarFlowStore::open(root.path()).unwrap();
+        store
+            .append_batch(vec![
+                FlowRecord::Edge(edge("a", "b", 1, "first")),
+                FlowRecord::Edge(edge("b", "c", 2, "second")),
+            ])
+            .unwrap();
+        let log_directory = store.log_path().parent().unwrap();
+        let before = directory_files(log_directory);
+        assert!(!cache_directory.exists(), "reads create no cache directory");
+
+        let cold = records_for_test_cache(&store, &cache_directory).unwrap();
+        assert_eq!(directory_files(log_directory), before);
+        assert!(cache_directory.exists());
+        let warm = records_for_test_cache(&store, &cache_directory).unwrap();
+        assert_eq!(warm, cold);
+        assert_eq!(directory_files(log_directory), before);
+        assert!(!cache_directory.starts_with(root.path()));
+    }
+
+    #[cfg(feature = "sidecar")]
+    #[test]
+    fn verified_prefix_cache_without_a_resolved_directory_verifies_and_writes_nothing() {
+        let root = tempfile::tempdir().unwrap();
+        let untouched = tempfile::tempdir().unwrap();
+        let mut store = SidecarFlowStore::open(root.path()).unwrap();
+        store
+            .append(FlowRecord::Edge(edge("a", "b", 1, "first")))
+            .unwrap();
+        let reader = test_reader("no-cache", store.log_path());
+        let fallbacks = std::cell::Cell::new(0);
+        let write_failures = std::cell::Cell::new(0);
+
+        let records =
+            records_for_test_reader(&store, None, Some(&reader), &fallbacks, &write_failures)
+                .unwrap();
+
+        assert_eq!(records.len(), 1);
+        assert_eq!(fallbacks.get(), 0);
+        assert_eq!(write_failures.get(), 0);
+        assert!(directory_files(untouched.path()).is_empty());
+    }
+
+    #[cfg(feature = "sidecar")]
+    #[test]
+    fn verified_prefix_cache_file_names_and_entries_are_bound_to_the_canonical_log_path() {
+        let first_root = tempfile::tempdir().unwrap();
+        let second_root = tempfile::tempdir().unwrap();
+        let cache = tempfile::tempdir().unwrap();
+        let mut first = SidecarFlowStore::open(first_root.path()).unwrap();
+        let second = SidecarFlowStore::open(second_root.path()).unwrap();
+        first
+            .append(FlowRecord::Edge(edge("a", "b", 1, "first")))
+            .unwrap();
+        let contents = std::fs::read_to_string(first.log_path()).unwrap();
+        let first_reader = test_reader("same-reader", first.log_path());
+        let second_reader = test_reader("same-reader", second.log_path());
+        assert_ne!(
+            verified_prefix_cache_path(cache.path(), &first_reader.log_path),
+            verified_prefix_cache_path(cache.path(), &second_reader.log_path)
+        );
+
+        let collision_path = verified_prefix_cache_path(cache.path(), &first_reader.log_path);
+        let foreign = VerifiedPrefixCache {
+            reader: second_reader,
+            prefix_len: u64::try_from(contents.len()).unwrap(),
+            digest: sha2_digest(contents.as_bytes()),
+            record_count: 1,
+        };
+        std::fs::write(
+            collision_path,
+            serde_json::to_vec(&VerifiedPrefixCacheMap {
+                entries: vec![serde_json::to_string(&foreign).unwrap()],
+            })
+            .unwrap(),
+        )
+        .unwrap();
+        assert!(matches!(
+            cached_prefix(cache.path(), &contents, &first_reader),
+            CacheLookup::Miss
+        ));
+    }
+
+    #[cfg(feature = "sidecar")]
+    #[test]
+    fn verified_prefix_cache_directory_keeps_only_the_64_newest_cache_files() {
+        let root = tempfile::tempdir().unwrap();
+        let cache = tempfile::tempdir().unwrap();
+        let mut store = SidecarFlowStore::open(root.path()).unwrap();
+        store
+            .append(FlowRecord::Edge(edge("a", "b", 1, "first")))
+            .unwrap();
+        for index in 0_u64..65 {
+            let path = cache.path().join(format!("{index:064x}.json"));
+            let file = std::fs::File::create(path).unwrap();
+            file.set_times(
+                std::fs::FileTimes::new()
+                    .set_modified(UNIX_EPOCH + std::time::Duration::from_secs(index)),
+            )
+            .unwrap();
+        }
+        for name in [
+            "notes.json",
+            "ABCDEFABCDEFABCDEFABCDEFABCDEFABCDEFABCDEFABCDEFABCDEFABCDEFABCD.json",
+            "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff.tmp",
+        ] {
+            std::fs::write(cache.path().join(name), b"keep").unwrap();
+        }
+
+        records_for_test_cache(&store, cache.path()).unwrap();
+
+        let matching = std::fs::read_dir(cache.path())
+            .unwrap()
+            .map(std::result::Result::unwrap)
+            .filter(|entry| is_verified_prefix_cache_file(&entry.file_name()))
+            .count();
+        assert_eq!(matching, VERIFIED_PREFIX_CACHE_FILES);
+        assert!(!cache.path().join(format!("{:064x}.json", 0)).exists());
+        assert!(!cache.path().join(format!("{:064x}.json", 1)).exists());
+        assert!(cache.path().join(format!("{:064x}.json", 2)).exists());
+        assert!(cache.path().join("notes.json").exists());
+        assert!(cache
+            .path()
+            .join("ABCDEFABCDEFABCDEFABCDEFABCDEFABCDEFABCDEFABCDEFABCDEFABCDEFABCD.json")
+            .exists());
+        assert!(cache
+            .path()
+            .join("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff.tmp")
+            .exists());
+    }
+
+    #[cfg(feature = "sidecar")]
     #[test]
     fn verified_prefix_cache_warm_read_matches_cold_read() {
         let dir = tempfile::tempdir().unwrap();
+        let cache = tempfile::tempdir().unwrap();
         let mut store = SidecarFlowStore::open(dir.path()).unwrap();
         store
             .append_batch(vec![
@@ -914,11 +1219,12 @@ mod tests {
             ])
             .unwrap();
 
-        let cache_path = verified_prefix_cache_path(store.log_path()).unwrap();
+        let reader = reader_identity(store.log_path()).unwrap();
+        let cache_path = verified_prefix_cache_path(cache.path(), &reader.log_path);
         assert!(!cache_path.exists());
-        let cold = store.records().unwrap();
+        let cold = records_for_test_cache(&store, cache.path()).unwrap();
         assert!(cache_path.exists());
-        let warm = store.records().unwrap();
+        let warm = records_for_test_cache(&store, cache.path()).unwrap();
         assert_eq!(warm, cold);
 
         let indexed = store.records_with_offsets().unwrap();
@@ -937,6 +1243,7 @@ mod tests {
     #[test]
     fn verified_prefix_cache_middle_record_tamper_still_refuses_integrity() {
         let dir = tempfile::tempdir().unwrap();
+        let cache = tempfile::tempdir().unwrap();
         let mut store = SidecarFlowStore::open(dir.path()).unwrap();
         store
             .append_batch(vec![
@@ -945,7 +1252,7 @@ mod tests {
                 FlowRecord::Edge(edge("c", "d", 3, "third")),
             ])
             .unwrap();
-        store.records().unwrap();
+        records_for_test_cache(&store, cache.path()).unwrap();
 
         let contents = std::fs::read_to_string(store.log_path()).unwrap();
         let mut lines: Vec<String> = contents.lines().map(str::to_owned).collect();
@@ -957,7 +1264,7 @@ mod tests {
         lines[1] = serde_json::to_string(&middle).unwrap();
         std::fs::write(store.log_path(), lines.join("\n") + "\n").unwrap();
 
-        let error = store.records().unwrap_err();
+        let error = records_for_test_cache(&store, cache.path()).unwrap_err();
         assert!(matches!(error, FabricError::Integrity { .. }), "{error:?}");
     }
 
@@ -965,6 +1272,7 @@ mod tests {
     #[test]
     fn verified_prefix_cache_truncation_and_same_length_replacement_fall_back() {
         let truncated_dir = tempfile::tempdir().unwrap();
+        let truncated_cache = tempfile::tempdir().unwrap();
         let mut truncated_store = SidecarFlowStore::open(truncated_dir.path()).unwrap();
         truncated_store
             .append_batch(vec![
@@ -972,7 +1280,7 @@ mod tests {
                 FlowRecord::Edge(edge("b", "c", 2, "second")),
             ])
             .unwrap();
-        let before = truncated_store.records().unwrap();
+        let before = records_for_test_cache(&truncated_store, truncated_cache.path()).unwrap();
         let bytes = std::fs::read(truncated_store.log_path()).unwrap();
         let first_end = bytes.iter().position(|byte| *byte == b'\n').unwrap() + 1;
         std::fs::OpenOptions::new()
@@ -981,13 +1289,17 @@ mod tests {
             .unwrap()
             .set_len(u64::try_from(first_end).unwrap())
             .unwrap();
-        assert_eq!(truncated_store.records().unwrap(), before[..1]);
         assert_eq!(
-            read_cache(&truncated_store).prefix_len,
+            records_for_test_cache(&truncated_store, truncated_cache.path()).unwrap(),
+            before[..1]
+        );
+        assert_eq!(
+            read_cache(&truncated_store, truncated_cache.path()).prefix_len,
             u64::try_from(first_end).unwrap()
         );
 
         let replaced_dir = tempfile::tempdir().unwrap();
+        let replaced_cache = tempfile::tempdir().unwrap();
         let mut replaced_store = SidecarFlowStore::open(replaced_dir.path()).unwrap();
         replaced_store
             .append_batch(vec![
@@ -995,7 +1307,7 @@ mod tests {
                 FlowRecord::Edge(edge("b", "c", 2, "third_")),
             ])
             .unwrap();
-        replaced_store.records().unwrap();
+        records_for_test_cache(&replaced_store, replaced_cache.path()).unwrap();
         let original = std::fs::read_to_string(replaced_store.log_path()).unwrap();
         let replacement = original
             .lines()
@@ -1017,13 +1329,17 @@ mod tests {
         assert_eq!(replacement.len(), original.len());
         let expected = decode_flow_records(&replacement).unwrap();
         std::fs::write(replaced_store.log_path(), replacement).unwrap();
-        assert_eq!(replaced_store.records().unwrap(), expected);
+        assert_eq!(
+            records_for_test_cache(&replaced_store, replaced_cache.path()).unwrap(),
+            expected
+        );
     }
 
     #[cfg(feature = "sidecar")]
     #[test]
     fn verified_prefix_cache_edited_prefix_falls_back_to_full_verification() {
         let dir = tempfile::tempdir().unwrap();
+        let cache = tempfile::tempdir().unwrap();
         let mut store = SidecarFlowStore::open(dir.path()).unwrap();
         store
             .append_batch(vec![
@@ -1032,7 +1348,7 @@ mod tests {
                 FlowRecord::Edge(edge("c", "d", 3, "third")),
             ])
             .unwrap();
-        store.records().unwrap();
+        records_for_test_cache(&store, cache.path()).unwrap();
 
         let original = std::fs::read_to_string(store.log_path()).unwrap();
         let mut lines: Vec<String> = original.lines().map(str::to_owned).collect();
@@ -1048,23 +1364,31 @@ mod tests {
         let expected = decode_flow_records(&edited).unwrap();
         std::fs::write(store.log_path(), edited).unwrap();
 
-        assert_eq!(store.records().unwrap(), expected);
+        assert_eq!(
+            records_for_test_cache(&store, cache.path()).unwrap(),
+            expected
+        );
     }
 
     #[cfg(feature = "sidecar")]
     #[test]
     fn verified_prefix_cache_corrupt_falls_back_and_foreign_reader_is_a_silent_miss() {
         let dir = tempfile::tempdir().unwrap();
+        let cache_directory = tempfile::tempdir().unwrap();
         let mut store = SidecarFlowStore::open(dir.path()).unwrap();
         store
             .append(FlowRecord::Edge(edge("a", "b", 1, "first")))
             .unwrap();
-        let expected = store.records().unwrap();
-        let cache_path = verified_prefix_cache_path(store.log_path()).unwrap();
+        let expected = records_for_test_cache(&store, cache_directory.path()).unwrap();
+        let current = reader_identity(store.log_path()).unwrap();
+        let cache_path = verified_prefix_cache_path(cache_directory.path(), &current.log_path);
 
         std::fs::write(&cache_path, b"{not-json").unwrap();
-        assert_eq!(store.records().unwrap(), expected);
-        let mut foreign = read_cache(&store);
+        assert_eq!(
+            records_for_test_cache(&store, cache_directory.path()).unwrap(),
+            expected
+        );
+        let mut foreign = read_cache(&store, cache_directory.path());
         foreign.reader.reader_version = "another-reader-version".into();
         std::fs::write(
             &cache_path,
@@ -1076,10 +1400,10 @@ mod tests {
         .unwrap();
         let fallback_count = std::cell::Cell::new(0);
         let write_failure_count = std::cell::Cell::new(0);
-        let current = reader_identity(store.log_path()).unwrap();
         assert_eq!(
             records_for_test_reader(
                 &store,
+                Some(cache_directory.path()),
                 Some(&current),
                 &fallback_count,
                 &write_failure_count,
@@ -1091,7 +1415,7 @@ mod tests {
             expected
         );
         assert_eq!(fallback_count.get(), 0);
-        let cache = read_cache_entries(&store);
+        let cache = read_cache_entries(&store, cache_directory.path());
         assert_eq!(cache.len(), 2);
         assert!(cache.iter().any(|entry| entry.reader == foreign.reader));
         assert!(cache.iter().any(|entry| entry.reader == current));
@@ -1101,6 +1425,7 @@ mod tests {
     #[test]
     fn verified_prefix_cache_alternating_readers_keep_their_own_warm_entries() {
         let dir = tempfile::tempdir().unwrap();
+        let cache = tempfile::tempdir().unwrap();
         let mut store = SidecarFlowStore::open(dir.path()).unwrap();
         store
             .append(FlowRecord::Edge(edge("a", "b", 1, "first")))
@@ -1110,29 +1435,58 @@ mod tests {
         let fallbacks = std::cell::Cell::new(0);
         let write_failures = std::cell::Cell::new(0);
 
-        records_for_test_reader(&store, Some(&a), &fallbacks, &write_failures).unwrap();
-        records_for_test_reader(&store, Some(&b), &fallbacks, &write_failures).unwrap();
-        records_for_test_reader(&store, Some(&a), &fallbacks, &write_failures).unwrap();
-        records_for_test_reader(&store, Some(&b), &fallbacks, &write_failures).unwrap();
+        records_for_test_reader(
+            &store,
+            Some(cache.path()),
+            Some(&a),
+            &fallbacks,
+            &write_failures,
+        )
+        .unwrap();
+        records_for_test_reader(
+            &store,
+            Some(cache.path()),
+            Some(&b),
+            &fallbacks,
+            &write_failures,
+        )
+        .unwrap();
+        records_for_test_reader(
+            &store,
+            Some(cache.path()),
+            Some(&a),
+            &fallbacks,
+            &write_failures,
+        )
+        .unwrap();
+        records_for_test_reader(
+            &store,
+            Some(cache.path()),
+            Some(&b),
+            &fallbacks,
+            &write_failures,
+        )
+        .unwrap();
 
         assert_eq!(fallbacks.get(), 0);
         assert_eq!(write_failures.get(), 0);
         let contents = std::fs::read_to_string(store.log_path()).unwrap();
         assert!(matches!(
-            cached_prefix(store.log_path(), &contents, &a),
+            cached_prefix(cache.path(), &contents, &a),
             CacheLookup::Hit(_)
         ));
         assert!(matches!(
-            cached_prefix(store.log_path(), &contents, &b),
+            cached_prefix(cache.path(), &contents, &b),
             CacheLookup::Hit(_)
         ));
-        assert_eq!(read_cache_entries(&store).len(), 2);
+        assert_eq!(read_cache_entries(&store, cache.path()).len(), 2);
     }
 
     #[cfg(feature = "sidecar")]
     #[test]
     fn verified_prefix_cache_replacing_one_reader_preserves_other_entry_bytes() {
         let dir = tempfile::tempdir().unwrap();
+        let cache_directory = tempfile::tempdir().unwrap();
         let mut store = SidecarFlowStore::open(dir.path()).unwrap();
         store
             .append(FlowRecord::Edge(edge("a", "b", 1, "first")))
@@ -1141,11 +1495,25 @@ mod tests {
         let b = test_reader("b", store.log_path());
         let fallbacks = std::cell::Cell::new(0);
         let write_failures = std::cell::Cell::new(0);
-        records_for_test_reader(&store, Some(&a), &fallbacks, &write_failures).unwrap();
-        records_for_test_reader(&store, Some(&b), &fallbacks, &write_failures).unwrap();
+        records_for_test_reader(
+            &store,
+            Some(cache_directory.path()),
+            Some(&a),
+            &fallbacks,
+            &write_failures,
+        )
+        .unwrap();
+        records_for_test_reader(
+            &store,
+            Some(cache_directory.path()),
+            Some(&b),
+            &fallbacks,
+            &write_failures,
+        )
+        .unwrap();
 
-        let cache_path = verified_prefix_cache_path(store.log_path()).unwrap();
-        let mut cache = read_cache_map(&store);
+        let cache_path = verified_prefix_cache_path(cache_directory.path(), &a.log_path);
+        let mut cache = read_cache_map(&store, cache_directory.path());
         let b_index = cache
             .entries
             .iter()
@@ -1164,9 +1532,16 @@ mod tests {
         store
             .append(FlowRecord::Edge(edge("b", "c", 2, "second")))
             .unwrap();
-        records_for_test_reader(&store, Some(&a), &fallbacks, &write_failures).unwrap();
+        records_for_test_reader(
+            &store,
+            Some(cache_directory.path()),
+            Some(&a),
+            &fallbacks,
+            &write_failures,
+        )
+        .unwrap();
 
-        assert!(read_cache_map(&store)
+        assert!(read_cache_map(&store, cache_directory.path())
             .entries
             .iter()
             .any(|encoded| encoded == &b_bytes));
@@ -1176,6 +1551,7 @@ mod tests {
     #[test]
     fn verified_prefix_cache_never_trusts_another_reader_identity() {
         let dir = tempfile::tempdir().unwrap();
+        let cache = tempfile::tempdir().unwrap();
         let store = SidecarFlowStore::open(dir.path()).unwrap();
         let future_record = FlowRecord::Edge(edge("a", "b", 1, "future"));
         let mut raw = serde_json::to_value(SidecarLine {
@@ -1189,26 +1565,35 @@ mod tests {
         std::fs::write(store.log_path(), &contents).unwrap();
         let a = test_reader("new-reader-a", store.log_path());
         let b = test_reader("old-reader-b", store.log_path());
-        assert!(write_verified_prefix_cache(store.log_path(), &contents, 1, &a).unwrap());
+        assert!(
+            write_verified_prefix_cache(store.log_path(), cache.path(), &contents, 1, &a).unwrap()
+        );
 
         let fallbacks = std::cell::Cell::new(0);
         let write_failures = std::cell::Cell::new(0);
-        let error =
-            records_for_test_reader(&store, Some(&b), &fallbacks, &write_failures).unwrap_err();
+        let error = records_for_test_reader(
+            &store,
+            Some(cache.path()),
+            Some(&b),
+            &fallbacks,
+            &write_failures,
+        )
+        .unwrap_err();
 
         assert!(
             matches!(error, FabricError::NewerWriter { .. }),
             "{error:?}"
         );
         assert_eq!(fallbacks.get(), 0);
-        assert_eq!(read_cache_entries(&store).len(), 1);
-        assert_eq!(read_cache_entries(&store)[0].reader, a);
+        assert_eq!(read_cache_entries(&store, cache.path()).len(), 1);
+        assert_eq!(read_cache_entries(&store, cache.path())[0].reader, a);
     }
 
     #[cfg(feature = "sidecar")]
     #[test]
     fn verified_prefix_cache_keeps_four_readers_and_evicts_the_oldest_write() {
         let dir = tempfile::tempdir().unwrap();
+        let cache_directory = tempfile::tempdir().unwrap();
         let mut store = SidecarFlowStore::open(dir.path()).unwrap();
         store
             .append(FlowRecord::Edge(edge("a", "b", 1, "first")))
@@ -1219,10 +1604,17 @@ mod tests {
         let fallbacks = std::cell::Cell::new(0);
         let write_failures = std::cell::Cell::new(0);
         for reader in &readers {
-            records_for_test_reader(&store, Some(reader), &fallbacks, &write_failures).unwrap();
+            records_for_test_reader(
+                &store,
+                Some(cache_directory.path()),
+                Some(reader),
+                &fallbacks,
+                &write_failures,
+            )
+            .unwrap();
         }
 
-        let cache = read_cache_entries(&store);
+        let cache = read_cache_entries(&store, cache_directory.path());
         assert_eq!(cache.len(), VERIFIED_PREFIX_CACHE_READERS);
         assert!(!cache.iter().any(|entry| entry.reader == readers[0]));
         assert_eq!(
@@ -1238,6 +1630,7 @@ mod tests {
     #[test]
     fn verified_prefix_cache_busy_writer_is_skipped_without_losing_records() {
         let dir = tempfile::tempdir().unwrap();
+        let cache = tempfile::tempdir().unwrap();
         let mut store = SidecarFlowStore::open(dir.path()).unwrap();
         store
             .append(FlowRecord::Edge(edge("a", "b", 1, "first")))
@@ -1252,6 +1645,7 @@ mod tests {
         let records = decode_flow_records_with_reader(
             store.log_path(),
             &contents,
+            Some(cache.path()),
             Some(&reader),
             |_| fallbacks.set(fallbacks.get() + 1),
             |_| write_failures.set(write_failures.get() + 1),
@@ -1267,15 +1661,14 @@ mod tests {
         );
         assert_eq!(fallbacks.get(), 0);
         assert_eq!(write_failures.get(), 0);
-        assert!(!verified_prefix_cache_path(store.log_path())
-            .unwrap()
-            .exists());
+        assert!(!verified_prefix_cache_path(cache.path(), &reader.log_path).exists());
     }
 
     #[cfg(feature = "sidecar")]
     #[test]
     fn verified_prefix_cache_missing_entry_emits_no_fallback() {
         let dir = tempfile::tempdir().unwrap();
+        let cache = tempfile::tempdir().unwrap();
         let mut store = SidecarFlowStore::open(dir.path()).unwrap();
         store
             .append(FlowRecord::Edge(edge("a", "b", 1, "first")))
@@ -1284,7 +1677,14 @@ mod tests {
         let fallbacks = std::cell::Cell::new(0);
         let write_failures = std::cell::Cell::new(0);
 
-        records_for_test_reader(&store, Some(&reader), &fallbacks, &write_failures).unwrap();
+        records_for_test_reader(
+            &store,
+            Some(cache.path()),
+            Some(&reader),
+            &fallbacks,
+            &write_failures,
+        )
+        .unwrap();
 
         assert_eq!(fallbacks.get(), 0);
         assert_eq!(write_failures.get(), 0);
@@ -1294,17 +1694,27 @@ mod tests {
     #[test]
     fn verified_prefix_cache_unreadable_executable_identity_bypasses_cache_io() {
         let dir = tempfile::tempdir().unwrap();
+        let cache = tempfile::tempdir().unwrap();
         let mut store = SidecarFlowStore::open(dir.path()).unwrap();
         store
             .append(FlowRecord::Edge(edge("a", "b", 1, "first")))
             .unwrap();
-        let cache_path = verified_prefix_cache_path(store.log_path()).unwrap();
+        let reader = test_reader("unreadable", store.log_path());
+        let cache_path = verified_prefix_cache_path(cache.path(), &reader.log_path);
+        std::fs::create_dir_all(cache.path()).unwrap();
         let sentinel = b"existing cache bytes are not read or replaced";
         std::fs::write(&cache_path, sentinel).unwrap();
         let fallbacks = std::cell::Cell::new(0);
         let write_failures = std::cell::Cell::new(0);
 
-        let records = records_for_test_reader(&store, None, &fallbacks, &write_failures).unwrap();
+        let records = records_for_test_reader(
+            &store,
+            Some(cache.path()),
+            None,
+            &fallbacks,
+            &write_failures,
+        )
+        .unwrap();
 
         assert_eq!(records.len(), 1);
         assert_eq!(fallbacks.get(), 0);
@@ -1316,18 +1726,22 @@ mod tests {
     #[test]
     fn verified_prefix_cache_extends_after_append() {
         let dir = tempfile::tempdir().unwrap();
+        let cache = tempfile::tempdir().unwrap();
         let mut store = SidecarFlowStore::open(dir.path()).unwrap();
         store
             .append(FlowRecord::Edge(edge("a", "b", 1, "first")))
             .unwrap();
-        store.records().unwrap();
-        let before = read_cache(&store);
+        records_for_test_cache(&store, cache.path()).unwrap();
+        let before = read_cache(&store, cache.path());
 
         store
             .append(FlowRecord::Edge(edge("b", "c", 2, "second")))
             .unwrap();
-        assert_eq!(store.records().unwrap().len(), 2);
-        let after = read_cache(&store);
+        assert_eq!(
+            records_for_test_cache(&store, cache.path()).unwrap().len(),
+            2
+        );
+        let after = read_cache(&store, cache.path());
         assert!(after.prefix_len > before.prefix_len);
         assert_eq!(after.record_count, 2);
         assert_eq!(
@@ -1340,11 +1754,12 @@ mod tests {
     #[test]
     fn verified_prefix_cache_tail_preserves_newer_writer_error() {
         let dir = tempfile::tempdir().unwrap();
+        let cache = tempfile::tempdir().unwrap();
         let mut store = SidecarFlowStore::open(dir.path()).unwrap();
         store
             .append(FlowRecord::Edge(edge("a", "b", 1, "first")))
             .unwrap();
-        store.records().unwrap();
+        records_for_test_cache(&store, cache.path()).unwrap();
 
         let future_record = FlowRecord::Edge(edge("b", "c", 2, "second"));
         let mut raw = serde_json::to_value(SidecarLine {
@@ -1362,7 +1777,7 @@ mod tests {
             .unwrap();
         writeln!(file, "{}", serde_json::to_string(&raw).unwrap()).unwrap();
 
-        let error = store.records().unwrap_err();
+        let error = records_for_test_cache(&store, cache.path()).unwrap_err();
         assert!(
             matches!(error, FabricError::NewerWriter { .. }),
             "{error:?}"
@@ -1383,7 +1798,10 @@ mod tests {
             "the benchmark refuses to run against the live flows.jsonl"
         );
         let store = SidecarFlowStore { log_path: path };
-        let cache_path = verified_prefix_cache_path(store.log_path()).unwrap();
+        let cache_directory = verified_prefix_cache_directory()
+            .expect("benchmark needs an absolute XDG_CACHE_HOME or HOME");
+        let reader = reader_identity(store.log_path()).unwrap();
+        let cache_path = verified_prefix_cache_path(&cache_directory, &reader.log_path);
         let mut cold = Vec::new();
         let mut records = 0;
         for _ in 0..3 {
@@ -1393,13 +1811,20 @@ mod tests {
                 Err(error) => panic!("remove disposable benchmark cache: {error}"),
             }
             let started = std::time::Instant::now();
-            records = store.records().unwrap().len();
+            records = records_for_test_cache(&store, &cache_directory)
+                .unwrap()
+                .len();
             cold.push(started.elapsed().as_secs_f64() * 1_000.0);
         }
         let mut warm = Vec::new();
         for _ in 0..5 {
             let started = std::time::Instant::now();
-            assert_eq!(store.records().unwrap().len(), records);
+            assert_eq!(
+                records_for_test_cache(&store, &cache_directory)
+                    .unwrap()
+                    .len(),
+                records
+            );
             warm.push(started.elapsed().as_secs_f64() * 1_000.0);
         }
         eprintln!(
