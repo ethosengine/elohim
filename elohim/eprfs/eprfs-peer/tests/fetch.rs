@@ -617,9 +617,13 @@ async fn index_warming_retries_are_spaced_and_stay_within_the_existing_deadline(
     .await;
     let endpoint = fetcher(&t.key_c).await;
     let (_dir, store) = payload();
+    // The outcome is IndexWarming only once a first warming answer has reached the fetch before its
+    // deadline; a deadline that passes first is DeadlineExceeded, by design. The budget is wide
+    // enough that the first answer cannot lose that race to connect time on a loaded gate host (dev's
+    // 30 ms budget did, 2026-11-27, backlog row 125), and nothing below depends on how fast the host is.
     let budget = FetchBudget {
-        stall: Duration::from_secs(1),
-        total: Duration::from_secs(1),
+        stall: Duration::from_secs(5),
+        total: Duration::from_secs(5),
         ..FetchBudget::default()
     };
     let started = Instant::now();
@@ -638,25 +642,29 @@ async fn index_warming_retries_are_spaced_and_stay_within_the_existing_deadline(
     assert_eq!(gap, FetchGap::IndexWarming);
     assert_eq!(gap.kind(), "index-warming");
     assert_eq!(gap.to_string(), "the sibling is still indexing");
-    // The retry never sleeps past the deadline: it gives up when the next wait would cross it. The
-    // slack covers only scheduling and the last round trip, not another wait.
+    // The retry never sleeps past the deadline: it gives up when the next wait would cross it, so the
+    // fetch ends near the deadline, never a further wait (up to 2 s) after it. The slack is loose on
+    // purpose: it covers scheduling and the last round trip on a loaded host, and still catches a wait
+    // slept across the deadline.
     let elapsed = started.elapsed();
     assert!(
-        elapsed <= budget.total + Duration::from_millis(50),
+        elapsed <= budget.total + Duration::from_millis(500),
         "{elapsed:?} past {:?}",
         budget.total
     );
-    // The waits double from 50 ms (50, 100, 200, 400 within one second), so the asks are few: a
-    // fixed small delay would make dozens. Each gap is at least its scheduled wait; a sleep never
-    // returns early, so these lower bounds hold on a loaded host too.
+    // The waits double from 50 ms to a 2 s cap: 50, 100, 200, 400, 800, 1600 fit in 5 s and the next
+    // does not, so at most 7 asks, whatever the host's speed, because a sleep never returns early. A
+    // fixed small delay would make hundreds. There is no lower bound on the count: a slow host asks
+    // fewer times, and that is not a failure. Each gap is at least its scheduled wait.
     let attempts = server.tier.manifest_attempt_times();
     assert!(
-        (3..=6).contains(&attempts.len()),
+        (1..=7).contains(&attempts.len()),
         "expected a few backed-off asks, got {}: {attempts:?}",
         attempts.len()
     );
     for (i, pair) in attempts.windows(2).enumerate() {
-        let wait = Duration::from_millis(50) * 2u32.pow(u32::try_from(i).expect("few attempts"));
+        let wait = (Duration::from_millis(50) * 2u32.pow(u32::try_from(i).expect("few attempts")))
+            .min(Duration::from_secs(2));
         assert!(
             pair[1].duration_since(pair[0]) >= wait,
             "ask {} came {:?} after the one before, under its {wait:?} wait: {attempts:?}",
