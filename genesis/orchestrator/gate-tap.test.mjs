@@ -295,6 +295,51 @@ test('slot holder releases non-zero and names members that survive the post-KILL
   assert.match(output, /^\[gate-slot\] session 7 still alive 0 ms after SIGKILL; releasing slot with surviving pids: 42$/m);
 });
 
+test('a stopped gate skips the slot drain: its survivors get TERM at once and KILL after the TERM grace', { timeout: 60_000 }, async () => {
+  const member = { pid: 42, sid: 7, start: '200', state: 'S' };
+  const sent = [];
+  let output = '';
+  let now = 0;
+  const status = await drainSlotSession(7, '100', {
+    scan: () => new Map([[member.pid, member]]),
+    now: () => { now += 10; return now; },
+    sleep: async () => {},
+    send: (sid, members, signal) => { sent.push([sid, members.map(item => item.pid), signal, now]); },
+    write: line => { output += line; },
+    drainMs: 60_000,
+    termMs: 30,
+    killMs: 0,
+    heartbeatMs: 10,
+    leaderObserved: true,
+    stopped: () => true,
+  });
+  assert.equal(status, 1);
+  assert.deepEqual(sent.map(([sid, pids, signal]) => [sid, pids, signal]), [[7, [42], 'SIGTERM'], [7, [42], 'SIGKILL']]);
+  assert.ok(sent[0][3] < 60_000, `TERM came at ${sent[0][3]} ms, inside the 60 s drain`);
+  assert.ok(sent[1][3] - sent[0][3] >= 30, 'KILL waits for the TERM grace');
+  assert.match(output, /^\[gate-slot\] session 7 was stopped; sent SIGTERM without the 60000 ms drain; members: 42$/m);
+});
+
+test('an unstopped gate still drains the full window before TERM', { timeout: 60_000 }, async () => {
+  const member = { pid: 42, sid: 7, start: '200', state: 'S' };
+  const sent = [];
+  let now = 0;
+  await drainSlotSession(7, '100', {
+    scan: () => new Map([[member.pid, member]]),
+    now: () => { now += 10; return now; },
+    sleep: async () => {},
+    send: (sid, members, signal) => { sent.push([signal, now]); },
+    write: () => {},
+    drainMs: 500,
+    termMs: 0,
+    killMs: 0,
+    heartbeatMs: 10,
+    leaderObserved: true,
+  });
+  assert.equal(sent[0][0], 'SIGTERM');
+  assert.ok(sent[0][1] >= 500, `TERM came at ${sent[0][1]} ms, before the 500 ms drain ended`);
+});
+
 test('slot holder observes its leader before accepting an empty session', { timeout: 60_000 }, async () => {
   const leader = { pid: 7, sid: 7, start: '100', state: 'S' };
   const scans = [new Map(), new Map([[leader.pid, leader]]), new Map()];

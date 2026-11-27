@@ -181,6 +181,10 @@ export async function drainSlotSession(sid, leaderStart, {
   heartbeatMs = Math.max(10, positiveMs(process.env.GATE_SLOT_DRAIN_HEARTBEAT_MS, 5000)),
   leaderObserved = false,
   emptyConfirmMs = SLOT_EMPTY_CONFIRM_MS,
+  // Whether the gate was stopped (an outside signal to its tap, or a stop-now request). The drain
+  // exists for a recipe that ended on its own and left background work to finish; a stopped gate
+  // has nothing left to finish, so its survivors get TERM at once and KILL after the TERM grace.
+  stopped = () => false,
 } = {}) {
   let drainAt = null;
   let termAt = null;
@@ -224,9 +228,13 @@ export async function drainSlotSession(sid, leaderStart, {
       write(`[gate-slot] draining session ${sid} after its recipe closed; members: ${members.map(p => p.pid).join(' ')}\n`);
       lastHeartbeat = at;
     }
-    if (termAt === null && at - drainAt >= drainMs) {
+    const stopAsked = termAt === null && stopped();
+    if (termAt === null && (stopAsked || at - drainAt >= drainMs)) {
       send(sid, members, 'SIGTERM');
       termAt = at;
+      if (stopAsked) {
+        write(`[gate-slot] session ${sid} was stopped; sent SIGTERM without the ${drainMs} ms drain; members: ${members.map(p => p.pid).join(' ')}\n`);
+      }
     } else if (termAt !== null && killAt === null && at - termAt >= termMs) {
       send(sid, members, 'SIGKILL');
       killAt = at;
@@ -274,7 +282,9 @@ async function slotHolderMain(lock, acquired, controlPath, admissionPath, superv
   if (admission !== 'admitted\n') return 0;
   const proc = process.env.GATE_SLOT_PROC_ROOT || '/proc';
   const trace = process.env.GATE_SLOT_PROC_TRACE;
+  const stopPath = `${controlPath}.stop`;
   return drainSlotSession(sid, leaderStart, {
+    stopped: () => existsSync(stopPath),
     // The session leader itself wrote the admission marker after proving this holder. That is a
     // stronger observation than a racy /proc snapshot and closes holder-ready -> gate-start.
     leaderObserved: true,
@@ -360,6 +370,8 @@ async function startSlotHolder(lock, mode, waitSeconds, scratch, interrupt) {
     child, done, acquired: Boolean(holder) && !interrupt.signal, closed, holder, admission,
     interrupted: interrupt.signal,
     holdSession(pid, start) { writeHandoff(control, `session\t${pid}\t${start}\n`); },
+    // Tells the holder the gate was stopped, so it ends the session's survivors without the drain.
+    stopGate() { writeHandoff(`${control}.stop`, 'stop\n'); },
     cancelGate() {
       if (!existsSync(admission)) writeHandoff(admission, 'cancelled\n');
     },
@@ -371,9 +383,9 @@ async function startSlotHolder(lock, mode, waitSeconds, scratch, interrupt) {
 
 async function acquireSlot(project, run, env, interrupt) {
   const lock = env.GATE_SLOT_LOCK_PATH;
-  if (!lock) return { busy: false, holdSession() {}, startGate() {}, cancelGate() {}, release: async () => {} };
+  if (!lock) return { busy: false, holdSession() {}, startGate() {}, cancelGate() {}, stopGate() {}, release: async () => {} };
   if (verifySlotOwnerToken(lock, env[SLOT_OWNER_ENV])) {
-    return { busy: false, nested: true, ownerToken: env[SLOT_OWNER_ENV], holdSession() {}, startGate() {}, cancelGate() {}, release: async () => {} };
+    return { busy: false, nested: true, ownerToken: env[SLOT_OWNER_ENV], holdSession() {}, startGate() {}, cancelGate() {}, stopGate() {}, release: async () => {} };
   }
   mkdirSync(dirname(lock), { recursive: true });
   const scratch = mkdtempSync(join(tmpdir(), 'gate-slot-holder-'));
@@ -387,6 +399,7 @@ async function acquireSlot(project, run, env, interrupt) {
     return { busy: false, holdSession: first.holdSession, startPath, admissionPath: first.admission,
       startGate() { writeHandoff(startPath, 'start\n'); },
       cancelGate: first.cancelGate,
+      stopGate: first.stopGate,
       ownerToken: holderToken(lock, { pid: first.holder.pid, start: first.holder.start }, { pid: supervisor.pid, start: supervisor.start }),
       release: async () => { await first.release(); cleanup(); } };
   }
@@ -411,7 +424,7 @@ async function acquireSlot(project, run, env, interrupt) {
     await blocked.done;
     cleanup();
     process.stderr.write(`gate ${project}: REFUSED cargo slot stayed busy for ${limit}s; holder: ${holder}\n`);
-    return { busy: true, release: async () => {} };
+    return { busy: true, stopGate() {}, release: async () => {} };
   }
   publishHolder(env.GATE_SLOT_HOLDER_PATH, project, blocked.child.pid, run);
   const supervisor = readStat(process.pid);
@@ -419,6 +432,7 @@ async function acquireSlot(project, run, env, interrupt) {
   return { busy: false, holdSession: blocked.holdSession, startPath, admissionPath: blocked.admission,
     startGate() { writeHandoff(startPath, 'start\n'); },
     cancelGate: blocked.cancelGate,
+    stopGate: blocked.stopGate,
     ownerToken: holderToken(lock, { pid: blocked.holder.pid, start: blocked.holder.start }, { pid: supervisor.pid, start: supervisor.start }),
     release: async () => { await blocked.release(); cleanup(); } };
 }
@@ -627,6 +641,8 @@ async function main() {
   // held and forwarded once it does.
   let child = null;
   let signalGate = null;
+  // Set once the slot is held: tells its holder the gate was stopped (see drainSlotSession).
+  let stopSlot = () => {};
   const slotInterrupt = { signal: null };
   const earlySignals = [];
   const forward = signal => () => {
@@ -634,7 +650,7 @@ async function main() {
       outsideSignal = signal;
       outsideSignalAt = performance.now();
     }
-    if (signalGate) signalGate(signal);
+    if (signalGate) { signalGate(signal); stopSlot(); }
     else { slotInterrupt.signal ??= signal; earlySignals.push(signal); }
   };
   for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(signal, forward(signal));
@@ -675,6 +691,7 @@ async function main() {
   if (leader) {
     slot.holdSession(child.pid, leader.start);
     slot.startGate();
+    stopSlot = () => { try { slot.stopGate?.(); } catch { /* the holder drains as before */ } };
   }
   // What the gate's side of its output points at, so a process that keeps the output open after the
   // leader ended can be named (gate-stop.mjs processesHolding); nothing is added to its environment.
@@ -700,7 +717,7 @@ async function main() {
   child.stdout.on('data', chunk => { process.stdout.write(chunk); out.write(chunk); });
   child.stderr.on('data', chunk => { process.stderr.write(chunk); err.write(chunk); });
 
-  for (const signal of earlySignals.splice(0)) signalGate(signal);
+  for (const signal of earlySignals.splice(0)) { signalGate(signal); stopSlot(); }
 
   // The stop-now probe: the run log is re-read only when it grew, so an idle check is one stat.
   // A stop-now request ends the gate's tree while its leader runs (gate-stop.mjs endTree). Whether
@@ -741,6 +758,7 @@ async function main() {
     const request = stopNowRequest(run);
     if (!request) return;
     stopping = { by: request.by ?? null, reason: request.reason ?? null, id: request.id ?? null };
+    stopSlot();
     if (!leaderHeld()) {
       // The recipe already ended on its own; only its output can still be open.
       stopping.ended = Promise.resolve(nothing);
