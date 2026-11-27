@@ -3325,3 +3325,11 @@ Fifteen test files under `.claude/hooks/__tests__/` (bootstrap_projection_test.p
 ## Row 121 — the agentic Python orphan test can no longer fail for the directories it checks
 
 Since agentic-tools owns its test files by glob, every `*_test.py` / `test_*.py` under genesis/agentic, genesis/agentic/bin and .claude/hooks/tests has an owner by construction, so the orphan test in gate-input-audit.test.mjs cannot fail there. It protects only if it points at the directories NOT yet covered (for example `.claude/hooks/__tests__/`, row 120, and any other directory holding Python tests). Cure: scan every directory that holds Python tests, and require an owner for each file found.
+
+## Row 122 — brit-first does not see a git call it only receives as text
+
+The brit-first hook classifies the stages of the visible shell command. A git call that reaches a shell as text is not a stage it sees, so it passes on dev and after the 2026-11-27 exemption alike: `eval "<a git call>"`, a command piped into `sh` or `bash` (`echo "<a git call>" | sh`), `xargs` with git as its program, a git call inside a command substitution (`$(…)`, backticks, an unquoted heredoc body with `$(…)` in it), and a script written in one command and run in a later one. Habit friction, not a security boundary (its own docstring), so this row records the misses instead of curing them. Cure, if wanted: refuse any of these forms when a git token appears in the text it would run, the same fail-closed rule the hook applies to a command it cannot read.
+
+## Row 123 — bootstrap_projection_test.py is green by absence when EPR_BIN is unset
+
+`.claude/hooks/__tests__/bootstrap_projection_test.py` skips when `EPR_BIN` is unset, and unittest counts a skip as success, so a run without the variable reports green having tested nothing. The directory is owned by no gate (row 120), so nothing runs it with the variable set either. Cure: fail, not skip, when no epr can be resolved (the UNMEASURED rule `session_envelope_test.py` follows), and give the directory an owner.
