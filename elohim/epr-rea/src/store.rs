@@ -4,10 +4,20 @@
 
 use std::collections::HashSet;
 #[cfg(feature = "sidecar")]
+use std::fs::{self, OpenOptions};
+#[cfg(feature = "sidecar")]
+use std::io::Write;
+#[cfg(feature = "sidecar")]
 use std::path::{Path, PathBuf};
+#[cfg(feature = "sidecar")]
+use std::sync::atomic::{AtomicBool, Ordering};
+#[cfg(feature = "sidecar")]
+use std::time::UNIX_EPOCH;
 
 use cid::Cid;
 use elohim_epr::algedonic::AlgedonicEvidence;
+#[cfg(feature = "sidecar")]
+use multihash_codetable::{Code, MultihashDigest};
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "sidecar")]
@@ -214,6 +224,63 @@ pub struct SidecarFlowStore {
     log_path: PathBuf,
 }
 
+#[cfg(feature = "sidecar")]
+const VERIFIED_PREFIX_CACHE_SUFFIX: &str = ".verified-prefix-cache.json";
+#[cfg(feature = "sidecar")]
+const VERIFIED_PREFIX_CACHE_READERS: usize = 4;
+
+#[cfg(feature = "sidecar")]
+static CACHE_FALLBACK_REPORTED: AtomicBool = AtomicBool::new(false);
+#[cfg(feature = "sidecar")]
+static CACHE_WRITE_FAILURE_REPORTED: AtomicBool = AtomicBool::new(false);
+
+#[cfg(feature = "sidecar")]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ReaderIdentity {
+    executable_path: PathBuf,
+    executable_len: u64,
+    executable_modified_before_epoch: bool,
+    executable_modified_secs: u64,
+    executable_modified_nanos: u32,
+    reader_version: String,
+    log_path: PathBuf,
+}
+
+#[cfg(feature = "sidecar")]
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct VerifiedPrefixCache {
+    reader: ReaderIdentity,
+    prefix_len: u64,
+    digest: Vec<u8>,
+    record_count: u64,
+}
+
+#[cfg(feature = "sidecar")]
+#[derive(Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct VerifiedPrefixCacheMap {
+    // Oldest write first. Replacing a reader moves it to the end, so eviction is deterministic
+    // without trusting wall-clock ordering between processes. Each entry stays opaque here so a
+    // reader replacing its own entry preserves every other reader's bytes, including fields from
+    // a cache schema this build predates.
+    entries: Vec<String>,
+}
+
+#[cfg(feature = "sidecar")]
+struct CachedPrefix {
+    prefix_len: u64,
+    records: Vec<(u64, Cid, FlowRecord)>,
+}
+
+#[cfg(feature = "sidecar")]
+enum CacheLookup {
+    Hit(CachedPrefix),
+    Miss,
+    Mismatch(&'static str),
+}
+
 /// One immutable flow-log prefix with each decoded record's JSONL line-start offset.
 #[cfg(feature = "sidecar")]
 #[derive(Debug)]
@@ -256,7 +323,7 @@ impl SidecarFlowStore {
             .map_err(|_| FabricError::Decode("flow log is too large for offsets".into()))?;
         Ok(FlowRecordPrefix {
             end_offset,
-            records: decode_flow_records_with_offsets(&contents)?,
+            records: decode_flow_records_with_cache(&self.log_path, &contents)?,
         })
     }
 
@@ -324,7 +391,11 @@ impl FlowStore for SidecarFlowStore {
     }
 
     fn records(&self) -> Result<Vec<(Cid, FlowRecord)>> {
-        decode_flow_records(&crate::sidecar::flow_contents(&self.log_path)?)
+        let contents = crate::sidecar::flow_contents(&self.log_path)?;
+        Ok(decode_flow_records_with_cache(&self.log_path, &contents)?
+            .into_iter()
+            .map(|(_, cid, record)| (cid, record))
+            .collect())
     }
 }
 
@@ -379,7 +450,11 @@ impl FlowStore for SidecarFlowTransaction {
     }
 
     fn records(&self) -> Result<Vec<(Cid, FlowRecord)>> {
-        decode_flow_records(&crate::sidecar::flow_contents(&self.log_path)?)
+        let contents = crate::sidecar::flow_contents(&self.log_path)?;
+        Ok(decode_flow_records_with_cache(&self.log_path, &contents)?
+            .into_iter()
+            .map(|(_, cid, record)| (cid, record))
+            .collect())
     }
 }
 
@@ -394,11 +469,295 @@ pub fn decode_flow_records(contents: &str) -> Result<Vec<(Cid, FlowRecord)>> {
 
 #[cfg(feature = "sidecar")]
 fn decode_flow_records_with_offsets(contents: &str) -> Result<Vec<(u64, Cid, FlowRecord)>> {
+    decode_flow_record_segment(contents, 0, true)
+}
+
+#[cfg(feature = "sidecar")]
+fn decode_flow_records_with_cache(
+    log_path: &Path,
+    contents: &str,
+) -> Result<Vec<(u64, Cid, FlowRecord)>> {
+    let reader = reader_identity(log_path).ok();
+    decode_flow_records_with_reader(
+        log_path,
+        contents,
+        reader.as_ref(),
+        report_cache_fallback_once,
+        report_cache_write_failure_once,
+    )
+}
+
+#[cfg(feature = "sidecar")]
+fn decode_flow_records_with_reader(
+    log_path: &Path,
+    contents: &str,
+    reader: Option<&ReaderIdentity>,
+    report_fallback: impl Fn(&str),
+    report_write_failure: impl Fn(&FabricError),
+) -> Result<Vec<(u64, Cid, FlowRecord)>> {
+    let Some(reader) = reader else {
+        return decode_flow_records_with_offsets(contents);
+    };
+    match cached_prefix(log_path, contents, reader) {
+        CacheLookup::Hit(CachedPrefix {
+            prefix_len,
+            mut records,
+        }) => {
+            let prefix_len_usize = usize::try_from(prefix_len)
+                .map_err(|_| FabricError::Decode("cached prefix is too large".into()))?;
+            let tail = contents
+                .get(prefix_len_usize..)
+                .ok_or_else(|| FabricError::Decode("cached prefix is not UTF-8 aligned".into()))?;
+            records.extend(decode_flow_record_segment(tail, prefix_len, true)?);
+            if prefix_len_usize < contents.len() {
+                advance_verified_prefix_cache(
+                    log_path,
+                    contents,
+                    records.len(),
+                    reader,
+                    &report_write_failure,
+                );
+            }
+            Ok(records)
+        }
+        CacheLookup::Miss => {
+            let records = decode_flow_records_with_offsets(contents)?;
+            advance_verified_prefix_cache(
+                log_path,
+                contents,
+                records.len(),
+                reader,
+                &report_write_failure,
+            );
+            Ok(records)
+        }
+        CacheLookup::Mismatch(reason) => {
+            report_fallback(reason);
+            let records = decode_flow_records_with_offsets(contents)?;
+            advance_verified_prefix_cache(
+                log_path,
+                contents,
+                records.len(),
+                reader,
+                &report_write_failure,
+            );
+            Ok(records)
+        }
+    }
+}
+
+#[cfg(feature = "sidecar")]
+fn cached_prefix(log_path: &Path, contents: &str, reader: &ReaderIdentity) -> CacheLookup {
+    let Some(path) = verified_prefix_cache_path(log_path) else {
+        return CacheLookup::Miss;
+    };
+    let bytes = match fs::read(path) {
+        Ok(bytes) => bytes,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return CacheLookup::Miss,
+        Err(_) => return CacheLookup::Mismatch("unreadable cache"),
+    };
+    let cache_map: VerifiedPrefixCacheMap = match serde_json::from_slice(&bytes) {
+        Ok(cache_map) => cache_map,
+        Err(_) => return CacheLookup::Mismatch("corrupt cache"),
+    };
+    let mut matching = None;
+    for encoded in &cache_map.entries {
+        let cache: VerifiedPrefixCache = match serde_json::from_str(encoded) {
+            Ok(cache) => cache,
+            Err(_) => return CacheLookup::Mismatch("corrupt cache"),
+        };
+        if &cache.reader == reader {
+            matching = Some(cache);
+        }
+    }
+    let Some(cache) = matching else {
+        return CacheLookup::Miss;
+    };
+    let Ok(prefix_len) = usize::try_from(cache.prefix_len) else {
+        return CacheLookup::Mismatch("corrupt prefix length");
+    };
+    let Some(prefix_bytes) = contents.as_bytes().get(..prefix_len) else {
+        return CacheLookup::Mismatch("log is shorter than cached prefix");
+    };
+    if !prefix_bytes.is_empty() && !prefix_bytes.ends_with(b"\n") {
+        return CacheLookup::Mismatch("cached prefix is not record-aligned");
+    }
+    if sha2_digest(prefix_bytes) != cache.digest {
+        return CacheLookup::Mismatch("prefix digest mismatch");
+    }
+    let Ok(prefix) = std::str::from_utf8(prefix_bytes) else {
+        return CacheLookup::Mismatch("cached prefix is not UTF-8 aligned");
+    };
+    let records = match decode_flow_record_segment(prefix, 0, false) {
+        Ok(records) => records,
+        Err(_) => return CacheLookup::Mismatch("cached prefix decode failed"),
+    };
+    if u64::try_from(records.len()).ok() != Some(cache.record_count) {
+        return CacheLookup::Mismatch("cached record count mismatch");
+    }
+    CacheLookup::Hit(CachedPrefix {
+        prefix_len: cache.prefix_len,
+        records,
+    })
+}
+
+#[cfg(feature = "sidecar")]
+fn advance_verified_prefix_cache(
+    log_path: &Path,
+    contents: &str,
+    record_count: usize,
+    reader: &ReaderIdentity,
+    report_write_failure: impl Fn(&FabricError),
+) {
+    if let Err(error) = write_verified_prefix_cache(log_path, contents, record_count, reader) {
+        report_write_failure(&error);
+    }
+}
+
+#[cfg(feature = "sidecar")]
+fn write_verified_prefix_cache(
+    log_path: &Path,
+    contents: &str,
+    record_count: usize,
+    reader: &ReaderIdentity,
+) -> Result<bool> {
+    let prefix_len = u64::try_from(contents.len())
+        .map_err(|_| FabricError::Encode("flow log is too large for cache".into()))?;
+    let record_count = u64::try_from(record_count)
+        .map_err(|_| FabricError::Encode("flow record count is too large for cache".into()))?;
+    let candidate = VerifiedPrefixCache {
+        reader: reader.clone(),
+        prefix_len,
+        digest: sha2_digest(contents.as_bytes()),
+        record_count,
+    };
+    let cache_path = verified_prefix_cache_path(log_path)
+        .ok_or_else(|| FabricError::Encode("flow log path has no file name".into()))?;
+
+    // Serialize cache writers with appenders on the log's own lock, but never wait for this
+    // optimisation. Parsing and hashing stay outside the critical section.
+    let _log_guard = match crate::sidecar::LockedLog::try_exclusive(log_path) {
+        Ok(guard) => guard,
+        Err(FabricError::Io(error)) if error.kind() == std::io::ErrorKind::WouldBlock => {
+            return Ok(false)
+        }
+        Err(error) => return Err(error),
+    };
+    let current_log_len = fs::metadata(log_path)?.len();
+    let mut cache_map = match fs::read(&cache_path) {
+        Ok(bytes) => serde_json::from_slice(&bytes).unwrap_or_default(),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            VerifiedPrefixCacheMap::default()
+        }
+        Err(error) => return Err(error.into()),
+    };
+    let mut decoded_entries = Vec::with_capacity(cache_map.entries.len());
+    for encoded in std::mem::take(&mut cache_map.entries) {
+        let Ok(entry) = serde_json::from_str::<VerifiedPrefixCache>(&encoded) else {
+            decoded_entries.clear();
+            break;
+        };
+        decoded_entries.push((encoded, entry));
+    }
+    if let Some((_, existing)) = decoded_entries
+        .iter()
+        .find(|(_, entry)| entry.reader == candidate.reader)
+    {
+        let same_prefix = existing.prefix_len == candidate.prefix_len
+            && existing.digest == candidate.digest
+            && existing.record_count == candidate.record_count;
+        if same_prefix {
+            return Ok(true);
+        }
+        // A reader that captured an older prefix must not regress its own entry after another
+        // process advanced it. A genuinely shortened/replaced log may replace the stale entry.
+        if existing.prefix_len > candidate.prefix_len && current_log_len > candidate.prefix_len {
+            return Ok(true);
+        }
+    }
+    cache_map.entries = decoded_entries
+        .into_iter()
+        .filter(|(_, entry)| entry.reader != candidate.reader)
+        .map(|(encoded, _)| encoded)
+        .collect();
+    cache_map.entries.push(
+        serde_json::to_string(&candidate)
+            .map_err(|error| FabricError::Encode(error.to_string()))?,
+    );
+    while cache_map.entries.len() > VERIFIED_PREFIX_CACHE_READERS {
+        cache_map.entries.remove(0);
+    }
+
+    let encoded =
+        serde_json::to_vec(&cache_map).map_err(|error| FabricError::Encode(error.to_string()))?;
+    let temp_path = cache_path.with_extension("json.tmp");
+    let mut temp = OpenOptions::new()
+        .create(true)
+        .truncate(true)
+        .write(true)
+        .open(&temp_path)?;
+    temp.write_all(&encoded)?;
+    temp.sync_all()?;
+    fs::rename(temp_path, cache_path)?;
+    Ok(true)
+}
+
+#[cfg(feature = "sidecar")]
+fn reader_identity(log_path: &Path) -> std::io::Result<ReaderIdentity> {
+    let executable_path = fs::canonicalize(std::env::current_exe()?)?;
+    let metadata = fs::metadata(&executable_path)?;
+    let modified = metadata.modified()?;
+    let (executable_modified_before_epoch, modified) = match modified.duration_since(UNIX_EPOCH) {
+        Ok(duration) => (false, duration),
+        Err(error) => (true, error.duration()),
+    };
+    Ok(ReaderIdentity {
+        executable_path,
+        executable_len: metadata.len(),
+        executable_modified_before_epoch,
+        executable_modified_secs: modified.as_secs(),
+        executable_modified_nanos: modified.subsec_nanos(),
+        reader_version: env!("CARGO_PKG_VERSION").to_string(),
+        log_path: log_path.to_path_buf(),
+    })
+}
+
+#[cfg(feature = "sidecar")]
+fn report_cache_fallback_once(reason: &str) {
+    if !CACHE_FALLBACK_REPORTED.swap(true, Ordering::Relaxed) {
+        eprintln!("flow verified-prefix cache fallback: {reason}");
+    }
+}
+
+#[cfg(feature = "sidecar")]
+fn report_cache_write_failure_once(error: &FabricError) {
+    if !CACHE_WRITE_FAILURE_REPORTED.swap(true, Ordering::Relaxed) {
+        eprintln!("flow verified-prefix cache not advanced: {error}");
+    }
+}
+
+#[cfg(feature = "sidecar")]
+fn verified_prefix_cache_path(log_path: &Path) -> Option<PathBuf> {
+    let name = log_path.file_name()?.to_string_lossy();
+    Some(log_path.with_file_name(format!("{name}{VERIFIED_PREFIX_CACHE_SUFFIX}")))
+}
+
+#[cfg(feature = "sidecar")]
+fn sha2_digest(bytes: &[u8]) -> Vec<u8> {
+    Code::Sha2_256.digest(bytes).digest().to_vec()
+}
+
+#[cfg(feature = "sidecar")]
+fn decode_flow_record_segment(
+    contents: &str,
+    starting_offset: u64,
+    verify_cids: bool,
+) -> Result<Vec<(u64, Cid, FlowRecord)>> {
     if !contents.is_empty() && !contents.ends_with('\n') {
         return Err(FabricError::Decode("unterminated record log".into()));
     }
     let mut records = Vec::new();
-    let mut offset = 0_u64;
+    let mut offset = starting_offset;
     for terminated in contents.split_inclusive('\n') {
         let line = terminated.strip_suffix('\n').unwrap_or(terminated);
         let line = line.strip_suffix('\r').unwrap_or(line);
@@ -408,25 +767,34 @@ fn decode_flow_records_with_offsets(contents: &str) -> Result<Vec<(u64, Cid, Flo
         }
         let parsed: SidecarLine =
             serde_json::from_str(line).map_err(|e| FabricError::Decode(e.to_string()))?;
-        let computed = parsed.record.cid()?;
-        if computed.to_string() != parsed.cid {
-            // A line from a NEWER writer (an additive field this binary predates) decodes
-            // with that field dropped and so re-hashes differently. Say so, naming the
-            // fields and this reader's version, instead of calling it tampering.
-            let unknown = unknown_fields(line, &parsed.record);
-            if !unknown.is_empty() {
-                return Err(FabricError::NewerWriter {
+        let cid = if verify_cids {
+            let computed = parsed.record.cid()?;
+            if computed.to_string() == parsed.cid {
+                computed
+            } else {
+                // A line from a NEWER writer (an additive field this binary predates) decodes
+                // with that field dropped and so re-hashes differently. Say so, naming the
+                // fields and this reader's version, instead of calling it tampering.
+                let unknown = unknown_fields(line, &parsed.record);
+                if !unknown.is_empty() {
+                    return Err(FabricError::NewerWriter {
+                        stored: parsed.cid,
+                        fields: unknown.join(", "),
+                        reader: env!("CARGO_PKG_VERSION"),
+                    });
+                }
+                return Err(FabricError::Integrity {
                     stored: parsed.cid,
-                    fields: unknown.join(", "),
-                    reader: env!("CARGO_PKG_VERSION"),
+                    computed: computed.to_string(),
                 });
             }
-            return Err(FabricError::Integrity {
-                stored: parsed.cid,
-                computed: computed.to_string(),
-            });
-        }
-        records.push((offset, computed, parsed.record));
+        } else {
+            parsed
+                .cid
+                .parse::<Cid>()
+                .map_err(|error| FabricError::Decode(error.to_string()))?
+        };
+        records.push((offset, cid, parsed.record));
         offset = offset.saturating_add(u64::try_from(terminated.len()).unwrap_or(u64::MAX));
     }
     Ok(records)
@@ -478,6 +846,566 @@ mod tests {
             None,
         )
         .expect("valid edge")
+    }
+
+    #[cfg(feature = "sidecar")]
+    fn read_cache_map(store: &SidecarFlowStore) -> VerifiedPrefixCacheMap {
+        let path = verified_prefix_cache_path(store.log_path()).unwrap();
+        serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap()
+    }
+
+    #[cfg(feature = "sidecar")]
+    fn read_cache_entries(store: &SidecarFlowStore) -> Vec<VerifiedPrefixCache> {
+        read_cache_map(store)
+            .entries
+            .into_iter()
+            .map(|encoded| serde_json::from_str(&encoded).unwrap())
+            .collect()
+    }
+
+    #[cfg(feature = "sidecar")]
+    fn read_cache(store: &SidecarFlowStore) -> VerifiedPrefixCache {
+        let reader = reader_identity(store.log_path()).unwrap();
+        read_cache_entries(store)
+            .into_iter()
+            .find(|entry| entry.reader == reader)
+            .unwrap()
+    }
+
+    #[cfg(feature = "sidecar")]
+    fn test_reader(label: &str, log_path: &Path) -> ReaderIdentity {
+        ReaderIdentity {
+            executable_path: PathBuf::from(format!("/test/readers/{label}")),
+            executable_len: 100 + u64::try_from(label.len()).unwrap(),
+            executable_modified_before_epoch: false,
+            executable_modified_secs: 1_700_000_000,
+            executable_modified_nanos: u32::try_from(label.len()).unwrap(),
+            reader_version: env!("CARGO_PKG_VERSION").to_string(),
+            log_path: log_path.to_path_buf(),
+        }
+    }
+
+    #[cfg(feature = "sidecar")]
+    fn records_for_test_reader(
+        store: &SidecarFlowStore,
+        reader: Option<&ReaderIdentity>,
+        fallback_count: &std::cell::Cell<usize>,
+        write_failure_count: &std::cell::Cell<usize>,
+    ) -> Result<Vec<(u64, Cid, FlowRecord)>> {
+        let contents = crate::sidecar::flow_contents(store.log_path())?;
+        decode_flow_records_with_reader(
+            store.log_path(),
+            &contents,
+            reader,
+            |_| fallback_count.set(fallback_count.get() + 1),
+            |_| write_failure_count.set(write_failure_count.get() + 1),
+        )
+    }
+
+    #[cfg(feature = "sidecar")]
+    #[test]
+    fn verified_prefix_cache_warm_read_matches_cold_read() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut store = SidecarFlowStore::open(dir.path()).unwrap();
+        store
+            .append_batch(vec![
+                FlowRecord::Edge(edge("a", "b", 1, "first")),
+                FlowRecord::Edge(edge("b", "c", 2, "second")),
+            ])
+            .unwrap();
+
+        let cache_path = verified_prefix_cache_path(store.log_path()).unwrap();
+        assert!(!cache_path.exists());
+        let cold = store.records().unwrap();
+        assert!(cache_path.exists());
+        let warm = store.records().unwrap();
+        assert_eq!(warm, cold);
+
+        let indexed = store.records_with_offsets().unwrap();
+        assert_eq!(
+            indexed
+                .records
+                .into_iter()
+                .map(|(_, cid, record)| (cid, record))
+                .collect::<Vec<_>>(),
+            cold
+        );
+        assert_eq!(store.transaction().unwrap().records().unwrap(), cold);
+    }
+
+    #[cfg(feature = "sidecar")]
+    #[test]
+    fn verified_prefix_cache_middle_record_tamper_still_refuses_integrity() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut store = SidecarFlowStore::open(dir.path()).unwrap();
+        store
+            .append_batch(vec![
+                FlowRecord::Edge(edge("a", "b", 1, "first")),
+                FlowRecord::Edge(edge("b", "c", 2, "second")),
+                FlowRecord::Edge(edge("c", "d", 3, "third")),
+            ])
+            .unwrap();
+        store.records().unwrap();
+
+        let contents = std::fs::read_to_string(store.log_path()).unwrap();
+        let mut lines: Vec<String> = contents.lines().map(str::to_owned).collect();
+        let mut middle: SidecarLine = serde_json::from_str(&lines[1]).unwrap();
+        let FlowRecord::Edge(edge) = &mut middle.record else {
+            panic!("fixture must contain an edge");
+        };
+        edge.sealed_at = 9;
+        lines[1] = serde_json::to_string(&middle).unwrap();
+        std::fs::write(store.log_path(), lines.join("\n") + "\n").unwrap();
+
+        let error = store.records().unwrap_err();
+        assert!(matches!(error, FabricError::Integrity { .. }), "{error:?}");
+    }
+
+    #[cfg(feature = "sidecar")]
+    #[test]
+    fn verified_prefix_cache_truncation_and_same_length_replacement_fall_back() {
+        let truncated_dir = tempfile::tempdir().unwrap();
+        let mut truncated_store = SidecarFlowStore::open(truncated_dir.path()).unwrap();
+        truncated_store
+            .append_batch(vec![
+                FlowRecord::Edge(edge("a", "b", 1, "first")),
+                FlowRecord::Edge(edge("b", "c", 2, "second")),
+            ])
+            .unwrap();
+        let before = truncated_store.records().unwrap();
+        let bytes = std::fs::read(truncated_store.log_path()).unwrap();
+        let first_end = bytes.iter().position(|byte| *byte == b'\n').unwrap() + 1;
+        std::fs::OpenOptions::new()
+            .write(true)
+            .open(truncated_store.log_path())
+            .unwrap()
+            .set_len(u64::try_from(first_end).unwrap())
+            .unwrap();
+        assert_eq!(truncated_store.records().unwrap(), before[..1]);
+        assert_eq!(
+            read_cache(&truncated_store).prefix_len,
+            u64::try_from(first_end).unwrap()
+        );
+
+        let replaced_dir = tempfile::tempdir().unwrap();
+        let mut replaced_store = SidecarFlowStore::open(replaced_dir.path()).unwrap();
+        replaced_store
+            .append_batch(vec![
+                FlowRecord::Edge(edge("a", "b", 1, "first")),
+                FlowRecord::Edge(edge("b", "c", 2, "third_")),
+            ])
+            .unwrap();
+        replaced_store.records().unwrap();
+        let original = std::fs::read_to_string(replaced_store.log_path()).unwrap();
+        let replacement = original
+            .lines()
+            .enumerate()
+            .map(|(index, line)| {
+                let mut parsed: SidecarLine = serde_json::from_str(line).unwrap();
+                let FlowRecord::Edge(edge) = &mut parsed.record else {
+                    panic!("fixture must contain an edge");
+                };
+                edge.from = if index == 0 { "x" } else { "y" }.into();
+                edge.to = if index == 0 { "y" } else { "z" }.into();
+                edge.sealed_at += 3;
+                parsed.cid = parsed.record.cid().unwrap().to_string();
+                serde_json::to_string(&parsed).unwrap()
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+            + "\n";
+        assert_eq!(replacement.len(), original.len());
+        let expected = decode_flow_records(&replacement).unwrap();
+        std::fs::write(replaced_store.log_path(), replacement).unwrap();
+        assert_eq!(replaced_store.records().unwrap(), expected);
+    }
+
+    #[cfg(feature = "sidecar")]
+    #[test]
+    fn verified_prefix_cache_edited_prefix_falls_back_to_full_verification() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut store = SidecarFlowStore::open(dir.path()).unwrap();
+        store
+            .append_batch(vec![
+                FlowRecord::Edge(edge("a", "b", 1, "first")),
+                FlowRecord::Edge(edge("b", "c", 2, "second")),
+                FlowRecord::Edge(edge("c", "d", 3, "third")),
+            ])
+            .unwrap();
+        store.records().unwrap();
+
+        let original = std::fs::read_to_string(store.log_path()).unwrap();
+        let mut lines: Vec<String> = original.lines().map(str::to_owned).collect();
+        let mut middle: SidecarLine = serde_json::from_str(&lines[1]).unwrap();
+        let FlowRecord::Edge(edge) = &mut middle.record else {
+            panic!("fixture must contain an edge");
+        };
+        edge.sealed_at = 7;
+        middle.cid = middle.record.cid().unwrap().to_string();
+        lines[1] = serde_json::to_string(&middle).unwrap();
+        let edited = lines.join("\n") + "\n";
+        assert_eq!(edited.len(), original.len());
+        let expected = decode_flow_records(&edited).unwrap();
+        std::fs::write(store.log_path(), edited).unwrap();
+
+        assert_eq!(store.records().unwrap(), expected);
+    }
+
+    #[cfg(feature = "sidecar")]
+    #[test]
+    fn verified_prefix_cache_corrupt_falls_back_and_foreign_reader_is_a_silent_miss() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut store = SidecarFlowStore::open(dir.path()).unwrap();
+        store
+            .append(FlowRecord::Edge(edge("a", "b", 1, "first")))
+            .unwrap();
+        let expected = store.records().unwrap();
+        let cache_path = verified_prefix_cache_path(store.log_path()).unwrap();
+
+        std::fs::write(&cache_path, b"{not-json").unwrap();
+        assert_eq!(store.records().unwrap(), expected);
+        let mut foreign = read_cache(&store);
+        foreign.reader.reader_version = "another-reader-version".into();
+        std::fs::write(
+            &cache_path,
+            serde_json::to_vec(&VerifiedPrefixCacheMap {
+                entries: vec![serde_json::to_string(&foreign).unwrap()],
+            })
+            .unwrap(),
+        )
+        .unwrap();
+        let fallback_count = std::cell::Cell::new(0);
+        let write_failure_count = std::cell::Cell::new(0);
+        let current = reader_identity(store.log_path()).unwrap();
+        assert_eq!(
+            records_for_test_reader(
+                &store,
+                Some(&current),
+                &fallback_count,
+                &write_failure_count,
+            )
+            .unwrap()
+            .into_iter()
+            .map(|(_, cid, record)| (cid, record))
+            .collect::<Vec<_>>(),
+            expected
+        );
+        assert_eq!(fallback_count.get(), 0);
+        let cache = read_cache_entries(&store);
+        assert_eq!(cache.len(), 2);
+        assert!(cache.iter().any(|entry| entry.reader == foreign.reader));
+        assert!(cache.iter().any(|entry| entry.reader == current));
+    }
+
+    #[cfg(feature = "sidecar")]
+    #[test]
+    fn verified_prefix_cache_alternating_readers_keep_their_own_warm_entries() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut store = SidecarFlowStore::open(dir.path()).unwrap();
+        store
+            .append(FlowRecord::Edge(edge("a", "b", 1, "first")))
+            .unwrap();
+        let a = test_reader("a", store.log_path());
+        let b = test_reader("b", store.log_path());
+        let fallbacks = std::cell::Cell::new(0);
+        let write_failures = std::cell::Cell::new(0);
+
+        records_for_test_reader(&store, Some(&a), &fallbacks, &write_failures).unwrap();
+        records_for_test_reader(&store, Some(&b), &fallbacks, &write_failures).unwrap();
+        records_for_test_reader(&store, Some(&a), &fallbacks, &write_failures).unwrap();
+        records_for_test_reader(&store, Some(&b), &fallbacks, &write_failures).unwrap();
+
+        assert_eq!(fallbacks.get(), 0);
+        assert_eq!(write_failures.get(), 0);
+        let contents = std::fs::read_to_string(store.log_path()).unwrap();
+        assert!(matches!(
+            cached_prefix(store.log_path(), &contents, &a),
+            CacheLookup::Hit(_)
+        ));
+        assert!(matches!(
+            cached_prefix(store.log_path(), &contents, &b),
+            CacheLookup::Hit(_)
+        ));
+        assert_eq!(read_cache_entries(&store).len(), 2);
+    }
+
+    #[cfg(feature = "sidecar")]
+    #[test]
+    fn verified_prefix_cache_replacing_one_reader_preserves_other_entry_bytes() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut store = SidecarFlowStore::open(dir.path()).unwrap();
+        store
+            .append(FlowRecord::Edge(edge("a", "b", 1, "first")))
+            .unwrap();
+        let a = test_reader("a", store.log_path());
+        let b = test_reader("b", store.log_path());
+        let fallbacks = std::cell::Cell::new(0);
+        let write_failures = std::cell::Cell::new(0);
+        records_for_test_reader(&store, Some(&a), &fallbacks, &write_failures).unwrap();
+        records_for_test_reader(&store, Some(&b), &fallbacks, &write_failures).unwrap();
+
+        let cache_path = verified_prefix_cache_path(store.log_path()).unwrap();
+        let mut cache = read_cache_map(&store);
+        let b_index = cache
+            .entries
+            .iter()
+            .position(|encoded| {
+                serde_json::from_str::<VerifiedPrefixCache>(encoded)
+                    .is_ok_and(|entry| entry.reader == b)
+            })
+            .unwrap();
+        let b_entry: VerifiedPrefixCache = serde_json::from_str(&cache.entries[b_index]).unwrap();
+        let mut future_shape = serde_json::to_value(b_entry).unwrap();
+        future_shape["fieldFromFutureCacheSchema"] = serde_json::json!({"kept": true});
+        let b_bytes = format!("  {}  ", serde_json::to_string(&future_shape).unwrap());
+        cache.entries[b_index] = b_bytes.clone();
+        std::fs::write(&cache_path, serde_json::to_vec(&cache).unwrap()).unwrap();
+
+        store
+            .append(FlowRecord::Edge(edge("b", "c", 2, "second")))
+            .unwrap();
+        records_for_test_reader(&store, Some(&a), &fallbacks, &write_failures).unwrap();
+
+        assert!(read_cache_map(&store)
+            .entries
+            .iter()
+            .any(|encoded| encoded == &b_bytes));
+    }
+
+    #[cfg(feature = "sidecar")]
+    #[test]
+    fn verified_prefix_cache_never_trusts_another_reader_identity() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = SidecarFlowStore::open(dir.path()).unwrap();
+        let future_record = FlowRecord::Edge(edge("a", "b", 1, "future"));
+        let mut raw = serde_json::to_value(SidecarLine {
+            cid: future_record.cid().unwrap().to_string(),
+            record: future_record,
+        })
+        .unwrap();
+        raw["record"]["fieldFromTheFuture"] = serde_json::json!("x");
+        raw["cid"] = serde_json::json!(atom_cid(&"future bytes".to_string()).unwrap().to_string());
+        let contents = serde_json::to_string(&raw).unwrap() + "\n";
+        std::fs::write(store.log_path(), &contents).unwrap();
+        let a = test_reader("new-reader-a", store.log_path());
+        let b = test_reader("old-reader-b", store.log_path());
+        assert!(write_verified_prefix_cache(store.log_path(), &contents, 1, &a).unwrap());
+
+        let fallbacks = std::cell::Cell::new(0);
+        let write_failures = std::cell::Cell::new(0);
+        let error =
+            records_for_test_reader(&store, Some(&b), &fallbacks, &write_failures).unwrap_err();
+
+        assert!(
+            matches!(error, FabricError::NewerWriter { .. }),
+            "{error:?}"
+        );
+        assert_eq!(fallbacks.get(), 0);
+        assert_eq!(read_cache_entries(&store).len(), 1);
+        assert_eq!(read_cache_entries(&store)[0].reader, a);
+    }
+
+    #[cfg(feature = "sidecar")]
+    #[test]
+    fn verified_prefix_cache_keeps_four_readers_and_evicts_the_oldest_write() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut store = SidecarFlowStore::open(dir.path()).unwrap();
+        store
+            .append(FlowRecord::Edge(edge("a", "b", 1, "first")))
+            .unwrap();
+        let readers: Vec<_> = (0..5)
+            .map(|index| test_reader(&format!("reader-{index}"), store.log_path()))
+            .collect();
+        let fallbacks = std::cell::Cell::new(0);
+        let write_failures = std::cell::Cell::new(0);
+        for reader in &readers {
+            records_for_test_reader(&store, Some(reader), &fallbacks, &write_failures).unwrap();
+        }
+
+        let cache = read_cache_entries(&store);
+        assert_eq!(cache.len(), VERIFIED_PREFIX_CACHE_READERS);
+        assert!(!cache.iter().any(|entry| entry.reader == readers[0]));
+        assert_eq!(
+            cache
+                .iter()
+                .map(|entry| entry.reader.clone())
+                .collect::<Vec<_>>(),
+            readers[1..]
+        );
+    }
+
+    #[cfg(feature = "sidecar")]
+    #[test]
+    fn verified_prefix_cache_busy_writer_is_skipped_without_losing_records() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut store = SidecarFlowStore::open(dir.path()).unwrap();
+        store
+            .append(FlowRecord::Edge(edge("a", "b", 1, "first")))
+            .unwrap();
+        let contents = crate::sidecar::flow_contents(store.log_path()).unwrap();
+        let expected = decode_flow_records(&contents).unwrap();
+        let reader = test_reader("busy", store.log_path());
+        let fallbacks = std::cell::Cell::new(0);
+        let write_failures = std::cell::Cell::new(0);
+        let _held = crate::sidecar::LockedLog::exclusive(store.log_path()).unwrap();
+
+        let records = decode_flow_records_with_reader(
+            store.log_path(),
+            &contents,
+            Some(&reader),
+            |_| fallbacks.set(fallbacks.get() + 1),
+            |_| write_failures.set(write_failures.get() + 1),
+        )
+        .unwrap();
+
+        assert_eq!(
+            records
+                .into_iter()
+                .map(|(_, cid, record)| (cid, record))
+                .collect::<Vec<_>>(),
+            expected
+        );
+        assert_eq!(fallbacks.get(), 0);
+        assert_eq!(write_failures.get(), 0);
+        assert!(!verified_prefix_cache_path(store.log_path())
+            .unwrap()
+            .exists());
+    }
+
+    #[cfg(feature = "sidecar")]
+    #[test]
+    fn verified_prefix_cache_missing_entry_emits_no_fallback() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut store = SidecarFlowStore::open(dir.path()).unwrap();
+        store
+            .append(FlowRecord::Edge(edge("a", "b", 1, "first")))
+            .unwrap();
+        let reader = test_reader("missing", store.log_path());
+        let fallbacks = std::cell::Cell::new(0);
+        let write_failures = std::cell::Cell::new(0);
+
+        records_for_test_reader(&store, Some(&reader), &fallbacks, &write_failures).unwrap();
+
+        assert_eq!(fallbacks.get(), 0);
+        assert_eq!(write_failures.get(), 0);
+    }
+
+    #[cfg(feature = "sidecar")]
+    #[test]
+    fn verified_prefix_cache_unreadable_executable_identity_bypasses_cache_io() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut store = SidecarFlowStore::open(dir.path()).unwrap();
+        store
+            .append(FlowRecord::Edge(edge("a", "b", 1, "first")))
+            .unwrap();
+        let cache_path = verified_prefix_cache_path(store.log_path()).unwrap();
+        let sentinel = b"existing cache bytes are not read or replaced";
+        std::fs::write(&cache_path, sentinel).unwrap();
+        let fallbacks = std::cell::Cell::new(0);
+        let write_failures = std::cell::Cell::new(0);
+
+        let records = records_for_test_reader(&store, None, &fallbacks, &write_failures).unwrap();
+
+        assert_eq!(records.len(), 1);
+        assert_eq!(fallbacks.get(), 0);
+        assert_eq!(write_failures.get(), 0);
+        assert_eq!(std::fs::read(cache_path).unwrap(), sentinel);
+    }
+
+    #[cfg(feature = "sidecar")]
+    #[test]
+    fn verified_prefix_cache_extends_after_append() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut store = SidecarFlowStore::open(dir.path()).unwrap();
+        store
+            .append(FlowRecord::Edge(edge("a", "b", 1, "first")))
+            .unwrap();
+        store.records().unwrap();
+        let before = read_cache(&store);
+
+        store
+            .append(FlowRecord::Edge(edge("b", "c", 2, "second")))
+            .unwrap();
+        assert_eq!(store.records().unwrap().len(), 2);
+        let after = read_cache(&store);
+        assert!(after.prefix_len > before.prefix_len);
+        assert_eq!(after.record_count, 2);
+        assert_eq!(
+            after.prefix_len,
+            std::fs::metadata(store.log_path()).unwrap().len()
+        );
+    }
+
+    #[cfg(feature = "sidecar")]
+    #[test]
+    fn verified_prefix_cache_tail_preserves_newer_writer_error() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut store = SidecarFlowStore::open(dir.path()).unwrap();
+        store
+            .append(FlowRecord::Edge(edge("a", "b", 1, "first")))
+            .unwrap();
+        store.records().unwrap();
+
+        let future_record = FlowRecord::Edge(edge("b", "c", 2, "second"));
+        let mut raw = serde_json::to_value(SidecarLine {
+            cid: future_record.cid().unwrap().to_string(),
+            record: future_record,
+        })
+        .unwrap();
+        raw["record"]["fieldFromTheFuture"] = serde_json::json!("x");
+        raw["cid"] = serde_json::json!(atom_cid(&"a different future record".to_string())
+            .unwrap()
+            .to_string());
+        let mut file = std::fs::OpenOptions::new()
+            .append(true)
+            .open(store.log_path())
+            .unwrap();
+        writeln!(file, "{}", serde_json::to_string(&raw).unwrap()).unwrap();
+
+        let error = store.records().unwrap_err();
+        assert!(
+            matches!(error, FabricError::NewerWriter { .. }),
+            "{error:?}"
+        );
+    }
+
+    #[cfg(feature = "sidecar")]
+    #[test]
+    #[ignore = "manual release benchmark against EPR_FLOW_BENCH_LOG"]
+    fn benchmark_verified_prefix_cache_cold_and_warm() {
+        let path = PathBuf::from(
+            std::env::var("EPR_FLOW_BENCH_LOG")
+                .expect("set EPR_FLOW_BENCH_LOG to the disposable flows-bench.jsonl copy"),
+        );
+        assert_eq!(
+            path.file_name().and_then(|name| name.to_str()),
+            Some("flows-bench.jsonl"),
+            "the benchmark refuses to run against the live flows.jsonl"
+        );
+        let store = SidecarFlowStore { log_path: path };
+        let cache_path = verified_prefix_cache_path(store.log_path()).unwrap();
+        let mut cold = Vec::new();
+        let mut records = 0;
+        for _ in 0..3 {
+            match std::fs::remove_file(&cache_path) {
+                Ok(()) => {}
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => panic!("remove disposable benchmark cache: {error}"),
+            }
+            let started = std::time::Instant::now();
+            records = store.records().unwrap().len();
+            cold.push(started.elapsed().as_secs_f64() * 1_000.0);
+        }
+        let mut warm = Vec::new();
+        for _ in 0..5 {
+            let started = std::time::Instant::now();
+            assert_eq!(store.records().unwrap().len(), records);
+            warm.push(started.elapsed().as_secs_f64() * 1_000.0);
+        }
+        eprintln!(
+            "flow-cache-bench records={records} bytes={} cold_ms={cold:?} warm_ms={warm:?}",
+            std::fs::metadata(store.log_path()).unwrap().len()
+        );
     }
 
     /// `DepEdge.to_resource` is additive: sidecar lines written by the `epr` binary BEFORE the

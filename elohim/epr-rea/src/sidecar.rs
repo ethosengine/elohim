@@ -13,7 +13,10 @@
 //!
 //! Flow-log readers hold a shared lock only long enough to capture the file length, then read
 //! exactly that immutable prefix and decode after unlocking. Cooperating writers only append, so
-//! bytes below that length cannot change and an append beyond it is deferred to the next read.
+//! bytes below that length cannot change and an append beyond it is deferred to the next read. A
+//! reader that advances the verified-prefix cache later tries the log's exclusive lock only for
+//! the small atomic cache-file write. It never waits for that optimisation, and a fully warm read
+//! takes no exclusive lock.
 //! Flow writers serialize first, then hold the exclusive lock only while they re-read and verify
 //! the final non-empty record (including its newline and CID), append one whole batch, and sync it
 //! once. The cost of admitting an append therefore follows the tail record, not the log history.
@@ -176,6 +179,20 @@ impl LockedLog {
     pub(crate) fn try_shared(path: &Path) -> Result<Self> {
         let file = File::open(path)?;
         file.try_lock_shared().map_err(|error| match error {
+            std::fs::TryLockError::WouldBlock => {
+                std::io::Error::from(std::io::ErrorKind::WouldBlock)
+            }
+            std::fs::TryLockError::Error(error) => error,
+        })?;
+        Ok(Self {
+            file,
+            validated: Cell::new(false),
+        })
+    }
+
+    pub(crate) fn try_exclusive(path: &Path) -> Result<Self> {
+        let file = OpenOptions::new().read(true).append(true).open(path)?;
+        file.try_lock().map_err(|error| match error {
             std::fs::TryLockError::WouldBlock => {
                 std::io::Error::from(std::io::ErrorKind::WouldBlock)
             }
