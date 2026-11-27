@@ -9,7 +9,9 @@ import {
   openSync,
   readFileSync,
   readdirSync,
+  readlinkSync,
   rmSync,
+  statSync,
   symlinkSync,
   writeFileSync,
 } from "node:fs";
@@ -164,6 +166,59 @@ function killTagged(tag) {
   }
 }
 
+/**
+ * What a slot test saw, for its failure message: the next red names its own cause. Every process
+ * still carrying a gate's tag (pid, state, parent, process group, session, whether it holds the slot
+ * lock, command), every process on the device holding that lock open, the holder file, each gate's
+ * wait result and the tail of its stderr (the `[gate-slot]` drain lines among them). Read-only.
+ */
+function slotDiagnosis(label, gates, sinceMs) {
+  const lines = [`${label}; ${Date.now() - sinceMs} ms since the kill`];
+  const procs = (() => { try { return readdirSync("/proc").filter(name => /^\d+$/.test(name)); } catch { return []; } })();
+  const read = (path, encoding = "utf8") => { try { return readFileSync(path, encoding); } catch { return null; } };
+  const holdsFile = (pid, path) => {
+    let target;
+    try { target = statSync(path); } catch { return false; }
+    let fds;
+    try { fds = readdirSync(`/proc/${pid}/fd`); } catch { return false; }
+    return fds.some(fd => {
+      try { const st = statSync(`/proc/${pid}/fd/${fd}`); return st.ino === target.ino && st.dev === target.dev; }
+      catch { return false; }
+    });
+  };
+  const describe = (pid, lock) => {
+    const stat = read(`/proc/${pid}/stat`);
+    const fields = stat ? stat.slice(stat.lastIndexOf(")") + 2).split(" ") : [];
+    const cmd = (read(`/proc/${pid}/cmdline`) || "").split("\0").filter(Boolean).join(" ").slice(0, 160);
+    let cwd = "";
+    try { cwd = readlinkSync(`/proc/${pid}/cwd`); } catch { /* gone */ }
+    return `pid=${pid} state=${fields[0] ?? "?"} ppid=${fields[1] ?? "?"} pgrp=${fields[2] ?? "?"} sid=${fields[3] ?? "?"}`
+      + ` lock-fd=${holdsFile(pid, lock) ? "open" : "-"} cwd=${cwd} cmd=${cmd}`;
+  };
+  for (const gate of gates) {
+    lines.push(`--- ${gate.label} (tag ${gate.tag}) lock ${gate.lock}`);
+    lines.push(`holder file: ${(read(gate.holderPath) || "absent").trim()}`);
+    lines.push(`wait result: ${(read(gate.waitResult) || "absent").trim()}`);
+    const needle = `GATE_TEST_RUN_TAG=${gate.tag}`;
+    const tagged = procs.filter(pid => (read(`/proc/${pid}/environ`, "latin1") || "").split("\0").includes(needle));
+    lines.push(`tagged processes alive: ${tagged.length}`);
+    for (const pid of tagged) lines.push(`  ${describe(pid, gate.lock)}`);
+    const lockers = procs.filter(pid => !tagged.includes(pid) && holdsFile(pid, gate.lock));
+    for (const pid of lockers) lines.push(`  another gate's process with the lock open: ${describe(pid, gate.lock)}`);
+    // The kernel's own answer to who owns the lock (an open descriptor alone does not: a waiting
+    // flock holds the file open too). /proc/locks names the owner pid and the file's inode.
+    let ino = null;
+    try { ino = statSync(gate.lock).ino; } catch { /* absent */ }
+    const owners = (read("/proc/locks") || "").split("\n")
+      .filter(line => ino !== null && new RegExp(`:${ino} `).test(`${line} `));
+    lines.push(`kernel lock entries for this inode: ${owners.length ? "" : "none"}`);
+    for (const line of owners) lines.push(`  ${line.trim()}`);
+    lines.push("stderr tail:");
+    for (const line of (gate.stderr() || "").trimEnd().split("\n").slice(-40)) lines.push(`  ${line}`);
+  }
+  return lines.join("\n");
+}
+
 function startSlotGate(t, fx, {
   projectName,
   workspace = "workspace-a",
@@ -223,7 +278,8 @@ function startSlotGate(t, fx, {
     // gate for 27 minutes. Every process of this gate carries the tag, so all of them end here.
     killTagged(tag);
   });
-  return { child, closed, stdout, stderr, slot, lock, waitResult };
+  return { child, closed, stdout, stderr, slot, lock, waitResult, tag, label,
+    holderPath: join(backing, ".gate.holder") };
 }
 
 async function waitUntil(predicate, message, timeoutMs = 15000) {  // setup waits only; a loaded host (gates run beside cargo) needs headroom
@@ -291,9 +347,11 @@ test("ending a gate tap releases its outside-the-group slot holder", { timeout: 
     waiter.closed,
     delay(10_000).then(() => ({ timeout: true })),
   ]);
-  assert.equal(waited.timeout, undefined, "waiter did not proceed when the killed holder released the lock");
+  assert.equal(waited.timeout, undefined,
+    slotDiagnosis("waiter did not proceed when the killed holder released the lock", [holder, waiter], killedAt));
   assert.equal(waited.status, 0, waited.stderr);
-  assert.ok(Date.now() - killedAt < 10_000, "the released slot proceeds within a loaded-host margin");
+  assert.ok(Date.now() - killedAt < 10_000,
+    slotDiagnosis("the released slot proceeds within a loaded-host margin", [holder, waiter], killedAt));
   writeFileSync(release, "release\n");
   const killed = await holder.closed;
   assert.equal(killed.status, 143);
@@ -312,12 +370,14 @@ test("different workspace slots never wait on each other", { timeout: 60_000 }, 
     try { return readFileSync(ready, "utf8").trim() === "ready"; } catch { return false; }
   }, "workspace-a holder never entered its recipe");
 
+  const startedAt = Date.now();
   const second = startSlotGate(t, fx, { projectName: "workspace-b-gate", workspace: "workspace-b" });
   const result = await Promise.race([
     second.closed,
     delay(10_000).then(() => ({ timeout: true })),
   ]);
-  assert.equal(result.timeout, undefined, "a different workspace waited on the occupied slot");
+  assert.equal(result.timeout, undefined,
+    slotDiagnosis("a different workspace waited on the occupied slot", [first, second], startedAt));
   assert.equal(result.status, 0, result.stderr);
   assert.doesNotMatch(result.stdout, /cargo slot busy/);
   writeFileSync(release, "release\n");
