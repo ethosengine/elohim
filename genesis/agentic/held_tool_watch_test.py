@@ -38,8 +38,19 @@ def result(tool_id, at):
         {"type": "tool_result", "tool_use_id": tool_id, "content": "ok"}]}})
 
 
-class Fixture(unittest.TestCase):
+class HeldToolTestCase(unittest.TestCase):
     def setUp(self):
+        super().setUp()
+        clean_env = {key: value for key, value in os.environ.items()
+                     if not key.startswith("HELD_TOOL_")}
+        held_tool_env = mock.patch.dict(os.environ, clean_env, clear=True)
+        held_tool_env.start()
+        self.addCleanup(held_tool_env.stop)
+
+
+class Fixture(HeldToolTestCase):
+    def setUp(self):
+        super().setUp()
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         self.root = Path(tmp.name)
@@ -134,7 +145,8 @@ class ScanTest(Fixture):
         old = T0 - 3 * 86400
         os.utime(self.main, (old, old))
         budget = W["Budget"]()
-        with mock.patch.dict(W["scan"].__globals__["time"].__dict__, {"time": lambda: T0}):
+        with mock.patch.dict(W["scan"].__globals__,
+                             {"time": SimpleNamespace(time=lambda: T0)}):
             self.assertEqual(W["scan"]([SESSION], str(self.transcripts), 120, T0 + 500, budget=budget), [])
         self.assertEqual(budget.read, 0)
 
@@ -179,7 +191,7 @@ def status_json(*incidents):
     return json.dumps({"sessions": [{"session": k, "openIncidents": v} for k, v in sessions.items()]})
 
 
-class NoStateDir(unittest.TestCase):
+class NoStateDir(HeldToolTestCase):
     def tearDown(self):
         self.assertFalse(Path(W["REPO_ROOT"], ".eprfs/status/held-tool-watch").exists())
         self.assertFalse(Path(W["main_checkout"](W["REPO_ROOT"]), ".eprfs/status/held-tool-watch").exists())
@@ -435,6 +447,12 @@ class CarryFixture(Fixture, NoStateDir):
         self.commit = "a" * 40
         self.closure = "b" * 64
         self.now = 1_900_000_000
+        self.monotonic = 10_000.0
+        clock = SimpleNamespace(time=lambda: self.now, monotonic=lambda: self.monotonic,
+                                sleep=lambda _seconds: None)
+        clock_patch = mock.patch.dict(W["cmd_carry"].__globals__, {"time": clock})
+        clock_patch.start()
+        self.addCleanup(clock_patch.stop)
         self.calls = []
         self.room = {"verdict": "admit", "reason": "two seats free"}
         self.holder = None
@@ -555,7 +573,9 @@ class CarryFixture(Fixture, NoStateDir):
 
     def run_carry(self, **changes):
         out = io.StringIO()
-        with contextlib.redirect_stdout(out):
+        with contextlib.redirect_stdout(out), \
+                mock.patch.dict(W["cmd_carry"].__globals__,
+                                {"_carry_paths_in_use": lambda *_args: False}):
             code = W["cmd_carry"](self.args(**changes), runner=self.runner, gate_runner=self.gate)
         return code, out.getvalue().splitlines()
 
@@ -924,8 +944,10 @@ class CarryTest(CarryFixture):
             raise AssertionError(argv)
 
         globals_ = W["run_carried_gate"].__globals__
+        clock = SimpleNamespace(time=lambda: self.now, monotonic=lambda: self.monotonic,
+                                sleep=lambda _seconds: None)
         with mock.patch.object(globals_["subprocess"], "Popen", side_effect=popen), \
-                mock.patch.object(globals_["time"], "sleep", return_value=None), \
+                mock.patch.dict(globals_, {"time": clock}), \
                 mock.patch.object(globals_["os"], "killpg", side_effect=AssertionError("killpg")):
             code, _, _, stopped, returned_log, settled, verdict = W["run_carried_gate"](
                 W["REPO_ROOT"], self.repo, self.commit, "eprfs", {}, W["time"].monotonic() + 10,
@@ -1021,7 +1043,8 @@ class CarryTest(CarryFixture):
         args = ["run", "--stasis-root", str(self.stasis), "--bin-store", str(self.store),
                 "--repo-root", str(self.repo), "--every", "60", "--carry-every", "60", "--passes", "3"]
         globals_ = W["cmd_run"].__globals__
-        with mock.patch.dict(globals_["time"].__dict__, {"monotonic": lambda: clock[0], "sleep": sleep}), \
+        local_time = SimpleNamespace(time=lambda: T0, monotonic=lambda: clock[0], sleep=sleep)
+        with mock.patch.dict(globals_, {"time": local_time}), \
                 mock.patch.dict(globals_, {"run_pass": run_pass, "start_async_pass": start,
                                            "poll_async_pass": lambda job: None}), \
                 contextlib.redirect_stderr(io.StringIO()):
@@ -1259,8 +1282,9 @@ sys.exit(9)
             return 1, "", "berth unavailable"
 
         globals_ = W["cmd_run"].__globals__
+        local_time = SimpleNamespace(time=lambda: T0, monotonic=lambda: clock[0], sleep=sleep)
         with contextlib.redirect_stderr(io.StringIO()) as err, \
-                mock.patch.dict(globals_["time"].__dict__, {"sleep": sleep, "monotonic": lambda: clock[0]}), \
+                mock.patch.dict(globals_, {"time": local_time}), \
                 mock.patch.dict(globals_, {"run_pass": failed_pass}):
             self.assertEqual(W["main"](args), 0)
         lines = err.getvalue().splitlines()
@@ -1323,6 +1347,7 @@ sys.exit(9)
 
 class BerthStatusTest(NoStateDir):
     def setUp(self):
+        super().setUp()
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         self.dir = Path(tmp.name)
@@ -1365,7 +1390,7 @@ class BerthStatusTest(NoStateDir):
 REAL_INTENTS = HERE / "fixtures/peer-intents-json.real.json"
 
 
-class RealIntentsShapeTest(unittest.TestCase):
+class RealIntentsShapeTest(HeldToolTestCase):
     """Carry reads the shape the real CLI prints, captured from `epr peer intents --json`."""
 
     def test_the_captured_full_output_yields_the_announced_miss_and_skips_unannounced_rows(self):
