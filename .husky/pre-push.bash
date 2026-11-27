@@ -1541,6 +1541,15 @@ for PUSH_LINE in "${PUSH_LINES[@]}"; do
 done
 LIVE_SHA="${LIVE_DEV_SHA:-$LIVE_SHA}"
 
+# A dev lander carries the hand-over's native intent into every project gate. The lookup is one
+# bounded, read-only device-head call; absence or failure is advisory and leaves each gate to run
+# here. Main and self/* pushes do not consume landing intents.
+if [ -n "$LIVE_DEV_SHA" ] && [ "${LANDING_INTENT:-on}" != off ] && [ -z "${GATE_LANDING_INTENT+x}" ]; then
+  GATE_LANDING_INTENT=$(node genesis/orchestrator/landing-intent.mjs \
+    --head "$LIVE_DEV_SHA" --root "$HOOK_WORK_TREE")
+  [ -z "$GATE_LANDING_INTENT" ] || export GATE_LANDING_INTENT
+fi
+
 # Live gate events: every red this push raises — a check below, the preflight, or a line a gate
 # prints — is appended to a run log on this device as it happens, so the session that started the
 # push hears it at its next tool call (`gate-live-inject`) or wakes on it (`gate-live.mjs follow`,

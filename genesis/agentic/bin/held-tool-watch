@@ -50,8 +50,9 @@ already writes and hands what it senses to the native fold.
       Cargo and rustc run from a private directory outside the candidate, with this device's Cargo
       home and trusted toolchain/env; checkout hooks, LFS and attributes filters are disabled, so
       candidate code first executes when its vouched-for gate recipe starts. Hold a berth cargo seat
-      for that gate's life, and yield through `gate-live stop --now` if local dev integration begins,
-      the switch turns off, the parent runner exits, or the deadline arrives. Release the carry claim
+      for that gate's life, and yield through `gate-live stop --now` if local dev integration, a
+      foreign cargo holder, or an interactive gate begins, the switch turns off, the parent runner
+      exits, or the deadline arrives. Release the carry claim
       when no verdict was recorded, remove its worktree and exact `-wt-<worktree>` cargo slot only
       after gate-live records the run closed and `/proc` names no user, and release the seat. A stop
       that cannot be confirmed preserves the claim and assets. If a released carry's verdict arrives
@@ -1142,6 +1143,48 @@ def _dev_integration_holder(repo, runner):
     return holder.get("holder") if isinstance(holder, dict) else None
 
 
+def _cargo_holder(repo, runner, own=None):
+    """A cargo holder other than `own`. `berth who cargo` prints a list (the lease has several
+    seats); a single record or null is accepted too, so either shape is read."""
+    rows = _json_call(runner, [berth_bin(), "who", "cargo"], cwd=repo)
+    if isinstance(rows, dict):
+        rows = [rows]
+    if not isinstance(rows, list):
+        return None
+    for row in rows:
+        holder = row.get("holder") if isinstance(row, dict) else None
+        if isinstance(holder, str) and holder and holder != own:
+            return holder
+    return None
+
+
+def _interactive_gate_holder(repo, now=None):
+    """The holder of a non-stale open `just gate` run, never a carrier's own gate-live run."""
+    runs = os.path.join(main_checkout(repo), ".eprfs", "status", "gate-live", "runs")
+    try:
+        names = sorted(os.listdir(runs), reverse=True)
+    except OSError:
+        return None
+    instant = time.time() if now is None else now
+    for name in names:
+        path = os.path.join(runs, name)
+        try:
+            if instant - os.path.getmtime(path) > 6 * 60 * 60:
+                continue
+        except OSError:
+            continue
+        events = _gate_events(path)
+        opened = next((event for event in events if event.get("kind") == "run-open"), None)
+        if not isinstance(opened, dict) or any(event.get("kind") == "run-close" for event in events):
+            continue
+        candidate = opened.get("candidate")
+        if not isinstance(candidate, dict) or candidate.get("target") != "just gate":
+            continue
+        holder = opened.get("session")
+        return holder if isinstance(holder, str) and holder else os.path.splitext(name)[0]
+    return None
+
+
 def _parent_alive(pid):
     if not pid:
         return True
@@ -1384,6 +1427,18 @@ def _cmd_carry_locked(args, repo, status_dir, runner, gate_runner):
                 decline_once(status_dir, repo, miss, reason, runner)
                 say(carry_line(miss, reason))
                 return 0
+            holder = _cargo_holder(repo, runner, carry_session)
+            if holder:
+                reason = f"local cargo is held by {holder}"
+                decline_once(status_dir, repo, miss, reason, runner)
+                say(carry_line(miss, reason))
+                return 0
+            holder = _interactive_gate_holder(repo, now)
+            if holder:
+                reason = f"interactive gate is held by {holder}"
+                decline_once(status_dir, repo, miss, reason, runner)
+                say(carry_line(miss, reason))
+                return 0
             remaining_wait = int(miss["waitUntil"] - now)
             valid_for = min(MAX_CARRY_VALID_S, max(600, p90 * 3), remaining_wait)
             if valid_for <= 0:
@@ -1436,6 +1491,12 @@ def _cmd_carry_locked(args, repo, status_dir, runner, gate_runner):
                     holder_now = _dev_integration_holder(repo, runner)
                     if holder_now:
                         return f"local landing started ({holder_now})"
+                    cargo_now = _cargo_holder(repo, runner, carry_session)
+                    if cargo_now:
+                        return f"local cargo started ({cargo_now})"
+                    gate_now = _interactive_gate_holder(repo, now)
+                    if gate_now:
+                        return f"interactive gate started ({gate_now})"
                 return None
 
             gate_started = True

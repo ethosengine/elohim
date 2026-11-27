@@ -438,6 +438,18 @@ class CarryFixture(Fixture, NoStateDir):
         (self.repo / ".worktrees").mkdir(parents=True)
         self.pool = self.root / "cargo-pool"
         (self.pool / "family").mkdir(parents=True)
+        self.tmp = self.root / "held-tool-closure-fixture"
+        self.tmp.mkdir()
+
+        @contextlib.contextmanager
+        def execution_root():
+            yield str(self.tmp)
+
+        closure_patch = mock.patch.dict(W["cmd_carry"].__globals__, {
+            "_closure_execution_root": execution_root,
+        })
+        closure_patch.start()
+        self.addCleanup(closure_patch.stop)
         self.store = self.root / "bin-store"
         self.head = self.store / "epr" / CID_NEW / "epr"
         self.head.parent.mkdir(parents=True)
@@ -456,6 +468,7 @@ class CarryFixture(Fixture, NoStateDir):
         self.calls = []
         self.room = {"verdict": "admit", "reason": "two seats free"}
         self.holder = None
+        self.cargo_holder = None
         self.fetch = 0
         self.computed = self.closure
         self.gate_code = 0
@@ -470,7 +483,9 @@ class CarryFixture(Fixture, NoStateDir):
         self.commitment = "bafyreiaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         self.misses = [self.miss()]
         Path(self.root, W["CARRY_ON_FILE"]).write_text(W["rfc3339"](self.now + 7 * 86400) + "\n")
-        self.pool_env = mock.patch.dict(os.environ, {"CARGO_TARGET_POOL_ROOT": str(self.pool)})
+        self.pool_env = mock.patch.dict(os.environ, {
+            "CARGO_TARGET_POOL_ROOT": str(self.pool), "TMPDIR": str(self.tmp),
+        })
         self.pool_env.start()
         self.addCleanup(self.pool_env.stop)
 
@@ -517,6 +532,11 @@ class CarryFixture(Fixture, NoStateDir):
             return 0, "", ""
         if "who" in argv and "dev-integration" in argv:
             return 0, json.dumps(self.holder), ""
+        if "who" in argv and "cargo" in argv:
+            # The real `berth who cargo` prints a list (the lease has several seats).
+            rows = self.cargo_holder if isinstance(self.cargo_holder, list) else (
+                [] if self.cargo_holder is None else [self.cargo_holder])
+            return 0, json.dumps(rows), ""
         if argv[:4] == ["git", "-C", str(self.repo), "fetch"]:
             return self.fetch, "", "fetch refused" if self.fetch else ""
         if argv[0].endswith("ram-guard"):
@@ -553,6 +573,10 @@ class CarryFixture(Fixture, NoStateDir):
             slot.mkdir(parents=True)
         if self.gate_stop:
             self.holder = {"holder": "local-lander"} if self.gate_stop == "landing" else self.holder
+            self.cargo_holder = ({"holder": "interactive-builder"}
+                                 if self.gate_stop == "cargo" else self.cargo_holder)
+            if self.gate_stop == "interactive":
+                self.open_live_run("just gate", "interactive-agent")
             if self.gate_stop == "off":
                 Path(self.root, W["CARRY_ON_FILE"]).unlink()
             if self.gate_stop == "expired":
@@ -570,6 +594,15 @@ class CarryFixture(Fixture, NoStateDir):
         code = 17 if stopped else self.gate_code
         error = "stopped" if stopped else ("infra red" if self.gate_code else "")
         return code, "", error, stopped, str(run_log), self.gate_settled, self.gate_verdict and not stopped
+
+    def open_live_run(self, target, session):
+        runs = self.repo / ".eprfs/status/gate-live/runs"
+        runs.mkdir(parents=True, exist_ok=True)
+        path = runs / f"{session}.jsonl"
+        path.write_text(json.dumps({"kind": "run-open", "session": session,
+                                    "candidate": {"target": target}}) + "\n")
+        os.utime(path, (self.now, self.now))
+        return path
 
     def run_carry(self, **changes):
         out = io.StringIO()
@@ -757,6 +790,37 @@ class CarryTest(CarryFixture):
                 self.assertEqual(self.claims(), [])
                 self.assertIn("cargo seat" if mode == "seat" else "local dev-integration", lines[-1])
 
+    def test_foreign_cargo_holder_declines_but_the_carriers_own_lease_does_not(self):
+        self.cargo_holder = {"holder": "interactive-builder"}
+        code, lines = self.run_carry()
+        self.assertEqual(code, 0)
+        self.assertEqual(self.claims(), [])
+        self.assertIn("local cargo is held by interactive-builder", lines[-1])
+        self.assertEqual(len([c for c in self.calls if "say" in c["argv"]]), 1)
+
+        self.calls.clear()
+        self.cargo_holder = {"holder": f"held-tool-carry-{os.getpid()}"}
+        code, lines = self.run_carry()
+        self.assertEqual(code, 0)
+        self.assertEqual(len(self.claims()), 1)
+        self.assertIn("gate green", lines[-1])
+
+    def test_open_interactive_gate_declines_but_a_carrier_run_does_not(self):
+        carrier = self.open_live_run("held-tool-carry:eprfs", "held-tool-carry-other")
+        code, lines = self.run_carry()
+        self.assertEqual(code, 0)
+        self.assertEqual(len(self.claims()), 1)
+        self.assertIn("gate green", lines[-1])
+
+        self.calls.clear()
+        carrier.unlink()
+        self.open_live_run("just gate", "interactive-agent")
+        code, lines = self.run_carry()
+        self.assertEqual(code, 0)
+        self.assertEqual(self.claims(), [])
+        self.assertIn("interactive gate is held by interactive-agent", lines[-1])
+        self.assertEqual(len([c for c in self.calls if "say" in c["argv"]]), 1)
+
     def test_failed_gate_verdict_settles_the_claim_and_releases_the_cargo_seat(self):
         self.gate_code = 7
         code, lines = self.run_carry()
@@ -864,6 +928,22 @@ class CarryTest(CarryFixture):
         self.assertEqual(code, 1)
         self.assertIn("yielded: local landing started", lines[-1])
         self.assertEqual(len(self.releases()), 1)
+
+    def test_foreign_cargo_or_interactive_gate_start_yields_the_running_carry(self):
+        for mode, reason in (("cargo", "local cargo started (interactive-builder)"),
+                             ("interactive", "interactive gate started (interactive-agent)")):
+            with self.subTest(mode=mode):
+                self.calls.clear()
+                self.cargo_holder = None
+                runs = self.repo / ".eprfs/status/gate-live/runs"
+                if runs.exists():
+                    for path in runs.iterdir():
+                        path.unlink()
+                self.gate_stop = mode
+                code, lines = self.run_carry()
+                self.assertEqual(code, 1)
+                self.assertIn(f"yielded: {reason}", lines[-1])
+                self.assertEqual(len(self.releases()), 1)
 
     def test_switching_off_during_the_gate_stops_and_releases(self):
         self.gate_stop = "off"
