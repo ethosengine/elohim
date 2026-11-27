@@ -22,7 +22,7 @@ cites:
   - genesis/research/commons-composition-at-scale-2026-10-15.md
   - "memory-search-scale-three-seams-design | Memory, search and scale — an index is a measure, reach at replication, pool folds on arcs (the three seams) | sha256:5397da36e2c29635 | path: genesis/docs/superpowers/specs/2026-09-12-memory-search-scale-three-seams-design.md"
   - "reliance-as-cite-shared-provenance-primitives-design | Reliance as cite — the first implementation of the shared provenance primitives, for code, the co-op grocer and the community-garden network | sha256:ed648f3378dba82a | path: genesis/docs/superpowers/specs/2026-10-15-reliance-as-cite-shared-provenance-primitives-design.md"
-  - "elohim-seam-map-concern-routing | The Elohim Seam Map — A Concern-Routing Atlas | sha256:4beadae30ba30633 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
+  - "elohim-seam-map-concern-routing | The Elohim Seam Map — A Concern-Routing Atlas | sha256:bafafa8ebf59e1a5 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
   - .claude/skills/elohim-commons-design/SKILL.md
   - .claude/skills/p2p-design-gate/SKILL.md
   - .claude/skills/gradient-reading/SKILL.md

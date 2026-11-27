@@ -11,9 +11,9 @@ serves: [private-feedback-loop, workspace-device-arrival, pain-is-answered, dev-
 refines: native-dev-tooling-over-peers-plan
 cites:
   - "feedback-as-a-lifecycle-item-design | the design whose stations FB-1 to FB-10 this plan restates as claimable | sha256:120869ada259e93d | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
-  - "one-loop-for-every-producer-design | the companion whose contract and store rule the FC stations fix as shapes | sha256:49f57459097ec394 | path: genesis/docs/superpowers/specs/2026-11-27-one-loop-for-every-producer-design.md"
+  - "one-loop-for-every-producer-design | the companion whose contract and store rule the FC stations fix as shapes | sha256:e7361b750b95dce3 | path: genesis/docs/superpowers/specs/2026-11-27-one-loop-for-every-producer-design.md"
   - "native-dev-tooling-over-peers-plan | the epic's plan this is a child of; its peer link, channel list and bin store are what this work rides | sha256:983afa13e08fe1d3 | path: genesis/docs/superpowers/plans/2026-10-29-native-dev-tooling-over-peers-plan.md"
-  - "observer-protocol | source of the safeguards station FC-9 answers line by line | sha256:efca99bb3cdf89d3 | path: genesis/docs/content/elohim-protocol/observer-protocol.md"
+  - "observer-protocol | source of the safeguards station FC-9 answers line by line | sha256:78afb76e1fb58772 | path: genesis/docs/content/elohim-protocol/observer-protocol.md"
 ---
 
 # The feedback loop and its contract — the stations
@@ -30,7 +30,7 @@ peer link, the channel's list and the bin store that this work rides are that ep
 
 Three things to know before claiming a station:
 
-- **The contract comes first.** The steward, 2026-11-27: "let's start a sprint making sure we've got the right primitives/interfaces/compositions to take this spec into it's contract so we can help drive consistency through other sprints.." The FC stations are that sprint. An FB station that builds against an interface the FC stations have not yet fixed says so in its State line.
+- **The contract comes first.** The steward, 2026-11-27, as typed: "let's start a sprint making sure we've got the right primitives/interfaces/compositions to take this spec into it's contract so we can help drive consistency through other sprints.." The FC stations are that sprint. An FB station that builds against an interface the FC stations have not yet fixed says so in its State line.
 - **Both designs are Drafts.** Each lists decisions that are the steward's, with a working posture on each. A station whose State line says it waits on a ruling is not claimable until that ruling exists.
 - **Nothing here was re-measured.** Each State line repeats a design or the survey behind it, as of 2026-11-27, in a worktree at dev `e4fe04965`.
 
@@ -56,9 +56,9 @@ Verify: one table in the sprint directory in which each primitive has exactly on
 
 - [ ] **FC-2 — the declaration a producer ships has one schema in the SDK, and brit's shipped table validates against it unchanged** (serves private-feedback-loop)
 
-State: not built. brit ships `{"claims": [...], "cures": [...]}` with twelve fields per claim (lifecycle spec section 5.4 and the seam of section 12). The SDK has two neighbouring shapes: `ClaimDeclaration` and `ObservationDeclaration` in `app-manifest.schema.json`, and `observation-kind.schema.json`. No schema describes brit's file. The P2P design gate for the declaration is recorded in the lifecycle spec's section 13: content-derived, part of the producer's own release, no DHT entry.
+State: not built; the place its schema lives waits on the steward's ruling (companion section 12, decision 2: SDK schema now, or after a second producer has used the call). Until then the deliverable is a draft schema in the sprint directory. brit ships `{"claims": [...], "cures": [...]}` with twelve fields per claim (lifecycle spec section 5.4 and the seam of section 12). The SDK has two neighbouring shapes: `ClaimDeclaration` and `ObservationDeclaration` in `app-manifest.schema.json`, and `observation-kind.schema.json`. No schema describes brit's file. The P2P design gate for the declaration is recorded in the lifecycle spec's section 13: content-derived, part of the producer's own release, no DHT entry.
 
-Verify: a schema file under `elohim/sdk/schemas/v1/manifest/` accepts the `claims.json` of the brit release that carries it, byte for byte, and refuses a row with an unknown field, a severity or polarity outside its list, or a `validityHorizon` that is not an ISO 8601 duration. The schema's own test runs in the SDK's schema test step.
+Verify: a draft schema file in the sprint directory accepts the `claims.json` of the brit release that carries it, byte for byte, and refuses a row with an unknown field, a severity or polarity outside its list, or a `validityHorizon` that is not an ISO 8601 duration. After the ruling, the same file under `elohim/sdk/schemas/v1/manifest/` with its test in the SDK's schema test step.
 
 - [ ] **FC-3 — the one call that records an observation has one written interface and two carriers that agree field for field** (serves private-feedback-loop)
 
@@ -68,9 +68,9 @@ Verify: one fixture expresses the same observation for each door; a test on each
 
 - [ ] **FC-4 — the reading of a term and the summary that may leave a device are each one closed shape, shared by every consumer** (serves private-feedback-loop)
 
-State: not built. The lifecycle spec gives nine readings with an order of precedence (section 6) and the summary's fields with their sources by state (section 5.5), in prose and tables. The SDK names the missing piece `ClaimInstance`.
+State: not built; like FC-2, where its schema lives waits on the steward's ruling (companion section 12, decision 2), and until then the deliverable is a draft in the sprint directory. The lifecycle spec gives nine readings with an order of precedence (section 6) and the summary's fields with their sources by state (section 5.5), in prose and tables. The SDK names the missing piece `ClaimInstance`.
 
-Verify: the readings and the summary are schema, with the precedence as a table-driven test that any implementation can run, and the story `genesis/a2o/features/devflow/feedback-drains-when-cured.feature` uses only readings the schema lists.
+Verify: the readings and the summary are a draft schema in the sprint directory, with the precedence as a table-driven test that any implementation can run, and the story `genesis/a2o/features/devflow/feedback-drains-when-cured.feature` uses only readings the schema lists.
 
 - [ ] **FC-5 — each act on a term names the existing command or record that performs it and the authority it needs** (serves private-feedback-loop)
 
@@ -104,7 +104,7 @@ Verify: one table with a row for each line of Part VIII, in which the feedback l
 
 - [ ] **FC-10 — each of the five doors onto this ground names the others in one line** (serves private-feedback-loop)
 
-State: four of five built, on the steward's word of 2026-11-27 ("let's make sure we get those pointers"). The Observer Protocol and the observability epic each name the lifecycle spec and the companion; the seam map routes a tool's refusal, a recurring error and a growing log in its section 3.16, its routing table and its crosswalk. Each edit was a sentence or a table row, and the cites that other documents hold on those three were refreshed in the same commit, on the ground that the only change to each target was an added pointer. Not built: the SDK pipeline (`elohim/sdk/README.md`) names none of the three. It is outside the documentation tree, so its pointer lands with FC-2.
+State: four of five built, on the steward's word of 2026-11-27, as typed: "yeah, let's make sure we get those pointers.. we'd want those edges to surface if an agent returns and is graph walking, or there's an embedder that could benefit from the relationship..." The Observer Protocol and the observability epic each name the lifecycle spec and the companion; the seam map routes a tool's refusal, a recurring error and a growing log in its section 3.16, its routing table and its crosswalk. Each edit was a sentence or a table row, and the cites this work made stale were refreshed, on the ground that the only change to each target was an added pointer: six specs and two research documents (`genesis/research/commons-composition-at-scale-2026-10-15.md` and `commons-facility-at-scale-2026-10-15.md`) whose cite of the seam map had been fresh, and this work's own documents. Cites that were already stale before these edits were left as they were. Not built: the SDK pipeline (`elohim/sdk/README.md`) names none of the three. It is outside the documentation tree, so its pointer lands with FC-2.
 
 Verify: a reader who starts at any one of the five (the Observer Protocol, the observability epic, the seam map's section 3.16, the SDK pipeline, the lifecycle spec) reaches each of the others within two links, and `epr flow cites verify` reports no stale cite among the documents that cite the edited ones.
 

@@ -13,7 +13,7 @@ cites:
   - "commons-pool-as-collective-party-design | A commons pool is a collective that is party to its members' commitments | sha256:c194ddbe3dc3b2a6 | path: genesis/docs/superpowers/specs/2026-10-04-commons-pool-as-collective-party-design.md"
   - "plural-mishpat-lenses-over-epr-design | Plural Mishpat Lenses over an EPR | sha256:14dab62ad1fb5f87 | path: genesis/docs/superpowers/specs/2026-06-27-plural-mishpat-lenses-over-epr-design.md"
   - "care-aggregation-adoption-policy-floor-design | Care Aggregation on the Deterministic Floor | sha256:5bd65c4f72fd79c2 | path: genesis/docs/superpowers/specs/2026-07-31-care-aggregation-adoption-policy-floor-design.md"
-  - "elohim-seam-map-concern-routing | The Elohim Seam Map | sha256:3ce0f9bd564ca1bf | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
+  - "elohim-seam-map-concern-routing | The Elohim Seam Map | sha256:bafafa8ebf59e1a5 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
   - "cradle-to-grave-capability-gradient | cradle-to-grave-capability-gradient | sha256:5aa31bed9f44db8c | path: genesis/docs/architecture/cradle-to-grave-capability-gradient.md"
   - "private-thought-governed-fruit | private-thought-governed-fruit | sha256:2945eb608257be1e | path: genesis/docs/architecture/private-thought-governed-fruit.md"
   - "elohim-protocol-manifesto | manifesto | sha256:bdfd593210e7fea0 | path: genesis/docs/content/elohim-protocol/manifesto.md"

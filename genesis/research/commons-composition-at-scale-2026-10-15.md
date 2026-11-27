@@ -17,7 +17,7 @@ cites:
   - "recursive-architecture-design | THE RECURSIVE ARCHITECTURE | sha256:053f260af9989d4b | path: genesis/docs/superpowers/specs/2026-06-14-recursive-architecture-design.md"
   - "plural-mishpat-lenses-over-epr-design | Plural Mishpat Lenses over an EPR | sha256:14dab62ad1fb5f87 | path: genesis/docs/superpowers/specs/2026-06-27-plural-mishpat-lenses-over-epr-design.md"
   - "requisite-variety-guidestar-epr-family-composition | Requisite variety as the guidestar | sha256:e1cf9e52fbe95c11 | path: genesis/docs/superpowers/specs/2026-08-12-requisite-variety-guidestar-epr-family-composition.md"
-  - "elohim-seam-map-concern-routing | The Elohim Seam Map | sha256:3ce0f9bd564ca1bf | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
+  - "elohim-seam-map-concern-routing | The Elohim Seam Map | sha256:bafafa8ebf59e1a5 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
   - "private-thought-governed-fruit | private-thought-governed-fruit | sha256:2945eb608257be1e | path: genesis/docs/architecture/private-thought-governed-fruit.md"
   - genesis/data/timeline/backlog/commons-pool-as-economic-authority-wallets-in-bridge-layer.md
   - genesis/data/timeline/backlog/citation-apparatus-claim-grain-typed-edges-reach-gate.md

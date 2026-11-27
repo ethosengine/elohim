@@ -6,7 +6,7 @@ status: Living reference
 author: workflow:elohim-seam-map-atlas
 cites:
   - "feedback-as-a-lifecycle-item-design | home for a tool's refusal, a recurring error or a growing log: seam 3.16 on a person's own device | sha256:120869ada259e93d | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
-  - "one-loop-for-every-producer-design | each producer's first move, the reusable patterns, a store's declared limits, and how seam 3.16 relates to the Observer Protocol | sha256:49f57459097ec394 | path: genesis/docs/superpowers/specs/2026-11-27-one-loop-for-every-producer-design.md"
+  - "one-loop-for-every-producer-design | each producer's first move, the reusable patterns, a store's declared limits, and how seam 3.16 relates to the Observer Protocol | sha256:e7361b750b95dce3 | path: genesis/docs/superpowers/specs/2026-11-27-one-loop-for-every-producer-design.md"
   - "platform-one-sdk-many-apis-design | THE ELOHIM PLATFORM MODEL | sha256:a15b10c68787a460 | path: genesis/docs/superpowers/specs/2026-06-14-platform-one-sdk-many-apis-design.md"
   - "elohim-hub-boundaries-design | elohim-hub / elohim-node / elohim-storage | sha256:233cb996edd7c366 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-02-elohim-hub-boundaries-design.md"
   - "weave-epic-arc-design | The Weave Epic | sha256:69966fdcc15dd7ba | path: genesis/docs/superpowers/specs/2026-06-20-weave-epic-arc-design.md"
@@ -434,10 +434,11 @@ canonical home · the adjacent-seam confusion to avoid.**
 - **Confusion:** self-sense is not a witness (a peer's `/metrics` is self-sense served by the peer,
   never evidence to anyone else); a self-report is self-sense dressed as a witness; the Grafana
   stack is a reader, never the store; a hub's aggregate is 3.11's rollup over fruit; a per-agent
-  label on a series is 3.15's resource-governance seam wearing a surveillance costume; a tool's
-  refusal recorded on the device that ran it is feedback, a person's own report when it leaves
-  that device, and not a witness; a log that keeps growing is a store with no declared limit,
-  not an observation.
+  label on a series is 3.15's resource-governance seam wearing a surveillance costume. Proposed,
+  in the feedback lifecycle design and its companion (both Drafts): a tool's refusal recorded on
+  the device that ran it is feedback and not a witness, and a log that keeps growing is a store
+  with no declared limit and not an observation. Whether the device counts as the observer of the
+  tool is left open there.
 
 ---
 
@@ -578,7 +579,7 @@ build-state, see the dated assessments in §6.)
 | Scheduler / Step-Functions / cron | temporal plane (3.14) |
 | Throttling / quotas / autoscaling | resource governance (3.15) + elohim-operator |
 | Observability / monitoring | observation / self-sense (3.16) over the witness log, graduating to attestations; rollup over fruit (3.11); the Grafana stack is a reader, never the store |
-| Logging / error tracking / log retention | one named occurrence per session under a term the producer declared, kept on the device that felt it and drained when a fix lands (3.16; the feedback lifecycle design); a store is born with a declared limit; a central log aggregator has no equivalent here, by design |
+| Logging / error tracking / log retention | a central log aggregator has no equivalent here, by design (3.16). Proposed, in the feedback lifecycle design and its companion (Drafts; not built, and partly waiting on the steward's rulings): one named occurrence per session under a term the producer declared, kept on the device that felt it and drained when a fix lands; a store born with a declared limit |
 | Analytics / ML platform | recursive aggregation / `CoverageRollup` (3.11) + local inference |
 | IaC / CI-CD | orchestrator + build-manifests + rakia + `deployments.json` |
 | Marketplace / service catalog | "monorepo IS the catalog" (one-SDK-many-APIs) |

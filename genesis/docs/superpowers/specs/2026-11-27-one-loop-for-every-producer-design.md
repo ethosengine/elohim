@@ -37,7 +37,7 @@ cites:
   - genesis/research/beer-designing-freedom-elohim-critique-2026-06-04.md
   - genesis/data/timeline/backlog/2026-08-10-algedonic-phase2-network-phase3-dedupe.md
   - elohim/sdk/README.md
-  - "observer-protocol | the root of the witness shape this method shares: raw capture processed where it was made and destroyed, a four-level response to harm, and the three lists of safeguards | sha256:efca99bb3cdf89d3 | path: genesis/docs/content/elohim-protocol/observer-protocol.md"
+  - "observer-protocol | the root of the witness shape this method shares: raw capture processed where it was made and destroyed, a four-level response to harm, and the three lists of safeguards | sha256:78afb76e1fb58772 | path: genesis/docs/content/elohim-protocol/observer-protocol.md"
 ---
 
 # One loop for every producer
@@ -170,9 +170,8 @@ Two directions of reuse matter most, and neither is decided here.
 ### Doors
 
 Someone will reach this ground again from another side, on foot or by walking the cite graph, so
-each door names the others in one line. The steward, 2026-11-27: "we'd want those edges to
-surface if an agent returns and is graph walking, or there's an embedder that could benefit from
-the relationship". Four of the five doors carry their pointers as of this document's landing; the
+each door names the others in one line. The steward, 2026-11-27, as typed: "yeah, let's make sure we get those pointers.. we'd want those edges to surface if an agent returns and is graph walking, or there's an embedder that could benefit from the relationship..."
+Four of the five doors carry their pointers as of this document's landing; the
 fifth is the remainder of station FC-10.
 
 | Arriving with | Read first | It points to the others |

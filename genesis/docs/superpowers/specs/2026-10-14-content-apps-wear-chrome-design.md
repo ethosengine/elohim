@@ -14,7 +14,7 @@ graduation-trigger: >
   focal) returns the bundle's bytes unchanged, with no chrome added; and an app bundle that is
   itself a chromed EPR app (spa-bundle, e.g. lamad-spa, imagodei-portal) is served unchanged.
 cites:
-  - "elohim-seam-map-concern-routing | places app-serving and render runtimes peer-side and keeps the doorway to web2 delivery; this spec's navigation shell is delivery behaviour in that seam | sha256:4beadae30ba30633 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
+  - "elohim-seam-map-concern-routing | places app-serving and render runtimes peer-side and keeps the doorway to web2 delivery; this spec's navigation shell is delivery behaviour in that seam | sha256:bafafa8ebf59e1a5 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
 ---
 
 # Content apps wear chrome

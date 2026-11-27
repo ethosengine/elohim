@@ -2,7 +2,7 @@
 id: observer-protocol
 cites:
   - "feedback-as-a-lifecycle-item-design | the same witness turned on the tools a person works with: a declared name per problem, kept on the device that felt it, drained when a fix lands | sha256:120869ada259e93d | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
-  - "one-loop-for-every-producer-design | sets this protocol, the observability epic and the feedback loop side by side: where they agree, seven seams, and the pieces one has that the others need | sha256:49f57459097ec394 | path: genesis/docs/superpowers/specs/2026-11-27-one-loop-for-every-producer-design.md"
+  - "one-loop-for-every-producer-design | sets this protocol, the observability epic and the feedback loop side by side: where they agree, seven seams, and the pieces one has that the others need | sha256:e7361b750b95dce3 | path: genesis/docs/superpowers/specs/2026-11-27-one-loop-for-every-producer-design.md"
   - "observability-epic | the companion that turns this epic's witness inward onto the network itself: self-sense, witness and fruit, with Part VIII's safeguards restated for peers, hubs and health | path: genesis/docs/content/elohim-protocol/observability/epic.md"
   - "elohim-protocol-manifesto | The vision this epic deepens; its Witnessed Humanity section (Part III) is the digital half of the Sybil answer whose physical half is written here: humanity witnessed by those who know you, attunement over filters, the sense that notices a counterfeit, the privacy line. | sha256:8ce1acd2670cf1f1 | path: genesis/docs/content/elohim-protocol/manifesto.md"
   - "shefa-economic-infrastructure | The economic pillar where social attestation against Sybil rings was first written (§5): people who know you attest, staking their own standing; the Observer adds the physical witness to that same relational shape. | sha256:74323616b4696d99 | path: genesis/docs/content/elohim-protocol/shefa.md"
@@ -267,7 +267,7 @@ Complete implementation where desired. Work, civic, community spaces joining. Li
 
 The network's observation of itself — its peers, hubs and health — under these same safeguards is written in the [Observability epic](observability/epic.md): the same witness, turned inward.
 
-The same witness turned on the tools a person works with, on their errors, logs and measures, is written in the [feedback lifecycle design](../../superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md). Its companion, [one loop for every producer](../../superpowers/specs/2026-11-27-one-loop-for-every-producer-design.md), sets the three side by side and says where they differ and what each could use of the others'.
+A related design, a Draft, turns a witness of this kind on the tools a person works with, on their errors, logs and measures: the [feedback lifecycle design](../../superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md). Its companion, [one loop for every producer](../../superpowers/specs/2026-11-27-one-loop-for-every-producer-design.md), sets the three side by side and says where they are alike, where they are not the same thing, and what each could use of the others'.
 
 ## **Part IX: Beyond Surveillance Capitalism**
 
