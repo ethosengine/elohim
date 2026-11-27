@@ -382,8 +382,89 @@ fn signature(row: &ParticipantRow, key: &DeviceKey) -> String {
         .collect()
 }
 
+/// Which bytes the sibling offers in `sibling_draw`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Offered {
+    /// The `epr` and `bin-launch` this test run built.
+    Built,
+    /// The same, with the offered `epr`'s ELF interpreter rewritten to a path no host has.
+    UnmetLoader,
+}
+
+/// What the draw owes on this host.
+enum Owed {
+    Drawn,
+    /// Refused before either binary runs, naming the loader this host's probe does not observe.
+    RefusedForLoader(String),
+}
+
+/// The byte offset and length (without its NUL) of an ELF64 little-endian file's PT_INTERP path.
+fn elf_interpreter(bytes: &[u8]) -> Option<(usize, usize)> {
+    const PT_INTERP: u32 = 3;
+    if bytes.len() < 64 || &bytes[..4] != b"\x7fELF" || bytes[4] != 2 || bytes[5] != 1 {
+        return None;
+    }
+    let u16_at = |at: usize| u16::from_le_bytes(bytes[at..at + 2].try_into().unwrap()) as usize;
+    let u64_at = |at: usize| u64::from_le_bytes(bytes[at..at + 8].try_into().unwrap()) as usize;
+    let (phoff, phentsize, phnum) = (u64_at(0x20), u16_at(0x36), u16_at(0x38));
+    (0..phnum).find_map(|i| {
+        let header = phoff + i * phentsize;
+        let kind = u32::from_le_bytes(bytes[header..header + 4].try_into().unwrap());
+        (kind == PT_INTERP).then(|| (u64_at(header + 8), u64_at(header + 32).saturating_sub(1)))
+    })
+}
+
+fn interpreter_of(file: &Path) -> Option<String> {
+    let bytes = fs::read(file).unwrap();
+    let (at, len) = elf_interpreter(&bytes)?;
+    Some(String::from_utf8(bytes[at..at + len].to_vec()).unwrap())
+}
+
+/// The loaders this host's own probe observes: the set the draw judges a staged binary against.
+fn observed_loaders() -> std::collections::BTreeSet<String> {
+    let host = ark_supervisor::host::observe_host();
+    match host.observed(&host_contract::AxisId(
+        host_contract::names::axis::ABI_LOADER.into(),
+    )) {
+        Some(host_contract::AxisValue::Names(names)) => names.clone(),
+        _ => Default::default(),
+    }
+}
+
+/// Rewrite the last character of `file`'s ELF interpreter so it names a loader that exists nowhere,
+/// keeping its length (the bytes still parse; they are refused before they would ever run).
+fn set_absent_loader(file: &Path) -> String {
+    let mut bytes = fs::read(file).unwrap();
+    let (at, len) = elf_interpreter(&bytes).expect("the built epr is a dynamic ELF");
+    bytes[at + len - 1] = if bytes[at + len - 1] == b'9' {
+        b'8'
+    } else {
+        b'9'
+    };
+    let absent = String::from_utf8(bytes[at..at + len].to_vec()).unwrap();
+    assert!(
+        !Path::new(&absent).exists(),
+        "{absent} must not exist on this host"
+    );
+    fs::write(file, bytes).unwrap();
+    absent
+}
+
+/// A declared non-builder with no release for HEAD draws the one its sibling serves, and never
+/// runs cargo; whether the draw is admitted is what the drawn bytes require of THIS host.
 #[test]
 fn declared_non_builder_draws_an_absent_sibling_release_without_cargo() {
+    sibling_draw(Offered::Built);
+}
+
+/// The opposite case, on every host: bytes whose loader this host lacks are refused before either
+/// binary runs, naming the loader, with nothing ingested, the installed head kept and no cargo.
+#[test]
+fn declared_non_builder_refuses_a_sibling_release_whose_loader_this_host_lacks() {
+    sibling_draw(Offered::UnmetLoader);
+}
+
+fn sibling_draw(case: Offered) {
     const HANDLE: &str = "matthew";
 
     let temp = tempfile::tempdir().unwrap();
@@ -538,6 +619,32 @@ fn declared_non_builder_draws_an_absent_sibling_release_without_cargo() {
     assert!(bin_launch.is_file(), "build bin-launch before this test");
     fs::copy(&epr, offered.join("epr")).unwrap();
     fs::copy(&bin_launch, offered.join("bin-launch")).unwrap();
+    let loaders = observed_loaders();
+    let owed = match case {
+        Offered::UnmetLoader => Owed::RefusedForLoader(set_absent_loader(&offered.join("epr"))),
+        Offered::Built => {
+            // The draw re-extracts what the bytes require and judges it on this host, so the
+            // outcome follows how this run's binaries were linked: a build against this host's
+            // standard loader is drawn; a build whose loader the probe does not observe (CI's
+            // nix-shell build names a /nix/store loader, which the probe's fixed list never
+            // holds) is owed the refusal, and the test says which it exercised.
+            let unobserved = ["epr", "bin-launch"]
+                .into_iter()
+                .filter_map(|bin| interpreter_of(&offered.join(bin)))
+                .find(|loader| !loaders.contains(loader));
+            match unobserved {
+                None => Owed::Drawn,
+                Some(loader) => {
+                    eprintln!(
+                        "this host's probe does not observe {loader}, the loader this run's \
+                         binaries were linked against (observed: {loaders:?}); asserting the \
+                         refusal the draw owes here instead of the draw"
+                    );
+                    Owed::RefusedForLoader(loader)
+                }
+            }
+        }
+    };
     let release = store.release_cid_of(&offered).unwrap();
     assert!(
         !store.root().join(&release).exists(),
@@ -745,25 +852,50 @@ fn declared_non_builder_draws_an_absent_sibling_release_without_cargo() {
         .output()
         .unwrap();
 
-    assert!(output.status.success(), "{}", text(&output));
-    let result: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(
-        result["sibling"]["device"],
-        sibling_key.did_key(),
-        "{}",
-        text(&output)
-    );
-    assert_eq!(result["sibling"]["release"], release, "{}", text(&output));
-    assert_eq!(
+    let installed = || {
         serde_json::from_slice::<serde_json::Value>(
-            &fs::read(store.root().join("current.json")).unwrap()
+            &fs::read(store.root().join("current.json")).unwrap(),
         )
-        .unwrap()["cid"],
-        release,
-        "{}",
-        text(&output)
-    );
-    assert!(store.holds_verified_for(&head));
+        .unwrap()["cid"]
+            .clone()
+    };
+    match owed {
+        Owed::Drawn => {
+            assert!(output.status.success(), "{}", text(&output));
+            let result: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+            assert_eq!(
+                result["sibling"]["device"],
+                sibling_key.did_key(),
+                "{}",
+                text(&output)
+            );
+            assert_eq!(result["sibling"]["release"], release, "{}", text(&output));
+            assert_eq!(installed(), release, "{}", text(&output));
+            assert!(store.holds_verified_for(&head));
+        }
+        Owed::RefusedForLoader(loader) => {
+            assert!(!output.status.success(), "{}", text(&output));
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            assert!(stderr.contains("abi.loader unmet"), "{}", text(&output));
+            assert!(
+                stderr.contains(&loader),
+                "names {loader}: {}",
+                text(&output)
+            );
+            assert!(stderr.contains("nothing was ingested"), "{}", text(&output));
+            assert_eq!(
+                installed(),
+                old_cid,
+                "the installed head is kept: {}",
+                text(&output)
+            );
+            assert!(!store.holds_verified_for(&head));
+            assert!(
+                !store.root().join(&release).exists(),
+                "the refused release is never stored"
+            );
+        }
+    }
     assert!(
         !base.join("cargo.log").exists(),
         "a declared non-builder never invokes cargo"
