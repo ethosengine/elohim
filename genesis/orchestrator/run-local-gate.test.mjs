@@ -338,7 +338,9 @@ test("ending a gate tap releases its outside-the-group slot holder", { timeout: 
   const release = join(fx.dir, "never.release");
   const holder = startSlotGate(t, fx, {
     projectName: "holder",
-    env: { GATE_TEST_READY: ready, GATE_TEST_RELEASE: release },
+    // A short TERM grace: if a member of the stopped gate's session misses the holder's TERM too, the
+    // KILL after this grace is what frees the slot, inside the 10 s bound below.
+    env: { GATE_TEST_READY: ready, GATE_TEST_RELEASE: release, GATE_SLOT_DRAIN_TERM_MS: "500" },
   });
   await waitUntil(() => {
     try { return readFileSync(ready, "utf8").trim() === "ready"; } catch { return false; }
@@ -352,11 +354,13 @@ test("ending a gate tap releases its outside-the-group slot holder", { timeout: 
     waiter.closed,
     delay(10_000).then(() => ({ timeout: true })),
   ]);
-  assert.equal(waited.timeout, undefined,
-    slotDiagnosis("waiter did not proceed when the killed holder released the lock", [holder, waiter], killedAt));
+  if (waited.timeout !== undefined) {
+    assert.fail(slotDiagnosis("waiter did not proceed when the killed holder released the lock", [holder, waiter], killedAt));
+  }
   assert.equal(waited.status, 0, waited.stderr);
-  assert.ok(Date.now() - killedAt < 10_000,
-    slotDiagnosis("the released slot proceeds within a loaded-host margin", [holder, waiter], killedAt));
+  if (Date.now() - killedAt >= 10_000) {
+    assert.fail(slotDiagnosis("the released slot proceeds within a loaded-host margin", [holder, waiter], killedAt));
+  }
   writeFileSync(release, "release\n");
   const killed = await holder.closed;
   assert.equal(killed.status, 143);
@@ -383,8 +387,9 @@ test("a gate stopped from outside frees its slot without the drain, even when a 
   holder.child.kill("SIGTERM");
   // An unref'd timer: the bound must not keep the test file alive after the waiter is admitted.
   const waited = await Promise.race([waiter.closed, delay(30_000, { timeout: true }, { ref: false })]);
-  assert.equal(waited.timeout, undefined,
-    slotDiagnosis("a stopped gate's TERM-ignoring member kept the slot for the drain", [holder, waiter], killedAt));
+  if (waited.timeout !== undefined) {
+    assert.fail(slotDiagnosis("a stopped gate's TERM-ignoring member kept the slot for the drain", [holder, waiter], killedAt));
+  }
   assert.equal(waited.status, 0, waited.stderr);
   assert.ok(Date.now() - killedAt < 30_000, "the stop freed the slot well inside the 60 s drain");
   assert.match(holder.stderr(), /\[gate-slot\] session \d+ was stopped; sent SIGTERM without the 60000 ms drain/);
@@ -411,8 +416,9 @@ test("different workspace slots never wait on each other", { timeout: 60_000 }, 
     second.closed,
     delay(10_000).then(() => ({ timeout: true })),
   ]);
-  assert.equal(result.timeout, undefined,
-    slotDiagnosis("a different workspace waited on the occupied slot", [first, second], startedAt));
+  if (result.timeout !== undefined) {
+    assert.fail(slotDiagnosis("a different workspace waited on the occupied slot", [first, second], startedAt));
+  }
   assert.equal(result.status, 0, result.stderr);
   assert.doesNotMatch(result.stdout, /cargo slot busy/);
   writeFileSync(release, "release\n");

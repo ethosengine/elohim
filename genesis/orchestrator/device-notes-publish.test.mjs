@@ -216,7 +216,7 @@ function mappedNotesPushRefusal() {
   const { forge, clones: [probe] } = world('probe');
   note(probe, '{"probe":1}');
   const r = spawnSync('brit', ['push', forge, `${STEP_REF}:${destinationOf(STEP_REF, 'did:key:zProbe')}`],
-    { cwd: probe, encoding: 'utf8' });
+    { cwd: probe, env: ENV, encoding: 'utf8' });
   if (r.status === 0) return null;
   const said = `${r.stdout || ''}${r.stderr || ''}`.split('\n').find(line => /notes transfers require/.test(line));
   return said ? said.replace(/\x1b\[[0-9;]*[A-Za-z]/g, '').trim().replace(/^.*?Error:\s*/, '') : null;

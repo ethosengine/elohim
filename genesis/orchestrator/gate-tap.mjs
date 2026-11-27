@@ -190,6 +190,7 @@ export async function drainSlotSession(sid, leaderStart, {
   let termAt = null;
   let killAt = null;
   let lastHeartbeat = 0;
+  let wasStopped = false;
   let sawLeader = leaderObserved;
   let emptyAt = null;
   for (;;) {
@@ -218,7 +219,10 @@ export async function drainSlotSession(sid, leaderStart, {
         await sleep(50);
         continue;
       }
-      if (termAt !== null && killAt === null) write(`[gate-slot] session ${sid} exceeded the ${drainMs} ms drain; sent SIGTERM\n`);
+      if (termAt !== null && killAt === null) {
+        write(wasStopped ? `[gate-slot] session ${sid} emptied after the stop's SIGTERM\n`
+          : `[gate-slot] session ${sid} exceeded the ${drainMs} ms drain; sent SIGTERM\n`);
+      }
       return 0;
     }
     emptyAt = null;
@@ -233,12 +237,14 @@ export async function drainSlotSession(sid, leaderStart, {
       send(sid, members, 'SIGTERM');
       termAt = at;
       if (stopAsked) {
+        wasStopped = true;
         write(`[gate-slot] session ${sid} was stopped; sent SIGTERM without the ${drainMs} ms drain; members: ${members.map(p => p.pid).join(' ')}\n`);
       }
     } else if (termAt !== null && killAt === null && at - termAt >= termMs) {
       send(sid, members, 'SIGKILL');
       killAt = at;
-      write(`[gate-slot] session ${sid} exceeded the ${drainMs} ms drain and ${termMs} ms TERM grace; sent SIGKILL\n`);
+      write(wasStopped ? `[gate-slot] session ${sid} outlived the stop's ${termMs} ms TERM grace; sent SIGKILL\n`
+        : `[gate-slot] session ${sid} exceeded the ${drainMs} ms drain and ${termMs} ms TERM grace; sent SIGKILL\n`);
     } else if (killAt !== null && at - killAt >= killMs) {
       write(`[gate-slot] session ${sid} still alive ${killMs} ms after SIGKILL; releasing slot with surviving pids: ${members.map(p => p.pid).join(' ')}\n`);
       return 1;
