@@ -170,8 +170,21 @@ namespaces, registries, deploy rights, secrets), so that an agent with an accoun
 what the runner can do, answer for what it did, and respond when it goes beyond its declaration. A run beyond
 its declared limits is recorded as an algedonic breach, and that is what makes it honestly subject to
 governance and trust rather than trusted blind. For a device carrier the declaration is its capacity vector
-(plan row 16: declared once in its ark RuntimeManifest, read by dispatch). A posture below is a working
-default until the steward rules otherwise.
+(plan row 16: declared once in its ark RuntimeManifest, read by dispatch).
+
+Why the limit must be knowable, in the steward's words (2026-11-27, same session, as typed): "it's a safe
+assumption that the cluster IS my stewarded compute.. elohim protocol actually shares the same compute limit as
+all my other infra we're trying to subsume.. the elohim protocol network should be able to model this.. BUT that
+model has to assume that i could instead be using a cloud provider, and have a billionare patron that's
+affording me virtually unlimited compute.. elohim protocol needs to understand the limit to KNOW how it needs to
+relate to what it's getting... because an steward with that kind of backing CAN create a conflict of interest or
+a nexus of power that if unknowable.. launders it's value into the network.. that's why this bonudary exists."
+So the declaration names not only how much compute and reach a runner has but **whose it is and who affords
+it**: the steward's own hardware, a provider, or a patron, with the steward of record as the one who answers for
+it. Undeclared or unbounded backing is not neutral capacity; it is a source of influence the network cannot
+weigh, and a grant whose runner's provenance is unknown does not meet condition 4. Today the cluster's compute
+is the steward's own, under the same limit as the rest of his infrastructure, and its grant says so. A posture
+below is a working default until the steward rules otherwise.
 
 ### Q1. May a grant cover only some gate projects?
 
