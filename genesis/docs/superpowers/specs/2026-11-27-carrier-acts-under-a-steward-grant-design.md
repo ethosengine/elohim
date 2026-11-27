@@ -72,6 +72,13 @@ as typed. Everything else on this page is derivation, marked as such where it mi
   3. The residual risk (below): "Acceptable, bounded".
   4. The gate-key change in the same lane (a separate commit): "Yes, with shem's guard".
 
+- ~18:40Z, two more calls asked of him in this session (his choices among offered options, quoted as the option
+  labels he chose): on checking a quote, "Digest at the turn" (nothing reads conversation text later: when he
+  speaks, the harness records only a digest of his turn on the device, and a grant's quote is checked against
+  that digest); on covenant content, "Both, quote stays home" (a carry grant may outlive its session, at most
+  24 hours, and its signed summary crosses to his other devices without his quoted words, which stay on the
+  recording device).
+
 ## Who acts: the options and what each costs
 
 | Option | What it is | Cost | Verdict |
@@ -125,19 +132,20 @@ recorded it ends, until it expires or is revoked. What the grant adds:
 - **What crosses, pending his ruling.** Covenant content stays on the device until he rules on publishing it,
   and this grant is not exempt. Every carry claim carries `env:grant=<cid>` (an address, not content). A signed
   grant digest in `env:grant-doc` (the precedent being `env:requires-doc`, which an older epr folds unchanged)
-  is covenant content leaving the device, even without the quote, so it ships switched off and is listed for
-  his ruling. Until he rules, a lander on another device cannot check the grant, so it does not reuse a carried
-  verdict and runs the gate itself; carries still run and are auditable, but they save nothing across devices.
+  is covenant content leaving the device. His ruling ("Both, quote stays home") lets the signed digest cross
+  to his other devices without the quote: address, kind, party, expiry, coverage, recipient, recording device
+  and signature. The quoted words stay on the recording device.
 - **The device mirror is checked, not trusted.** The carrier reads `<device config>/carry-grant.json` only to
   find the grant quickly; any process can write that file, so before each claim the carrier checks the mirror's
   CID and signature against the brit-signed clause in the covenant notes, and a mismatch refuses the claim and
   records `carry-grant-unverified@1`.
 
-**Who audits the quote, and when.** (Blocked on his ruling, below: finding the quote means reading the
-steward's turn, and conversation text is read by nothing today.) The verifier is one read, `epr flow carry verify-grant <cid>`, run (1) by the
+**Who audits the quote, and when.** By his ruling ("Digest at the turn"), nothing reads conversation text
+later: when the steward speaks in a session, the harness records a digest of that turn on the device (new
+harness work, in slice 1), and the verifier checks the grant's quote against those digests. The verifier is one read, `epr flow carry verify-grant <cid>`, run (1) by the
 answering session when it acknowledges the grant, before the first claim under it, and (2) by the lander before
-it reuses a carried verdict. It compares the clause's quote with the named session's record of the steward's
-turn. That record is on the recording device, so the full check runs only there: a recipient device, or a
+it reuses a carried verdict. It compares the digest of the clause's quote with the recording session's digests of the
+steward's turns. That record is on the recording device, so the full check runs only there: a recipient device, or a
 lander elsewhere, once the digest crosses (below), checks the signature, the recording device's standing for the steward, the expiry and the
 coverage, and `carry show` names the recording device as the one to ask for the words. A quote the verifier
 cannot find is a lie held against the session that wrote it: the verifier emits `carry-grant-unverified@1`
@@ -263,18 +271,9 @@ gate-grade.mjs:14-20 already counts sponsored results zero. Wiring it is its own
 
 ## Open for the steward
 
-- **Reading the steward's turn to verify a quote** (blocks slice 1). Attribution reads no conversation text
-  today, and the Codex adapter reads only its thread's model; a terminal command has nothing defined to read.
-  Verifying a quote against the session record is therefore a boundary change. Two shapes for his choice: (a)
-  the verifier reads the one named turn of the recording session, on that device only, and nothing else; (b)
-  nothing reads conversation text: at the moment he speaks, the harness records only a digest of his turn on
-  the device, and the grant's quote is checked against that digest. Either is his to rule; until then slice 1
-  waits. Also to verify in slice 1: that `brit covenant list` reads clauses across sessions, which the
-  new-words rule needs.
-
-- **Publishing the grant digest across devices** (`env:grant-doc`): it is covenant content, and his ruling on
-  publishing covenant notes covers it. Without it a carried verdict saves nothing on another device.
-- **A clause that outlives its session** (`grantsCarry`), as above.
+Ruled at ~18:40Z and no longer open: the quote check (digest at the turn), the signed digest crossing without
+the quote, and a grant outliving its session. Still to verify in slice 1: that `brit covenant list` reads
+clauses across sessions, which the new-words rule needs.
 
 - **The first carrier ships with condition 4 unmet:** nothing observes a carry exceeding its declared limits
   (above). Whether to ship it before station F4-limits-answerable lands is his call.
