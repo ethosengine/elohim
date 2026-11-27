@@ -2,6 +2,9 @@
 
 use eprfs_core::ReachReason;
 
+// This read joins the key of every gate whose sources cover eprfs-core (elohim-storage, steward-node,
+// elohim-ark and the two bridges, pinned in gate-input-audit.test.mjs), though only the eprfs recipe
+// runs this test: one exact file, so an edit to the schema re-runs them, and nothing else does.
 const REACH_REASON_SCHEMA: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../../sdk/schemas/v1/enums/reach-reason.schema.json"
