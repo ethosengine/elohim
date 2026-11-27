@@ -21,6 +21,11 @@ import test from "node:test";
 import { openRun, readRun } from "./gate-live.mjs";
 import { slotGateLockPath } from "./gate-runner.mjs";
 
+// How long a slot test waits for a gate's whole run (start-up, recipe, exit) once its slot is free.
+// It is the test's own budget, inside the 60 s test timeout, so a loaded gate host is never a red;
+// a gate that never gets its slot still fails here, with a message, rather than at the timeout.
+const SLOT_PROCEED_BOUND_MS = 50_000;
+
 const SCRIPT = join(import.meta.dirname, "run-local-gate.sh");
 const TAP = join(import.meta.dirname, "gate-tap.mjs");
 const BASE_PATH = "/usr/local/bin:/usr/bin:/bin";
@@ -285,15 +290,21 @@ test("ending a gate tap releases its outside-the-group slot holder", { timeout: 
   const waiter = startSlotGate(t, fx, { projectName: "waiter" });
   await waitUntil(() => waiter.stderr().includes("cargo slot still busy"), "waiter never observed contention");
 
-  const killedAt = Date.now();
+  // The waiter blocks on the slot's kernel lock, which wakes the moment the killed holder's tap ends
+  // its outside-the-group holder. What the test can measure is only the waiter's WHOLE gate run (its
+  // start-up, recipe and exit), which on a loaded gate host took 10.7 s against a 10 s race and
+  // refused a push (2026-11-27, backlog row 127). So it asserts the cause, not a speed: the holder's
+  // own recipe waits on `release`, written only after the waiter is done, so a waiter that finishes
+  // with status 0 can only have been admitted by the killed holder's release. The bound is the test's
+  // budget, with a message, never a host-speed margin.
   holder.child.kill("SIGTERM");
   const waited = await Promise.race([
     waiter.closed,
-    delay(10_000).then(() => ({ timeout: true })),
+    delay(SLOT_PROCEED_BOUND_MS).then(() => ({ timeout: true })),
   ]);
   assert.equal(waited.timeout, undefined, "waiter did not proceed when the killed holder released the lock");
   assert.equal(waited.status, 0, waited.stderr);
-  assert.ok(Date.now() - killedAt < 10_000, "the released slot proceeds within a loaded-host margin");
+  assert.equal(existsSync(release), false, "the waiter ran before the holder's own release was written");
   writeFileSync(release, "release\n");
   const killed = await holder.closed;
   assert.equal(killed.status, 143);
@@ -312,10 +323,13 @@ test("different workspace slots never wait on each other", { timeout: 60_000 }, 
     try { return readFileSync(ready, "utf8").trim() === "ready"; } catch { return false; }
   }, "workspace-a holder never entered its recipe");
 
+  // Same shape as above: the bound covers the second gate's whole run, so it is the test's budget,
+  // not a host-speed margin. Waiting on workspace-a's slot would block until `release`, which is
+  // written only after this returns, so finishing at all proves the slots are separate.
   const second = startSlotGate(t, fx, { projectName: "workspace-b-gate", workspace: "workspace-b" });
   const result = await Promise.race([
     second.closed,
-    delay(10_000).then(() => ({ timeout: true })),
+    delay(SLOT_PROCEED_BOUND_MS).then(() => ({ timeout: true })),
   ]);
   assert.equal(result.timeout, undefined, "a different workspace waited on the occupied slot");
   assert.equal(result.status, 0, result.stderr);
