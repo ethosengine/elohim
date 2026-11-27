@@ -155,6 +155,29 @@ recorded it ends, until it expires or is revoked. What the grant adds:
   ruling ("Both, quote stays home") allows without the quote. No separate `env:grant-doc` and no device mirror
   file: the carrier reads the grant from its own fold, so nothing outside the flow store can stand in for it.
 
+**The turn digest, concretely** (slice 1; his ruling "Digest at the turn").
+
+- *Who writes it.* Two harness hooks and nothing else: a `UserPromptSubmit` hook for what he types, and a
+  `PostToolUse` hook on the question tool for what he chooses (his ~18:40Z rulings were option choices, which
+  arrive as a tool result a prompt-submit hook does not see; the hook records the chosen option labels and any
+  note he typed with them, as a turn of kind `option`).
+- *Where.* A device-local, append-only log outside every checkout: `<device state>/steward-turns/<session>.jsonl`,
+  one line per turn: session, time, turn index, kind (`prompt` or `option`), and digests.
+- *Which hash, over what.* sha256 over the text after Unicode NFC and whitespace collapsing, taken twice: over
+  the whole turn, and over each sentence (split on sentence-ending punctuation and line breaks). A quote matches
+  when it is a whole turn, or a run of consecutive whole sentences of one turn. A paraphrase or a fragment of a
+  sentence does not match, by design: the grant must quote him, not describe him.
+- *Who else can write it, and the residual.* An agent's Write or Edit to that path is denied by a PreToolUse rule;
+  a Bash command naming the path is denied the same way, which is best-effort (a shell can reach any file the
+  user can). So each line also carries the digest of the line before it, and at each turn the hook posts that
+  chain head as a flow event signed by the device, which crosses to his other devices. A line forged later
+  breaks the chain against heads his siblings already folded, and is caught. **Not caught:** a forgery written
+  by a shell on the same device before the hook's next head is posted, if that device is not compared with a
+  sibling. That residual is his to accept; it is listed below.
+- *Surfaces with no hook.* A Codex session declares no prompt hook (its adapter reads only the model), and a
+  command he runs in a terminal looks the same as one an agent runs. Neither can record a grant in slice 1: a
+  `grantsCarry` clause from either is refused, saying why.
+
 **Who audits the quote, and when.** By his ruling ("Digest at the turn"), nothing reads conversation text
 later: when the steward speaks in a session, the harness records a digest of that turn on the device (new
 harness work, in slice 1), and the verifier checks the grant's quote against those digests. The verifier is one read, `epr flow carry verify-grant <cid>`, run (1) by the
@@ -243,6 +266,10 @@ unresolved one as "no participant" within its 2 s, so a tool's report of a probl
   audit trail.
 - It yields to any held cargo lease that is not its own, to `dev-integration`, and to an open interactive gate
   run (`gate-live`). The lander sets `GATE_LANDING_INTENT` in pre-push.
+- **`GATE_CARRY_WAIT=on` waits for the lander's grant check.** Slice 2 (landed separately) gives every dev
+  gate its landing intent, but `GATE_CARRY_WAIT` stays `shadow` until the lander checks the grant: turned on
+  before that, a matched intent could hold a landing up to the wait's hard cap (1800 s) on a carry no grant
+  vouches for.
 - **The lander's check has a pin lag:** a lander running an epr older than this change ignores `env:grant` and
   reuses a carried verdict without checking it, until every lander is upgraded. Until then the grant is
   accountability, not a gate, on those landers.
@@ -286,6 +313,9 @@ gate-grade.mjs:14-20 already counts sponsored results zero. Wiring it is its own
 
 ## Open for the steward
 
+- **The turn-digest residual** (above): a forgery written by a shell on the recording device before the next
+  chain head is posted, on a device not compared with a sibling, is not caught.
+
 Ruled at ~18:40Z and no longer open: the quote check (digest at the turn), the signed digest crossing without
 the quote, and a grant outliving its session. Still to verify in slice 1: that `brit covenant list` reads
 clauses across sessions, which the new-words rule needs.
@@ -299,6 +329,17 @@ clauses across sessions, which the new-words rule needs.
 - The runner-spawned accountability above: whether a child workload's grant-forwarding is the shape he means
   by "epr-service compliant". A named follow-on, not in these slices.
 - Whether a granted Jenkins result should ever count toward sufficiency.
+
+## Known gaps in slice 2, from its review
+
+The integrator's reader passed slice 2 (`self/ethosengine-lander-intent`, 982f1830d) as safe to land and named
+these, to cure in the carry-watch slice (3) or later: a `just gate` killed by SIGKILL or power loss leaves an open
+run, and the carrier declines for up to its 6-hour staleness window; any other cargo claim, a rust-analyzer check
+among them, stops a carry each time, and a stopped carry is not recorded once, so the watcher may retry and stop
+again until the miss's wait ends; one failed `berth who cargo` read mid-gate stops the gate; the mid-gate check
+spawns two berth reads a second for the gate's life; untested are main and `self/*` pushes skipping the lookup,
+`LANDING_INTENT=off`, a preset `GATE_LANDING_INTENT` winning, two live intents sharing a Change-Id, and a malformed
+Change-Id.
 
 ## Story first, then slices, and what rolls
 
