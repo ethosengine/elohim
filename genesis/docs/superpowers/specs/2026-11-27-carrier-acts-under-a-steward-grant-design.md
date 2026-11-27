@@ -72,6 +72,11 @@ as typed. Everything else on this page is derivation, marked as such where it mi
   3. The residual risk (below): "Acceptable, bounded".
   4. The gate-key change in the same lane (a separate commit): "Yes, with shem's guard".
 
+- ~20:00Z, told that "Digest at the turn" fails twice (an agent with a shell can append and sign a forged turn,
+  since the device key is a plain file of the same user, and the chain catches only rewrites; and the log is a
+  standing, easily reversed record of every turn he types), he chose the offered option "Approve in the portal":
+  only grants are witnessed, by his approval in the consent portal on one of his devices, and no log of his
+  turns exists. This replaces the ~18:40Z "Digest at the turn".
 - ~19:15Z, asked whether grants are EPRs and offered the grant as a native REA Commitment instead of tags on
   other records: "yes that sounds resonable".
 - ~18:40Z, two more calls asked of him in this session (his choices among offered options, quoted as the option
@@ -155,39 +160,38 @@ recorded it ends, until it expires or is revoked. What the grant adds:
   ruling ("Both, quote stays home") allows without the quote. No separate `env:grant-doc` and no device mirror
   file: the carrier reads the grant from its own fold, so nothing outside the flow store can stand in for it.
 
-**The turn digest, concretely** (slice 1; his ruling "Digest at the turn").
+**The portal witness** (slice 1; his ruling of ~20:00Z, "Approve in the portal").
 
-- *Who writes it.* Two harness hooks and nothing else: a `UserPromptSubmit` hook for what he types, and a
-  `PostToolUse` hook on the question tool for what he chooses (his ~18:40Z rulings were option choices, which
-  arrive as a tool result a prompt-submit hook does not see; the hook records the chosen option labels and any
-  note he typed with them, as a turn of kind `option`).
-- *Where.* A device-local, append-only log outside every checkout: `<device state>/steward-turns/<session>.jsonl`,
-  one line per turn: session, time, turn index, kind (`prompt` or `option`), and digests.
-- *Which hash, over what.* sha256 over the text after Unicode NFC and whitespace collapsing, taken twice: over
-  the whole turn, and over each sentence (split on sentence-ending punctuation and line breaks). A quote matches
-  when it is a whole turn, or a run of consecutive whole sentences of one turn. A paraphrase or a fragment of a
-  sentence does not match, by design: the grant must quote him, not describe him.
-- *Who else can write it, and the residual.* An agent's Write or Edit to that path is denied by a PreToolUse rule;
-  a Bash command naming the path is denied the same way, which is best-effort (a shell can reach any file the
-  user can). So each line also carries the digest of the line before it, and at each turn the hook posts that
-  chain head as a flow event signed by the device, which crosses to his other devices. A line forged later
-  breaks the chain against heads his siblings already folded, and is caught. **Not caught:** a forgery written
-  by a shell on the same device before the hook's next head is posted, if that device is not compared with a
-  sibling. That residual is his to accept; it is listed below.
-- *Surfaces with no hook.* A Codex session declares no prompt hook (its adapter reads only the model), and a
-  command he runs in a terminal looks the same as one an agent runs. Neither can record a grant in slice 1: a
-  `grantsCarry` clause from either is refused, saying why.
+His words are still recorded, as the covenant clause above, but what proves he granted it is an act of his own
+on a surface no agent on the device drives: an approval in the consent portal, through the ceremony
+`crates/consent-grant` already runs for device enrollment (`ceremony`: the asking side sends a request, a portal
+where his controller is signed in shows a consent screen, his controller cell signs, and a single-use code bound
+to the asker by PKCE comes back; `ConsentRecord` is content-addressed and can be shown to anyone).
 
-**Who audits the quote, and when.** By his ruling ("Digest at the turn"), nothing reads conversation text
-later: when the steward speaks in a session, the harness records a digest of that turn on the device (new
-harness work, in slice 1), and the verifier checks the grant's quote against those digests. The verifier is one read, `epr flow carry verify-grant <cid>`, run (1) by the
-answering session when it acknowledges the grant, before the first claim under it, and (2) by the lander before
-it reuses a carried verdict. It compares the digest of the clause's quote with the recording session's digests of the
-steward's turns. That record is on the recording device, so the full check runs only there: a recipient device, or a
-lander elsewhere, once the digest crosses (below), checks the signature, the recording device's standing for the steward, the expiry and the
-coverage, and `carry show` names the recording device as the one to ask for the words. A quote the verifier
-cannot find is a lie held against the session that wrote it: the verifier emits `carry-grant-unverified@1`
-naming that session, captures feedback naming the steward, and voids the grant with a revocation clause.
+- *The ask.* Recording a grant sends a request naming one new act, `carry.grant`, with what the screen must
+  show: the runner device, the covered projects and branches, the expiry, and the quoted words. He may agree to
+  less than was asked (the crate's rule), never more.
+- *The witness.* The returned `ConsentRecord` (asked acts, agreed acts, his identity root, the device) is the
+  grant's witness. Its CID is added to the Commitment as `consent:<cid>`, and the crossing `Affirm` event carries
+  it, so a sibling or a lander verifies the controller cell's signature over the record, not the device key.
+- *What this changes in the crate.* Its acts are recognition today ("Both acts here are recognition ... Neither
+  says what the device may do to any content", act.rs:8-9; "It grants no authority over any content",
+  lib.rs:33-34). `carry.grant` is the first act of authority, so the crate's stated boundary moves: listed for
+  him below, and the module documentation changes with it.
+- *Surfaces.* Any session on any runtime may ask, Codex and a terminal command included, because the witness is
+  his portal approval, not the session. No log of his turns is kept, nothing reads conversation text, and his
+  turn count and timing do not cross.
+- *Residual.* An agent that can drive the browser in which his controller is signed in (a browser-automation tool
+  in his own session) could approve for him. The portal therefore asks for a fresh confirmation on the consent
+  screen (the crate's witness beat) and the grant records which portal approved it.
+
+**Who audits the grant, and when.** The verifier is one read, `epr flow carry verify-grant <cid>`, run (1) by the
+answering session before the first claim under a grant and (2) by the lander before it reuses a carried verdict,
+on any device: it checks the `ConsentRecord`'s controller signature and its agreed acts against the
+Commitment's coverage and expiry. A grant with no valid consent record carries nothing; a grant whose consent
+record does not match it (wider coverage, longer expiry, another runner) is a false grant held against the
+session that wrote it: the verifier emits `carry-grant-unverified@1` naming that session, captures feedback
+naming the steward, and voids the grant with a revocation.
 
 ## The record a carry act leaves, and the trace
 
@@ -266,7 +270,7 @@ unresolved one as "no participant" within its 2 s, so a tool's report of a probl
   audit trail.
 - It yields to any held cargo lease that is not its own, to `dev-integration`, and to an open interactive gate
   run (`gate-live`). The lander sets `GATE_LANDING_INTENT` in pre-push.
-- **`GATE_CARRY_WAIT=on` waits for the lander's grant check.** Slice 2 (landed separately) gives every dev
+- **`GATE_CARRY_WAIT=on` waits for the lander's grant check.** Slice 2 (handed over separately as 982f1830d, read safe, not yet landed) gives every dev
   gate its landing intent, but `GATE_CARRY_WAIT` stays `shadow` until the lander checks the grant: turned on
   before that, a matched intent could hold a landing up to the wait's hard cap (1800 s) on a carry no grant
   vouches for.
@@ -313,17 +317,17 @@ gate-grade.mjs:14-20 already counts sponsored results zero. Wiring it is its own
 
 ## Open for the steward
 
-- **The turn-digest residual** (above): a forgery written by a shell on the recording device before the next
-  chain head is posted, on a device not compared with a sibling, is not caught.
+- **`carry.grant` moves the consent crate's boundary** from recognition to authority (above).
+- **The browser residual:** an agent able to drive the browser where his controller is signed in could approve.
 
-Ruled at ~18:40Z and no longer open: the quote check (digest at the turn), the signed digest crossing without
+Ruled at ~18:40Z and no longer open: the quote check (digest at the turn, replaced at ~20:00Z by the portal witness), the signed digest crossing without
 the quote, and a grant outliving its session. Still to verify in slice 1: that `brit covenant list` reads
 clauses across sessions, which the new-words rule needs.
 
 - **The first carrier ships with condition 4 unmet:** nothing observes a carry exceeding its declared limits
   (above). Whether to ship it before station F4-limits-answerable lands is his call.
-- Whether cross-device recording (a grant said on one device for another) stands, given that only the recording
-  device can check the words.
+- Whether cross-device recording (a grant said on one device for another) stands. With the portal witness any
+  device can verify the grant, so the earlier reason against it is gone.
 - The liveness standard: the 120-second acknowledgement bound, and whether a live follow without an
   acknowledgement is enough.
 - The runner-spawned accountability above: whether a child workload's grant-forwarding is the shape he means
@@ -347,7 +351,7 @@ Slice 0 is the scenario, before any code: `genesis/a2o/features/devflow/carry-un
 does not exist yet), through the blind-reader loop. Its scenarios: the graduation trigger above; a carry
 declined with no acknowledged answering session; a miss declined at each of steps 2, 4 and 5; and a grant whose
 quote is not found being voided. Then, each its own commit: (1) the attribution case, the grant kind with its
-required expiry, new-words renewal, the grant Commitment and its signed `Affirm` event, the turn digest and `carry verify-grant`; (2)
+required expiry, new-words renewal, the grant Commitment and its signed `Affirm` event, the `carry.grant` consent act and portal witness, and `carry verify-grant`; (2)
 the lander's intent, the yields and the lander's grant check; (3) carry-watch under the supervisor with steps
 1-6, the grant-held cargo lease, the acknowledged answering agent and the three measures with their registry
 declarations and headline slot, together, so no carrier ships without an answering agent; (4) carry show; (5)
