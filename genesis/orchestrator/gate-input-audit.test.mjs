@@ -529,12 +529,14 @@ function realReadSet(name) {
 }
 
 test('default read-set options preserve the five device-runtime gate outputs byte for byte', () => {
+  // 2026-11-27: each of the five gained one read, elohim/sdk/schemas/v1/enums/reach-reason.schema.json,
+  // from eprfs-core's tests/schema_contract.rs (the schema pin), and nothing else moved.
   const expected = new Map([
-    ['elohim-storage', 'f962c76e4cd5411b7c7d1b3223a11449023d1f745e6423bca1daa70f52f9ba8f'],
-    ['steward-node', '0f30099c6fc559d0d97cc5cad214e0bf7387298882ae63335867f20bd213cae2'],
-    ['elohim-ark', '71d683c1c9c4e64a855d0372e743e96776a30642c8f49b30120a192e516fa190'],
-    ['cargo-bridge', 'b49e9c6b2c0b38ccef214c201ae8b310d9420943d438e80c80f05b2889e2e91d'],
-    ['jenkins-bridge', '2aea65b9ae27448330400ffed6a335540dd5ed664a1d6c3867db71af76f6b489'],
+    ['elohim-storage', 'b47b79812e5fb519ce91be3735bb9688c50a5b603072ff429a9589440a409fb2'],
+    ['steward-node', 'afb1fbf0a8c6a4978325b1154c2b1c5d54b3a1395f8df84483820f29251caa1f'],
+    ['elohim-ark', 'e3039c8b077b6ccb5b7b46b03885963846841b820578c40433ee661d933070c6'],
+    ['cargo-bridge', '5b8af70a1a936678b08ee00a3112ead840ef07a6da694df585bfc79f7765b93f'],
+    ['jenkins-bridge', '7c042fc2b855d961a84805dcf6fd8d5e96ce8ee9d6341fd1a76e8a1e7220ae25'],
   ]);
   for (const [name, digest] of expected) {
     const bytes = JSON.stringify(realReadSet(name));
