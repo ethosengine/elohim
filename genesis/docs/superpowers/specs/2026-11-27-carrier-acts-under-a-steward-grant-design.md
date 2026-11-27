@@ -152,11 +152,21 @@ and the yields; `carry-watch` under the supervisor; `carry show`; the answering 
 The steward, asked these on 2026-11-27, said he was not sure and asked for each to be green- and red-teamed to
 a working posture, adding (as typed): "i'm thinking jenkins sholud have it's grants.. as long as it's results
 can carry the accountability, and it's runtime can be asked.. and can reach the elohim network to consider and
-answer the question if necessary then I think it's ok." Those three conditions are the test every grant must
-pass, whoever holds it: **(1) its results carry the accountability** (each cites the grant, and the grant names
-the steward); **(2) its runtime can be asked** (a question about any result reaches something that can answer
-from the records); **(3) it can reach the elohim network** to consider and answer a question when one comes.
-A posture below is a working default until the steward rules otherwise.
+answer the question if necessary then I think it's ok." And then: "because jenkins has access to pods and
+such.. whatever compute it has available.. as long as it's own limits are anserable to the elohim network..
+then it can be honestly subject to governance and trust if it does something that an agent with an
+acconutable steward can undrstand, answer and respond to." Those are the test every grant must pass, whoever
+holds it: **(1) its results carry the accountability** (each cites the grant, and the grant names the
+steward); **(2) its runtime can be asked** (a question about any result reaches something that can answer from
+the records); **(3) it can reach the elohim network** to consider and answer a question when one comes; and
+**(4) its own limits are answerable to the network**: the grant declares, or cites a declaration of, the
+runner's compute (cores, memory, concurrency, the pods it can schedule) and its reach (what it can touch:
+namespaces, registries, deploy rights, secrets), so that an agent with an accountable steward can understand
+what the runner can do, answer for what it did, and respond when it goes beyond its declaration. A run beyond
+its declared limits is recorded as an algedonic breach, and that is what makes it honestly subject to
+governance and trust rather than trusted blind. For a device carrier the declaration is its capacity vector
+(plan row 16: declared once in its ark RuntimeManifest, read by dispatch). A posture below is a working
+default until the steward rules otherwise.
 
 ### Q1. May a grant cover only some gate projects?
 
@@ -203,6 +213,10 @@ A posture below is a working default until the steward rules otherwise.
   steward as grantor, the pipelines or gate projects it covers, and an expiry. Its results cite the grant
   (condition 1), it is asked through the answering live agent that reads its harvested results (condition
   2), and it reaches the network through the bridge that already harvests and offers its records (condition
-  3). `service:jenkins` stays a non-actor: the grant is the authority, the steward the principal. Whether a
+  3). Its grant declares its limits (condition 4): the compute its agents and pods have, and its reach, which
+  for Jenkins is the larger part (it schedules pods, pushes images, deploys to the alpha fleet). That
+  declaration is read from the repository's manifests (`genesis/manifests/`, the Jenkinsfiles' agent and pod
+  templates), never from the live cluster, since cluster reads are the operator's; a result the bridge
+  harvests from beyond the declared reach is an algedonic breach and does not count. `service:jenkins` stays a non-actor: the grant is the authority, the steward the principal. Whether a
   granted Jenkins result then counts toward sufficiency is a separate ruling, not taken here; it counts zero
   until the steward rules.
