@@ -2576,3 +2576,133 @@ test('a directory read ignores a habit atom edit and still sees every other chan
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test('a directory read at or inside .epr-meta keeps habit atoms in its full tree key', () => {
+  const root = mkdtempSync(join(tmpdir(), 'read-governance-dir-'));
+  const git = (...args) => {
+    const r = spawnSync('git', args, { cwd: root, encoding: 'utf8' });
+    assert.equal(r.status, 0, r.stderr);
+    return r.stdout.trim();
+  };
+  const commitAll = message => { git('add', '-A'); git('commit', '-qm', message); return git('rev-parse', 'HEAD'); };
+  try {
+    git('init', '-q');
+    git('config', 'user.email', 'test@example.invalid');
+    git('config', 'user.name', 'test');
+    mkdirSync(join(root, 'crate/.epr-meta/inside/.epr-meta'), { recursive: true });
+    writeFileSync(join(root, 'crate/.epr-meta/outer.habit.md'), 'DELTA one\n');
+    writeFileSync(join(root, 'crate/.epr-meta/inside/.epr-meta/inner.habit.md'), 'DELTA one\n');
+    const base = commitAll('base');
+    writeFileSync(join(root, 'crate/.epr-meta/outer.habit.md'), 'DELTA two\n');
+    const outer = commitAll('outer habit delta');
+    writeFileSync(join(root, 'crate/.epr-meta/inside/.epr-meta/inner.habit.md'), 'DELTA two\n');
+    const inner = commitAll('inner habit delta');
+
+    const key = (commit, path) => readPathOid(root, commit, path, readDirectories(root, commit, [path]));
+    assert.notEqual(key(outer, 'crate/.epr-meta'), key(base, 'crate/.epr-meta'),
+      'a read of .epr-meta keeps its habit atom');
+    assert.notEqual(key(inner, 'crate/.epr-meta/inside'), key(outer, 'crate/.epr-meta/inside'),
+      'a directory inside .epr-meta keeps nested habit atoms too');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('a symlink named like a habit atom stays in its parent directory key', () => {
+  const root = mkdtempSync(join(tmpdir(), 'read-habit-symlink-'));
+  const git = (...args) => {
+    const r = spawnSync('git', args, { cwd: root, encoding: 'utf8' });
+    assert.equal(r.status, 0, r.stderr);
+    return r.stdout.trim();
+  };
+  const commitAll = message => { git('add', '-A'); git('commit', '-qm', message); return git('rev-parse', 'HEAD'); };
+  try {
+    git('init', '-q');
+    git('config', 'user.email', 'test@example.invalid');
+    git('config', 'user.name', 'test');
+    mkdirSync(join(root, 'crate/.epr-meta'), { recursive: true });
+    mkdirSync(join(root, 'targets'), { recursive: true });
+    writeFileSync(join(root, 'targets/one'), 'one\n');
+    writeFileSync(join(root, 'targets/two'), 'two\n');
+    const link = join(root, 'crate/.epr-meta/x.habit.md');
+    symlinkSync('../../targets/one', link);
+    const base = commitAll('base');
+    rmSync(link);
+    symlinkSync('../../targets/two', link);
+    const retargeted = commitAll('retarget habit-shaped symlink');
+
+    assert.notEqual(projectTree(root, retargeted, 'crate'), projectTree(root, base, 'crate'),
+      'mode 120000 is a keyed blob even when its path matches the habit-atom pattern');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('gateKeyMaterial routes an audited directory read through the habit-filtered path key', () => {
+  const root = mkdtempSync(join(tmpdir(), 'gate-directory-read-'));
+  const cleanEnv = { ...process.env };
+  for (const key of ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_PREFIX', 'GIT_COMMON_DIR',
+    'GATE_COMMIT', 'RUSTUP_TOOLCHAIN']) delete cleanEnv[key];
+  Object.assign(cleanEnv, {
+    GIT_CEILING_DIRECTORIES: dirname(root), GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null', HOME: root,
+    GIT_AUTHOR_NAME: 'Test Author', GIT_AUTHOR_EMAIL: 'author@example.test',
+    GIT_COMMITTER_NAME: 'Test Committer', GIT_COMMITTER_EMAIL: 'committer@example.test',
+  });
+  const git = (...args) => {
+    const r = spawnSync('git', args, { cwd: root, env: cleanEnv, encoding: 'utf8' });
+    assert.equal(r.status, 0, r.stderr);
+    return r.stdout.trim();
+  };
+  const commitAll = message => { git('add', '-A'); git('commit', '-qm', message); return git('rev-parse', 'HEAD'); };
+  try {
+    git('init', '-q');
+    mkdirSync(join(root, 'crate/src'), { recursive: true });
+    mkdirSync(join(root, 'shared/.epr-meta'), { recursive: true });
+    mkdirSync(join(root, 'genesis/orchestrator'), { recursive: true });
+    writeFileSync(join(root, 'build-manifest.json'), JSON.stringify({
+      steps: { s: { inputs: { sources: ['crate/**'] } } },
+    }));
+    writeFileSync(join(root, 'crate/Cargo.toml'), '[package]\nname = "fixture"\nversion = "0.0.0"\n');
+    writeFileSync(join(root, 'crate/justfile'), 'gate:\n  true\n');
+    writeFileSync(join(root, 'crate/src/lib.rs'), [
+      'pub fn fixture() {',
+      '  let _ = std::fs::read_dir(',
+      '    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../shared"),',
+      '  );',
+      '}',
+      '',
+    ].join('\n'));
+    writeFileSync(join(root, 'genesis/orchestrator/run-local-gate.sh'), '#!/bin/sh\n');
+    writeFileSync(join(root, 'shared/.epr-meta/read-key.habit.md'), 'DELTA one\n');
+    writeFileSync(join(root, 'shared/source.txt'), 'one\n');
+    const base = commitAll('base');
+    writeFileSync(join(root, 'shared/.epr-meta/read-key.habit.md'), 'DELTA two\n');
+    const habitOnly = commitAll('habit delta');
+    writeFileSync(join(root, 'shared/source.txt'), 'two\n');
+    const source = commitAll('source edit');
+
+    const spawn = (bin, args, opts = {}) => {
+      if (isFingerprint(bin, args)) return fingerprintReply('fixture')(bin, args);
+      if (bin === 'rustc') return { status: 0, stdout: 'rustc fixture\n', stderr: '' };
+      return spawnSync(bin, args, { ...opts, env: { ...cleanEnv, ...(opts.env || {}) } });
+    };
+    const fixtureProject = {
+      name: 'directory-read-fixture', dir: 'crate', manifestPath: 'build-manifest.json', steps: ['s'],
+      run: { kind: 'just', recipe: 'gate', cargo: { workspace: 'fixture' } },
+    };
+    const at = commit => gateKeyMaterial(fixtureProject, {
+      root, commit, env: cleanEnv, spawn, britBin: '/fixture/brit',
+    });
+    const before = at(base);
+    const habit = at(habitOnly);
+    const changed = at(source);
+    assert.match(before.key, /^[0-9a-f]{64}$/, before.line);
+    assert.deepEqual(before.reads.oids.map(row => row.path), ['shared']);
+    assert.equal(habit.key, before.key,
+      'the wired closure ignores a habit-only edit inside an audited directory');
+    assert.notEqual(changed.key, habit.key,
+      'the wired closure still changes for an ordinary file edit inside that directory');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});

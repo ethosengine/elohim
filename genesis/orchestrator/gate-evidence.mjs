@@ -163,10 +163,11 @@ export function manifestBlob(root, commit, manifestPath, spawn = spawnSync) {
 export const isHabitAtom = path => /(^|\/)\.epr-meta\/[^/]+\.habit\.md$/.test(path);
 
 /**
- * The project directory's tree at `commit`, minus its habit atoms. With no atom to drop it is the
- * plain tree OID, so keys for such directories are unchanged; with atoms it is a digest of the
- * remaining `<mode> <type> <oid>\t<path>` entries. Null when the directory is absent; an unreadable
- * listing keeps the plain tree OID (conservative: the atoms stay in the key).
+ * The project directory's tree at `commit`, minus regular-file habit atoms. A symlink or gitlink
+ * whose path looks like an atom stays keyed. With no atom to drop it is the plain tree OID, so keys
+ * for such directories are unchanged; with atoms it is a digest of the remaining
+ * `<mode> <type> <oid>\t<path>` entries. Null when the directory is absent; an unreadable listing
+ * keeps the plain tree OID (conservative: the atoms stay in the key).
  */
 export function projectTree(root, commit, dir, spawn = spawnSync) {
   const oid = manifestBlob(root, commit, dir, spawn);
@@ -175,7 +176,13 @@ export function projectTree(root, commit, dir, spawn = spawnSync) {
   const listing = gitRead(root, ['ls-tree', '-r', '-z', commit, '--', rel], spawn);
   if (listing === null) return oid;
   const entries = listing.split('\0').filter(Boolean);
-  const kept = entries.filter(entry => !isHabitAtom(entry.slice(entry.indexOf('\t') + 1)));
+  const kept = entries.filter(entry => {
+    const tab = entry.indexOf('\t');
+    if (tab < 0) return true;
+    const [mode, type] = entry.slice(0, tab).split(' ');
+    const path = entry.slice(tab + 1);
+    return !(type === 'blob' && (mode === '100644' || mode === '100755') && isHabitAtom(path));
+  });
   if (kept.length === entries.length) return oid;
   return `tree-minus-habit-atoms:${createHash('sha256').update(kept.sort().join('\n')).digest('hex')}`;
 }
@@ -205,11 +212,13 @@ export function readDirectories(root, commit, paths, spawn = spawnSync) {
  * The key for one audited read path. A directory read (a dependency's crate root, read through a
  * CARGO_MANIFEST_DIR construction) keys its tree minus habit atoms, as a project's own tree does
  * (`projectTree`): a habit DELTA in a dependency's `.epr-meta` re-keyed every dependent gate, about 13
- * projects and some 259 min for one `elohim/epr/.epr-meta` delta (backlog row 128). A file read, and
- * a habit atom a gate names on purpose, keep their blob id.
+ * projects and some 259 min for one `elohim/epr/.epr-meta` delta (backlog row 128). A directory at or
+ * inside `.epr-meta` keeps its full tree because that read names governance on purpose. File reads
+ * keep their blob id.
  */
 export function readPathOid(root, commit, path, directories, spawn = spawnSync) {
-  return directories.has(path) && !isHabitAtom(path)
+  const governancePath = /(^|\/)\.epr-meta(?:\/|$)/.test(path);
+  return directories.has(path) && !governancePath
     ? projectTree(root, commit, path, spawn)
     : manifestBlob(root, commit, path, spawn);
 }
