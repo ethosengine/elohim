@@ -7,10 +7,10 @@ steward: human:matthew
 author: shem session 3d494616 (Claude Fable 5.2), orchestrating; acts read from the code by Codex (astra); citations opened by a Claude Haiku subagent; prose by a Claude scribe agent
 serves: [private-feedback-loop]
 cites:
-  - "feedback-loop-contract-plan | the plan whose station FC-5 this table delivers, and whose condition it finds unmet | sha256:37fd9ff8f91c8771 | path: genesis/docs/superpowers/plans/2026-11-27-feedback-loop-contract-plan.md"
+  - "feedback-loop-contract-plan | the plan whose station FC-5 this table delivers, and whose condition it finds unmet | sha256:c797ac99ca07cf87 | path: genesis/docs/superpowers/plans/2026-11-27-feedback-loop-contract-plan.md"
   - "feedback-as-a-lifecycle-item-design | the design that names most of the acts, cited in rows as L | sha256:bb8216eb2f736464 | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
   - "one-loop-for-every-producer-design | the companion whose section 6 names the three acts of the contract, cited in rows as O | sha256:e7361b750b95dce3 | path: genesis/docs/superpowers/specs/2026-11-27-one-loop-for-every-producer-design.md"
-  - "feedback-contract-fc1-primitives-inventory | the sibling inventory whose last rows first found the retire and exchange acts missing | sha256:ac239b35827d1a21 | path: genesis/docs/superpowers/sprints/2026-11-27-feedback-contract/fc1-primitives-inventory.md"
+  - "feedback-contract-fc1-primitives-inventory | the sibling inventory whose last rows first found the retire and exchange acts missing | sha256:334e42fd83e95af4 | path: genesis/docs/superpowers/sprints/2026-11-27-feedback-contract/fc1-primitives-inventory.md"
 ---
 
 # FC-5: each act, the command that performs it, and who may

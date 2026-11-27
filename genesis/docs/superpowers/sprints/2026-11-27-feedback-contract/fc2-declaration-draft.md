@@ -7,10 +7,10 @@ steward: human:matthew
 author: shem session 3d494616 (Claude Fable 5.2), called the designing session below, orchestrating and checking; schema, script and hand-written fixtures by Codex (astra), the schema then changed in two places by the designing session
 serves: [private-feedback-loop]
 cites:
-  - "feedback-loop-contract-plan | the plan whose station FC-2 this draft answers | sha256:37fd9ff8f91c8771 | path: genesis/docs/superpowers/plans/2026-11-27-feedback-loop-contract-plan.md"
+  - "feedback-loop-contract-plan | the plan whose station FC-2 this draft answers | sha256:c797ac99ca07cf87 | path: genesis/docs/superpowers/plans/2026-11-27-feedback-loop-contract-plan.md"
   - "feedback-as-a-lifecycle-item-design | the design whose section 5.4 lists the declaration fields the schema closes | sha256:bb8216eb2f736464 | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
   - "one-loop-for-every-producer-design | the companion whose section 12 holds the open decision on where this schema lives | sha256:e7361b750b95dce3 | path: genesis/docs/superpowers/specs/2026-11-27-one-loop-for-every-producer-design.md"
-  - "feedback-contract-fc1-primitives-inventory | the inventory that found reach and polarity mean something else in the SDK, which is why this draft does not reference them | sha256:ac239b35827d1a21 | path: genesis/docs/superpowers/sprints/2026-11-27-feedback-contract/fc1-primitives-inventory.md"
+  - "feedback-contract-fc1-primitives-inventory | the inventory that found reach and polarity mean something else in the SDK, which is why this draft does not reference them | sha256:334e42fd83e95af4 | path: genesis/docs/superpowers/sprints/2026-11-27-feedback-contract/fc1-primitives-inventory.md"
 ---
 
 # FC-2: a draft schema for the declaration a producer ships
@@ -32,20 +32,24 @@ call), and he has not ruled. Nothing reads this schema yet.
 | `fc2/fixtures/accepted/` | Three small valid files written by hand, and `brit-0.3.10-a99143327.claims.json`, brit's own output |
 | `fc2/fixtures/refused/` | Twenty-four files, each wrong in exactly one way, named for it |
 
-The script that ran these checks is not in the repository yet. No gate would run a script kept in
-a documents directory, so it comes in a following batch as a test in the orchestrator's suite,
-which a gate does run. Until then the checks under Evidence are this session's own runs, and
-nothing repeats them. A refused fixture's file name is a plain description of its one fault
-(`severity-outside-list.json`, `duplicate-id.json`); the script holds a table from each file name
-to the schema keyword and the place in the file that must be what refuses it, and a fixture with
-no entry in that table fails.
+The checks are a test, `genesis/orchestrator/producer-declaration-schema.test.mjs`, which the
+orchestrator's gate runs at every landing that touches the test or this `fc2/` directory. It is
+kept there, and not beside the schema, because no gate runs a script kept in a documents
+directory. It requires every accepted file to pass, brit's file to keep its recorded SHA-256, and
+each refused file to be refused once, for the reason its name states. A refused fixture's file
+name is a plain description of its one fault (`severity-outside-list.json`, `duplicate-id.json`);
+the test holds a table from each file name to the schema keyword and the place in the file that
+must be what refuses it, and a fixture with no entry in that table fails. The test moves with the
+schema when the schema's home is ruled.
 
-To check the schema without that script: any validator for JSON Schema 2020-12 accepts the four
+To check the schema without the test: any validator for JSON Schema 2020-12 accepts the four
 files in `fc2/fixtures/accepted/` and refuses twenty-one of the twenty-four in
 `fc2/fixtures/refused/`. The other three (`duplicate-id.json`, `supersedes-undeclared-id.json`,
-`cure-undeclared-id.json`) pass the schema and are refused only by the three script rules named
-below. The script takes one file (`node check.mjs <file>`) or runs every fixture
-(`--fixtures`), and requires each refused file to be refused once, for the reason its name states.
+`cure-undeclared-id.json`) pass the schema and are refused only by the three rules named below,
+which the test carries.
+
+The first version of these checks was a script run by hand, before the test existed. The Evidence
+section describes those runs.
 
 ## What the schema decides, and on whose word
 
@@ -58,7 +62,7 @@ steward's.
 - **Its closed lists are the lifecycle design's, which are wider than brit's use of them.**
   `severity` has the six standard logging names (`trace`, `debug`, `info`, `warn`, `error`,
   `fatal`), `polarity` two (`negative`, `positive`), `ceiling` four (`device`, `steward`,
-  `collective`, `commons`). brit's table uses two of the four ceilings. A ceiling is the furthest
+  `collective`, `commons`). brit's code allows two of the four, `device` and `steward`, and all 72 rows it ships today say `device`. A ceiling is the furthest
   a summary of the claim may travel: no further than the device, the steward's own devices, a
   collective, or the commons.
 - **It does not point at the SDK's existing lists for reach or polarity.** Station FC-1 found
@@ -77,7 +81,7 @@ steward's.
   problem counts as cured on a device, such as running a release at least as new as a named one.
   `retireWhen` is `null` or `quiet:<duration>`: how long the problem must stay gone before it is
   called gone.
-- **Three rules a JSON Schema cannot state are in the check script, each under its own name**: ids are
+- **Three rules a JSON Schema cannot state are in the test, each under its own name**: ids are
   unique (`uniqueClaimIds`), every superseded id is declared (`declaredSupersedes`), and every
   cure names a declared id (`declaredCureClaims`).
 
@@ -111,7 +115,7 @@ The schema follows what brit's code serialises. These differences are recorded a
 | `retireWhen` | `null` or a quiet duration; called optional | Always serialised; every current row is `null` | Optional, currently `null` |
 | `cure` | "where one exists" | Left out when absent | Left out when absent |
 | `weight` | What an occurrence cost the one who felt it; no range | An integer from 0 to 255 that the producer assigns | A small non-negative integer |
-| `ceiling` | Four rungs; `steward` described as the default | Tests allow two rungs; the default is `device` | Four rungs; brit uses two |
+| `ceiling` | Four rungs; `steward` described as the default | Tests allow two rungs; the default is `device`; all 72 shipped rows say `device` | Four rungs; "Brit uses `device` or `steward`" |
 | `validityHorizon` | An ISO 8601 duration | A string; tests allow only whole days | An ISO 8601 duration, currently `P14D` |
 | `id` | The grammar, no length | The grammar, no length check | The grammar |
 

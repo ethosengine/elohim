@@ -7,7 +7,7 @@ steward: human:matthew
 author: shem session 3d494616 (Claude Fable 5.2), orchestrating; inventory read by Codex (astra); citations opened by a Claude Haiku subagent
 serves: [private-feedback-loop, dev-system-equilibrium]
 cites:
-  - "feedback-loop-contract-plan | the plan whose station FC-1 this table delivers | sha256:37fd9ff8f91c8771 | path: genesis/docs/superpowers/plans/2026-11-27-feedback-loop-contract-plan.md"
+  - "feedback-loop-contract-plan | the plan whose station FC-1 this table delivers | sha256:c797ac99ca07cf87 | path: genesis/docs/superpowers/plans/2026-11-27-feedback-loop-contract-plan.md"
   - "feedback-as-a-lifecycle-item-design | the design whose primitives the table looks up, cited in rows as L | sha256:bb8216eb2f736464 | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
   - "one-loop-for-every-producer-design | the companion whose section 6 lists the contract pieces, cited in rows as O | sha256:e7361b750b95dce3 | path: genesis/docs/superpowers/specs/2026-11-27-one-loop-for-every-producer-design.md"
 ---
@@ -79,7 +79,7 @@ definition knows what it touches.
 | Producer declaration — CONFIRMED | `B/feedback/claims.rs:413`, `Manifest { claims, cures }` | `A:587`, `ClaimDeclaration`; `A:614`, `ObservationDeclaration`; `K:4`, `ObservationKindDeclaration` | Separate shapes declare overlapping vocabulary without a common schema. | `B/feedback.rs:30` |
 | Emitter — CONFIRMED | `C/feedback/claim.rs:62`, 1–256 ASCII characters: `A-Z a-z 0-9 . _ : + -` | `C/feedback/spool.rs:47`, optional string | Spool field itself carries no grammar. | `C/feedback/claim.rs:147` |
 | Producer — CONFIRMED | `R/feedback.rs:30`, `Source.producer`; `:102`, admitted `Policy.producers` | — | none | `R/feedback_store.rs:78` |
-| Session key — CONFIRMED | `C/feedback/claim.rs:76`, SHA-256; `session-`, `invocation-`, or `day-` prefix | `B/feedback.rs:286`, same algorithm; `D/session.rs:15`, native session string | Feedback key is derived from, not identical to, native session identity. | `C/feedback/claim.rs:123`; `D/envelope.rs:26` |
+| Session key — CONFIRMED | `C/feedback/claim.rs:76`: `session-` or `invocation-` followed by a SHA-256 in hex; or, when the environment names no session, `day-` followed by a count of days | `B/feedback.rs:286`, same algorithm; `D/session.rs:15`, native session string | Feedback key is derived from, not identical to, native session identity. | `C/feedback/claim.rs:123`; `D/envelope.rs:26` |
 | Run / item — CONFIRMED | `R/feedback.rs:29`, `Source { producer, run, item }` | `C/feedback/genesis.rs:54`, run-id CID; `C/feedback/claim.rs:129`, claim/outcome/emitter item | Report identity versus session identity. | `R/feedback_store.rs:122` |
 | Participant — CONFIRMED | `R/feedback.rs:43`, optional reported participant; `:101`, policy participant | `D/envelope.rs:36`, roster human `steward` | Steward and reported participant are distinct; capture reads policy. | `C/feedback/claim.rs:140` |
 | Actor id — CONFIRMED | `R/model.rs:25`, `AgentRef`, documented Holochain hash | `R/actor.rs:41`, `agent:`; `:47`, `human:`; `:53`, `service:`, which the comment there says a record may name as provenance and `parse_acting_participant` (`:321`) refuses wherever something claims, authors or attests | One string slot carries a hash identity and three repository attribution forms, one of which may be named and may not act. | `C/feedback/response.rs:48` |

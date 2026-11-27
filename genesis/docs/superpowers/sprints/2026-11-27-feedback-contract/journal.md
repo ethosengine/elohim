@@ -7,7 +7,7 @@ steward: human:matthew
 author: shem session 3d494616 (Claude Fable 5.2), designing; shem session cacccb55 integrating
 serves: [private-feedback-loop, dev-system-equilibrium]
 cites:
-  - "feedback-loop-contract-plan | the plan whose FC stations are this sprint | sha256:37fd9ff8f91c8771 | path: genesis/docs/superpowers/plans/2026-11-27-feedback-loop-contract-plan.md"
+  - "feedback-loop-contract-plan | the plan whose FC stations are this sprint | sha256:c797ac99ca07cf87 | path: genesis/docs/superpowers/plans/2026-11-27-feedback-loop-contract-plan.md"
   - "feedback-as-a-lifecycle-item-design | the spec the sprint takes into a contract | sha256:bb8216eb2f736464 | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
   - "one-loop-for-every-producer-design | the companion that sketches the contract and the producers it must serve | sha256:e7361b750b95dce3 | path: genesis/docs/superpowers/specs/2026-11-27-one-loop-for-every-producer-design.md"
 ---
@@ -167,3 +167,20 @@ session reading it against the code. All nine are corrected.
 
 Not done: no gate ran for these documents beyond the address lint on the staged tree, and the
 schema's check is not yet a test.
+
+### 2026-11-27, the schema's check becomes a test
+
+`genesis/orchestrator/producer-declaration-schema.test.mjs` now carries the FC-2 checks, with one
+entry in the suite's list of reads. Codex (astra) wrote it from the hand-run script; the designing
+session ran it (6 passed), made it fail three ways and restored it, and ran the orchestrator gate
+on the commit: the named suite was green in 198 s. The same run's tree suite was red on the one
+notes-publish test already recorded above, which depends on the session's brit and not on this
+change.
+
+Two corrections from the integrator's reader, applied: brit's code allows two ceilings and all 72
+rows it ships say `device`; and the session key is a hash only when a session or invocation is
+named, and a count of days otherwise.
+
+The integrator's first push of the founding slice was refused by a different test of the tree
+suite, one that fails when two gate runs overlap on the device, and not by the slice. Dev did not
+move. The integrator pushes again when the device is quiet.
