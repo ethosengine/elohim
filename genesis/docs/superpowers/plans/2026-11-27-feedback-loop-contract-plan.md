@@ -50,7 +50,7 @@ or removed. A tick is a claim that a line is met, and still awaits verification.
 
 - [ ] **FC-1 — every primitive the contract uses names the one existing type or schema that defines it, or is marked new** (serves private-feedback-loop)
 
-State: not built. The companion's section 6 lists the pieces (terms, the promise a term bears on, a bound, a release's cures, a store's limits; one call; one reading; three acts) and proposes homes. The surveys found several pieces defined more than once: severity as three levels in `elohim/epr/src/algedonic.rs`, as error/warning/info in the Genesis adapter and as six standard names in brit's table; polarity in the SDK's enum and, under another meaning, on brit's rows; reach as eight rings, as five observation reaches and as four rungs.
+State: the table is written, on its branch, as `../sprints/2026-11-27-feedback-contract/fc1-primitives-inventory.md`: 38 primitives, each with the home that defines it today or marked new. It was read from the code by one agent, and a second agent that did not write it opened every citation and found no mismatch. It does not yet give each primitive exactly one home: where definitions disagree it lists them all and states the difference, and choosing is left to FC-2 to FC-5 and, for some rows, to the steward. Three pieces have more than one list of values: reach or ceiling (eight rings, five observation scopes, two ceilings in brit's table, four rungs in the lifecycle spec), severity (three levels in `elohim/epr/src/algedonic.rs`, error/warning/info in the Genesis adapter, six standard names in brit's table) and polarity (one list of two values under two meanings). Six are used by the designs and defined by no code or schema: the reading of a term, the summary that may leave a device, the grant a service acts under, the retire act, and the ask, answer and release of a sample. The station stays open until the table is on dev.
 
 Verify: one table in the sprint directory in which each primitive has exactly one defining home, cited by path, and every other use is listed as a use of it or as a difference to resolve. A reader who did not write it opens every cited path and finds what the row says.
 
@@ -156,7 +156,7 @@ Verify: the note survives a reclaim; a recurrence from the curing release reads 
 
 State: not built. `.claude/hooks/brit-first.py` holds its own table and reads any brit but two versions as a stale table.
 
-Verify: a brit older than the hook's table reads as pin lag with its cure, a newer one as a stale table, and the hook's refusal and brit's leave one record in a session.
+Verify: a brit older than the hook's table reads as pin lag with its cure, a newer one as a stale table, and the hook's refusal and brit's leave one record each in a session, under one shared run (the store identifies a source by producer, run and item, so two producers are two records).
 
 - [ ] **FB-8 — the acceptance suite's results are read against the habit register** (serves private-feedback-loop)
 

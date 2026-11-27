@@ -7,7 +7,7 @@ steward: human:matthew
 author: shem session 3d494616 (Claude Fable 5.2), designing; shem session cacccb55 integrating
 serves: [private-feedback-loop, dev-system-equilibrium]
 cites:
-  - "feedback-loop-contract-plan | the plan whose FC stations are this sprint | sha256:220151a0b1a2d79f | path: genesis/docs/superpowers/plans/2026-11-27-feedback-loop-contract-plan.md"
+  - "feedback-loop-contract-plan | the plan whose FC stations are this sprint | sha256:c86fbf24763b3838 | path: genesis/docs/superpowers/plans/2026-11-27-feedback-loop-contract-plan.md"
   - "feedback-as-a-lifecycle-item-design | the spec the sprint takes into a contract | sha256:bb8216eb2f736464 | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
   - "one-loop-for-every-producer-design | the companion that sketches the contract and the producers it must serve | sha256:e7361b750b95dce3 | path: genesis/docs/superpowers/specs/2026-11-27-one-loop-for-every-producer-design.md"
 ---
@@ -108,3 +108,37 @@ be deleted after being swapped; and the scan of the holding place had no bound. 
 the session key equal to brit's.
 
 Version bumps: none. `elohim-epr-cli` is not published, and no lockfile moved.
+
+### 2026-11-27, the slice's gate run, and the inventory of primitives (FC-1)
+
+The gate run on the slice. The designing session ran every selected gate once at the slice's
+tip (`dd59d312f`, on dev's tip `e957207d0`), from 18:42Z to 20:09Z. Eleven of twelve were green,
+among them the eprfs workspace's format, lint and tests on the pinned toolchain and the
+acceptance suite's own gate. One was red: in the orchestrator's tree suite,
+`device-notes-publish.test.mjs` "DEVICE_NOTES_PUSH=brit publishes through brit push". brit 0.3.5
+refuses that push because its source and destination refs differ. The test fails the same way
+when its file is run alone, and the slice touches nothing under `genesis/orchestrator`. It was
+reported to the integrator and not changed. The integrator's account: its own session still
+runs brit 0.3.4, which accepts that push, so the test passes in its pre-push and will fail in
+every session started since the device's brit moved; it has put the gap to the brit lane. No CI
+lane runs the two scenarios the slice un-tagged; local runs are their only evidence.
+
+The inventory. `fc1-primitives-inventory.md` in this directory is station FC-1's table: 38
+primitives, each with the type or schema that defines it today, or marked new. Codex (astra) read
+it from the code; a Claude Haiku agent that had not written it opened every citation, about 149,
+and found no mismatch; the designing session re-read one row against brit's later tip.
+
+What it shows the next stations:
+
+- **Three pieces have several lists of values.** Reach or ceiling has four (eight rings, five
+  observation scopes, two ceilings in brit's table, four rungs in the lifecycle spec). Severity
+  has three. Polarity has one list of two values that means two different things.
+- **Six pieces are in the designs and in no code or schema**: the reading of a term, the summary
+  that may leave a device, the grant a service acts under, the retire act, and the ask, answer and
+  release of a sample.
+- **Smaller differences** a schema will have to settle: time as an RFC 3339 string or as epoch
+  seconds, two patterns for an observation kind's name, and a duration pattern that accepts
+  anything starting with `P`.
+
+The table chooses nothing. FC-2 to FC-5 choose, and where a choice is the steward's it waits for
+him.
