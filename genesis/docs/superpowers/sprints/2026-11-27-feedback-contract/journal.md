@@ -42,8 +42,9 @@ Its stations are FC-1 to FC-10 of the plan
 6. FC-6, a store's limits, when the steward has ruled on bringing stores under rules.
 
 FB-1, the founding slice of code, is built by the designing session and not on ethosengine. The
-integrator relayed the steward's question to it ("i think, we should let that planning session
-work on minting that founding slice what do you think?") and his answer; the steward then
+integrator relayed the steward's question to it (as relayed by the integrator, 2026-11-27: "i
+think, we should let that planning session work on minting that founding slice what do you
+think?") and his answer; the steward then
 confirmed to the designing session directly, as typed: "yes, but coordinate with the integrator,
 if we could save wall-clock by using emerging integration primitives we've been working on
 elsewhere.. the integrator can help you." The brief written for ethosengine is not sent. The slice
