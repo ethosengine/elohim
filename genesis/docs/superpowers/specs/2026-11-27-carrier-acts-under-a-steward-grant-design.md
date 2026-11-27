@@ -125,6 +125,11 @@ Designed once, used by feedback capture and by the carrier alike: `acting(root) 
 session <id> | grant <cid>, device, expires }` in device-runtime, from files only (the session envelope and
 claim, the roster, the grant), inside capture's 2 s budget and without taking the store lock. A session resolves
 through its envelope and claim, a carrier through its grant; neither resolving is a refusal, not a guess.
+The refusal binds the read and what acts on it, not the record of a problem: feedback capture treats an
+unresolved answer as "no participant" and still stores the record within its 2 s, so a tool's report of a
+problem is not lost because attribution could not be learned. Such a record cannot be closed by machine, which
+is today's state for most records and is visible as such. The carrier, by contrast, does not carry when the read
+refuses.
 
 ## The supervised carry-watch, and which commits it may run
 
