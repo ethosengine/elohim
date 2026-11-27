@@ -238,25 +238,27 @@ section 12 names the station that builds each part.
 
 ### 5.2 What the device stores
 
-One `Occurrence` per claim per session, in the existing store, with no field added to the type.
+One `Occurrence` per producer, claim, outcome and emitter per session, in the existing store, with
+no field added to the type.
 
 | `Occurrence` field | Holds | Kind of field |
 |---|---|---|
 | `source.producer` | The producer's name, which the policy's `producers` list must admit | Closed |
 | `source.run` | The session key, defined below, so one session is one run. The two records section 7 writes use the fixed words `compacted` and `retired` here | Closed (a hash, or one of those two words) |
-| `source.item` | The claim id and the outcome, as `<claim id> <outcome>`. The store's same-source rule then keeps one record per claim and outcome per session | Closed |
+| `source.item` | The claim id, the outcome and the emitter, as `<claim id> <outcome> <emitter>`; the emitter is left off when none was given. The store's same-source rule then keeps one record per producer, claim, outcome and emitter per session | Closed |
 | `subject` | The claim id. Distinct runs and recovery are already computed per producer and subject | Closed |
 | `outcome` | The existing enum: `reported`, `passed`, `failed`, `skipped`, `unmeasured`, `refused`, `bridge-declared`, `fallback-declared`, `unsupported`. `passed` is an observation against a negative claim | Closed |
-| `participant` | The session's participant, from the session envelope when one exists | Closed (an actor id) |
+| `participant` | The participant the repository's feedback policy names, as today. Reading it from the session, or from a steward's grant for a service that runs unattended, waits on the read named in section 7a, node 1 | Closed (an actor id) |
 | `observed_at`, `count`, `duration_ms` | As today | Measured |
-| `detail.emitter` | The emitter's address | Closed |
+| `detail.emitter` | The emitter's address: 1 to 256 ASCII characters from `A-Z a-z 0-9 . _ : + -`. A release record's address and brit's `unrecorded:` form both fit; a path does not. A value outside the rule is treated as absent and the record is still stored | Closed |
+| `detail.grant` | The address of the steward's grant under which an unattended service acted, when the record was written by one. No capture code writes it yet | Closed (a CID) |
 | `detail.level` | The surface's own numeric level, where it has one | Measured |
 | `detail.about` | What the occurrence concerned, as an EPR address, when the surface knows it | Open |
 | `detail.judged` | The input the emitter judged, such as the version that answered | Open |
 | `message` | A person's own words, attached deliberately | Open |
 
 `detail` stays an allow-listed map, and the list depends on which of three records it is. On a
-session's record: `emitter`, `level`, `about`, `judged`. On an aggregate: `emitter`, `sessions`,
+session's record: `emitter`, `grant`, `level`, `about`, `judged`. On an aggregate: `emitter`, `sessions`,
 `first-day`, `last-day`, `bytes`. On an archival note: `emitter`, `cure`, `sessions`, `first-day`,
 `last-day`, `bytes`. In all three `emitter` means the same thing, the emitter that reported the
 problem. Section 7 defines the aggregate and the note.
@@ -273,8 +275,13 @@ session gets the same key.
 **A session is the unit of counting.** A second observation of the same claim with the same
 outcome in the same session is a no-op: brit's marker skips it before any process starts, and the
 store returns the address it already holds. `count` stays 1. Capture leaves `duration_ms` empty on
-a claim record, so a repeat from a second emitter matches the first and is not refused as
-conflicting evidence. Where no session identity exists the key falls back to the day, on purpose:
+a claim record, so a repeat matches the first record and is not refused as conflicting evidence.
+The emitter is part of the item for the same reason: a tool replaced by a newer release in the
+middle of a session reports as a second source, where otherwise the store would refuse it as
+different evidence for the first. Two producers that meet one claim in one session leave one
+record each, under the same run, because the store identifies a source by producer, run and item.
+That is kept: two reports of one event are two observations, and the count of sessions is still
+one. Where no session identity exists the key falls back to the day, on purpose:
 one record per claim, outcome and emitter per day is the floor.
 
 Older occurrences, whose subject is `brit:<verb>`, read as `brit/unclassified`.
@@ -441,9 +448,9 @@ dropping of matching lines to a later station (section 7a, node 5).
 
 Each is a step between two things that already have names.
 
-1. Chain: a problem is closed. Between "an occurrence is captured automatically" and "an experienced recovery can be linked to it". Missing node: capture stamps the session's participant. Probe: a failing brit command in an attributed session, followed by a passing one in a later session, yields a recovery link. Present state: 1,764 of 1,772 occurrences on shem have no participant.
+1. Chain: a problem is closed. Between "an occurrence is captured automatically" and "an experienced recovery can be linked to it". Missing node: capture stamps the participant the act was for. Under it lies a second missing node, found when the first slice was built (2026-11-27): a read that answers "for whom does this act, and under what authority" from a file, without the session store's lock. The session envelope names a steward and no participant, and its one lookup takes a lock that can wait five seconds, while brit allows the recorder two. The same read serves a service that runs unattended under a steward's grant (the carrier being designed on ethosengine): a session resolves through its envelope, a carrier through its grant. Capture treats an unresolved answer as no participant and still stores the record. Probe: a failing brit command in an attributed session, followed by a passing one in a later session, yields a recovery link. Present state: 1,764 of 1,772 occurrences on shem have no participant; the first slice leaves that as it is.
 2. Chain: a problem is answered. Between "a responder's commitment is linked to an occurrence" and "its group may be reclaimed". Missing node: retention reads whether the linked commitment was fulfilled. Probe: a group whose commitment is fulfilled and whose claim is retired is selected for reclaim. Present state: `retention.rs:175-178` protects every linked group.
-3. Chain: the recorder is itself sensed. Between "the recorder cannot be reached" and "the device's steward is told". Missing node: a device-status condition for the feedback recorder, with a cure per cause. Probe: `just status device` on a session with an inherited older epr names the cause and the cure. Present state: none; the pain is a line on every brit command.
+3. Chain: the recorder is itself sensed. Between "the recorder cannot be reached" and "the device's steward is told". Missing node: a device-status condition for the feedback recorder, with a cure per cause. Probe: `just status device` on a device whose recorder could not be reached names how many gap notes wait, since when, and the command that catches up. Present state: the first slice adds that line; the existing `epr binary` line already says when a session's epr is behind the device's.
 4. Chain: one session is one run. Between "a tool reports a claim" and "the store counts sessions". Missing node: the session key passed as the invocation. Probe: twenty brit commands in one session leave one record per claim. Present state: 1,771 runs for 1,772 occurrences.
 5. Chain: the surface cleans itself. Between "a claim is cured on this device" and "the surface's own log lines for it are dropped". Missing node: an adapter call by which a surface drops what a cure covers. Probe: after a retirement, the runtime's stored lines for that claim count zero. Present state: nothing. The acceptance suite is the nearest case to hand: 1.4 GB of raw results, traces and screenshots on this device, whose findings the store would hold in a few kilobytes.
 6. Chain: a claim on the application plane. Between "a claim declaration" and "an observation kind". Missing node: a closed-vocabulary field type in the observation-kind schema, whose types today are `Cid`, `String` and numbers. Probe: a kind whose param is an enumerated list refuses a value outside it. Present state: a `String` field is open.
@@ -583,7 +590,7 @@ parts, and only the first runs on what is built. The stations are prose here on 
 is claimable from this document. A plan restates them as claimable stations once the steward
 accepts the design.
 
-- **FB-1 Record.** Capture reads the claim and emitter from the environment and stores them as section 5.2 says. It derives the session key itself, from the environment it inherits and by the rule in the seam below, and uses the `--invocation` argument only when no session identity is present. When a claim is present it does not check the `--operation` word against its fixed list and does not store `--elapsed-ms`. It stamps the participant. Producers come from the policy and not from a fixed pair. The launcher sets the release record's address. Device status gains the recorder condition. Probe: twenty brit commands in one attributed session leave one record per claim and outcome, and a session with an older epr reads `degraded` with its cure.
+- **FB-1 Record.** Capture reads the claim and emitter from the environment and stores them as section 5.2 says. It derives the session key itself, from the environment it inherits and by the rule in the seam below, and does not use the `--invocation` argument on a claim record. When a claim is present it does not check the `--operation` word against its fixed list and does not store `--elapsed-ms`. Producers come from the policy and not from a fixed pair. `epr feedback drain-spool` turns each gap note brit left into one record and removes the note. Device status gains a `feedback recorder` line that counts the gap notes waiting and names that command. Not in the first slice: stamping the participant (section 7a, node 1), and the launcher setting the release record's address. Probe: twenty captures of one claim in one session leave one record per producer, claim, outcome and emitter, and a device with gap notes waiting reads `degraded` with its cure.
 - **FB-2 Grow and judge.** The device reads declarations (brit's `claims.json` from the head release in the bin store; this repository's from `.epr-meta/feedback-claims.json`) and `epr feedback triage` gives the readings of section 6. Probe: an occurrence from an older emitter reads `stale-emitter`, and `cure-available` once the head lists it in `cures`.
 - **FB-3 Trigger.** The measure `feedback-claim-burden@1`, its bound and a native probe. Probe: a claim past its hard mark appears in `epr flow report --breaches` with its concern.
 - **FB-4a Respond, among the steward's devices.** The crossing kind and its reader beside gate misses in `epr peer intents`. Depends on decision 2. Probe: a claim open on one device is counted on a second with no subject or text in the record.
@@ -608,8 +615,8 @@ Agreed with the brit lane on 2026-11-27, and built on brit branch `run-ci/feedba
 - **Claim and emitter reach capture as environment**, `EPR_FEEDBACK_CLAIM` and `EPR_FEEDBACK_EMITTER`. An older epr ignores them and records as before, so brit needs no version gate. The arguments are unchanged, and the `--operation` word is drawn only from the list every installed recorder accepts, with `other` for any command outside it; a test in brit pins that list. This is the cure for finding 9 of section 3 on the brit side.
 - **The emitter** is the release record's address, which the launcher passes as `EPR_BIN_RECORD`, because a binary cannot contain its own record's address. A registry-built brit falls back to `unrecorded:<version>+exe.<sha12>` over the executable's bytes.
 - **A marker, checked before any process is started**, keyed on claim, emitter and session key, skips repeats. This removes the start and the 2-second wait that every brit command pays today. The marker is brit's alone: a file brit creates under `$XDG_CACHE_HOME/brit/feedback-notices/`, named by the key. epr neither reads nor writes it; epr's own guard against repeats is the store's same-source rule (section 5.2).
-- **The session key** is brit's existing `gap_notice_key()` (brit 0.3.9; the brit lane reports commits `67f4068d8` and `c84b34665`, which this checkout's older brit does not hold): the SHA-256 of the first non-empty of `ELOHIM_SESSION_ID`, `CLAUDE_SESSION_ID`, `CLAUDE_CODE_SESSION_ID`, `CODEX_THREAD_ID`, `CODEX_SESSION_ID`; with `EPR_FEEDBACK_INVOCATION` set, that value is hashed in as well; with no session, the UTC day. The agent-side hook derives the same key, so the two emitters leave one record.
-- **The recorder cannot record its own absence**, so brit writes the claim, cause and time to a spool: `$XDG_STATE_HOME/brit/feedback-spool/<32 hex>.json`, one file per session and recorder identity, at most 1,024 bytes, written by rename, at most 256 files. A recorder that is missing, times out or cannot be started is skipped for the rest of that session. A recorder that refuses one record is not unavailable, so its file is keyed on the session, the recorder and the refused claim: only that claim is not retried, and one session can leave several `refused` files. The file does not say which claim was refused. Its keys are `v`, `claim`, `cause`, `at`, `emitter`, `session` (hashed), `recorder` (`path`, `size`, `mtime`) and `stderr` (the recorder's first error line). brit does not delete; epr drains. `stderr` and `recorder.path` are open fields.
+- **The session key** is brit's existing `gap_notice_key()` (brit 0.3.9; the brit lane reports commits `67f4068d8` and `c84b34665`, which this checkout's older brit does not hold): the SHA-256 of the first non-empty of `ELOHIM_SESSION_ID`, `CLAUDE_SESSION_ID`, `CLAUDE_CODE_SESSION_ID`, `CODEX_THREAD_ID`, `CODEX_SESSION_ID`; with `EPR_FEEDBACK_INVOCATION` set, that value is hashed in as well; with no session, the UTC day. The agent-side hook derives the same key, so the two producers' records share one run; each leaves its own record (section 5.2).
+- **The recorder cannot record its own absence**, so brit writes the claim, cause and time to a spool: `$XDG_STATE_HOME/brit/feedback-spool/<32 hex>.json`, one file per session and recorder identity, at most 1,024 bytes, written by rename, at most 256 files. A recorder that is missing, times out or cannot be started is skipped for the rest of that session. A recorder that refuses one record is not unavailable, so its file is keyed on the session, the recorder and the refused claim: only that claim is not retried, and one session can leave several `refused` files. The file does not say which claim was refused. Its keys are `v`, `claim`, `cause`, `at`, `emitter`, `session` (hashed), `recorder` (`path`, `size`, `mtime`) and `stderr` (the recorder's first error line). brit does not delete; epr drains. `stderr` and `recorder.path` are open fields. `epr feedback drain-spool` reads at most 256 notes a run, without following a link, turns each valid one into an occurrence (producer `brit`, run `spool-<session>`, item `<claim> failed <emitter>`, the note's own time, no participant) and removes the note it read and no other file; `stderr` and `recorder.path` are not stored. A note it cannot read as one is left where it is, and device status then says so.
 - **`claims.json` lists every legal id in full**, and `brit feedback claims --json` prints it.
 - **A refusal by design** (`brit/refused:<verb>.<form>`: a push deletion, a force push) declares weight 0 and no `clears`. Anything a later release could remove is `brit/capability-absent`.
 - **`brit/command:<verb>`** is today's per-command capture: weight 0, ceiling `device`. It is the denominator, and it is what retention already treats as a routine success.

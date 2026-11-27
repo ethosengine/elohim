@@ -5,7 +5,7 @@ date: 2026-06-21
 status: Living reference
 author: workflow:elohim-seam-map-atlas
 cites:
-  - "feedback-as-a-lifecycle-item-design | home for a tool's refusal, a recurring error or a growing log: seam 3.16 on a person's own device | sha256:120869ada259e93d | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
+  - "feedback-as-a-lifecycle-item-design | home for a tool's refusal, a recurring error or a growing log: seam 3.16 on a person's own device | sha256:bb8216eb2f736464 | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
   - "one-loop-for-every-producer-design | each producer's first move, the reusable patterns, a store's declared limits, and how seam 3.16 relates to the Observer Protocol | sha256:e7361b750b95dce3 | path: genesis/docs/superpowers/specs/2026-11-27-one-loop-for-every-producer-design.md"
   - "platform-one-sdk-many-apis-design | THE ELOHIM PLATFORM MODEL | sha256:a15b10c68787a460 | path: genesis/docs/superpowers/specs/2026-06-14-platform-one-sdk-many-apis-design.md"
   - "elohim-hub-boundaries-design | elohim-hub / elohim-node / elohim-storage | sha256:233cb996edd7c366 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-02-elohim-hub-boundaries-design.md"

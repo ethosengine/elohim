@@ -10,7 +10,7 @@ author: "Claude (session 3d494616 on shem, Fable 5.2), at the steward's directio
 serves: [private-feedback-loop, workspace-device-arrival, pain-is-answered, dev-system-equilibrium]
 refines: native-dev-tooling-over-peers-plan
 cites:
-  - "feedback-as-a-lifecycle-item-design | the design whose stations FB-1 to FB-10 this plan restates as claimable | sha256:120869ada259e93d | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
+  - "feedback-as-a-lifecycle-item-design | the design whose stations FB-1 to FB-10 this plan restates as claimable | sha256:bb8216eb2f736464 | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
   - "one-loop-for-every-producer-design | the companion whose contract and store rule the FC stations fix as shapes | sha256:e7361b750b95dce3 | path: genesis/docs/superpowers/specs/2026-11-27-one-loop-for-every-producer-design.md"
   - "native-dev-tooling-over-peers-plan | the epic's plan this is a child of; its peer link, channel list and bin store are what this work rides | sha256:983afa13e08fe1d3 | path: genesis/docs/superpowers/plans/2026-10-29-native-dev-tooling-over-peers-plan.md"
   - "observer-protocol | source of the safeguards station FC-9 answers line by line | sha256:78afb76e1fb58772 | path: genesis/docs/content/elohim-protocol/observer-protocol.md"
@@ -112,9 +112,9 @@ Verify: a reader who starts at any one of the five (the Observer Protocol, the o
 
 - [ ] **FB-1 — capture records an observation under its declared term once per session, in the session's participant's name, and device status says when the recorder is down** (serves private-feedback-loop, workspace-device-arrival)
 
-State: not built on the epr side; the interface it builds against is FC-3. On shem on 2026-11-27, 1,764 of 1,772 occurrences carried no participant and 1,771 runs held 1,772 occurrences. brit's side is built on `run-ci/feedback-f1`.
+State: partly built, on branch `feedback/fb1` (2026-11-27), not landed. Built, inside `epr-cli` and with no record shape changed: capture by declared term from the environment, the session as the run, producers admitted by the policy, `epr feedback drain-spool`, and a `feedback recorder` line in device status. Not built: the participant. No read answers "for whom does this act" without the session store's lock, and the recorder has two seconds; the design names that read as a missing node (section 7a, node 1) and the carrier design on ethosengine proposes it once for sessions and for services under a grant. So the station stays open. On shem on 2026-11-27, 1,764 of 1,772 occurrences carried no participant and 1,771 runs held 1,772 occurrences. brit's side is built on `run-ci/feedback-f1`.
 
-Verify: twenty brit commands in one attributed session leave one record per term and outcome; a session whose epr is behind the device's reads `degraded` in `just status device` with its cure; an older epr still reads the store.
+Verify: twenty captures of one term in one session leave one record per producer, term, outcome and emitter (scenario "A refused command names its problem, and one session leaves one record"); a device with gap notes waiting reads `degraded` in `just status device` with its cure, and reads well after the catch-up command (scenario "A device that could not keep its records says so, and says how to catch up"); an older epr still reads the store. Still to verify, with the participant: a failing command in an attributed session followed by a passing one in a later session yields a recovery link.
 
 - [ ] **FB-2 — the device reads the declarations of the producers it runs and gives each term one reading** (serves private-feedback-loop)
 

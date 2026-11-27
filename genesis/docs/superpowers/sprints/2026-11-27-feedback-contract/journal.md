@@ -7,8 +7,8 @@ steward: human:matthew
 author: shem session 3d494616 (Claude Fable 5.2), designing; shem session cacccb55 integrating
 serves: [private-feedback-loop, dev-system-equilibrium]
 cites:
-  - "feedback-loop-contract-plan | the plan whose FC stations are this sprint | sha256:3a983c57d2b0cac2 | path: genesis/docs/superpowers/plans/2026-11-27-feedback-loop-contract-plan.md"
-  - "feedback-as-a-lifecycle-item-design | the spec the sprint takes into a contract | sha256:120869ada259e93d | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
+  - "feedback-loop-contract-plan | the plan whose FC stations are this sprint | sha256:220151a0b1a2d79f | path: genesis/docs/superpowers/plans/2026-11-27-feedback-loop-contract-plan.md"
+  - "feedback-as-a-lifecycle-item-design | the spec the sprint takes into a contract | sha256:bb8216eb2f736464 | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
   - "one-loop-for-every-producer-design | the companion that sketches the contract and the producers it must serve | sha256:e7361b750b95dce3 | path: genesis/docs/superpowers/specs/2026-11-27-one-loop-for-every-producer-design.md"
 ---
 
@@ -71,3 +71,40 @@ open decisions.
 - The first landing attempt was refused. A habit line under `elohim/epr/` put that crate's tree into the closure of about thirteen gate projects for a documents landing, and one of those gates failed on a test of its own. Nothing reached dev. The work was rebuilt as one documents commit and one habit commit, which the integrator carries separately.
 - The integrator's reader found one error of fact, since corrected: the feedback store has three write verbs (`capture`, `ingest-genesis`, `record`), not one.
 - The steward, on what the day showed, as typed: "Discoverability.. that's been a bit a latecomer in the designs we've pursued". The evidence is in this sprint's own history: five survey lanes and a prior-art pass did not surface the Observer Protocol or the SDK pipeline's named gaps until he pointed at them. Recorded as a datapoint on backlog item `progressive-discovery-substrate-emergent-concern`.
+
+### 2026-11-27, the founding slice is built
+
+Who did what: the designing session wrote a contract for the slice and orchestrated; astra (Codex)
+read the code before it was written and reviewed it after; one Opus agent built it in its own
+worktree; the integrator's reader reads it before any gate of the integrator's.
+
+What the reading and the building corrected in the design:
+
+- **The participant is not stamped.** The session envelope names a steward and no participant,
+  and its lookup takes a lock that can wait five seconds; brit gives the recorder two. The slice
+  leaves the participant as the policy names it. The missing node is a read that answers "for
+  whom does this act, and under what authority" without that lock.
+- **Two producers leave two records.** The store identifies a source by producer, run and item.
+  The design said one record per term per session; it is one per producer, term, outcome and
+  emitter, under one shared run.
+- **The emitter is part of the item**, so a tool replaced in the middle of a session is a second
+  source and not refused as conflicting evidence.
+- **A holding place with only unreadable files does not read as well.**
+
+The same day the ethosengine coordinator, designing a service that runs unattended under a
+steward's grant, asked what a record should name when there is no session. The two sessions
+agreed, as design and not as ruling: the participant is the steward the grant traces to; the
+grant's address rides one new closed detail key, `grant`; the answering session is never named;
+and the read above is designed once, for sessions and for such services. That design is
+`2026-11-27-carrier-acts-under-a-steward-grant-design.md` on ethosengine's branch, not on dev
+when this was written.
+
+What the independent review found, all fixed before hand-over, each with a test that fails
+without the fix: the new `--dir` option was accepted by every feedback verb, which changed what a
+legacy capture call does; a release address could be shaped like a path; two gap notes of one
+session from two releases collided in the store and blocked the catch-up command for good (a
+defect in the orchestrator's own ruling); a note could be read through a link, block on a pipe, or
+be deleted after being swapped; and the scan of the holding place had no bound. The review found
+the session key equal to brit's.
+
+Version bumps: none. `elohim-epr-cli` is not published, and no lockfile moved.
