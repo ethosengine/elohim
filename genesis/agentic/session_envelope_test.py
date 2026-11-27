@@ -29,14 +29,21 @@ def resolve_caller_epr(env=os.environ):
         raise RuntimeError(f'UNMEASURED: caller-selected epr is unavailable ({error})') from error
 
 
-# Chosen when this file's own tests run, never at import: shift_lease_test imports this module for its
-# Fixture and patches BINARY itself, and an import must not raise for a caller that set no EPR_BIN.
+# The epr under test is chosen on first use, never at import, through binary() alone, so every entry path
+# (unittest, --stage, --parallel, a module load by bootstrap_projection_test) resolves the caller's EPR_BIN
+# the same way. BINARY stays the patch point shift_lease_test sets directly; when it is set, binary() uses it.
 BINARY = None
 
 
-def setUpModule():
+def binary():
     global BINARY
-    BINARY = resolve_caller_epr()
+    if BINARY is None:
+        BINARY = resolve_caller_epr()
+    return BINARY
+
+
+def setUpModule():
+    binary()
 RUNTIMES = {'claude': ('claude-code', 4101), 'codex': ('codex', 4102)}
 
 
@@ -145,20 +152,20 @@ recipes:
         (self.root / 'genesis/agentic/bin/berth').symlink_to(REPO / 'genesis/agentic/bin/berth')
         for args in [('init','-q'), ('add','.epr-meta','docs','gap','.claude'), ('commit','-qm','fixture')]:
             self.run(['git', *args], native=False)
-        self.run([BINARY, 'actor','witness','--subject',f'human:{human}','--as','agent:reader@fixture','--session','enrollment','--basis','Fixture person present','--json'])
+        self.run([binary(), 'actor','witness','--subject',f'human:{human}','--as','agent:reader@fixture','--session','enrollment','--basis','Fixture person present','--json'])
         candidate = self.base / 'cargo-target/debug/epr'
         candidate.parent.mkdir(parents=True)
-        link_or_copy(BINARY, candidate)
-        cid = json.loads(self.run([BINARY,'bin','ingest',candidate,'--tool','epr','--source-commit',self.run(['git','rev-parse','HEAD'],native=False).strip(),'--tree-clean','true','--gate-run','fixture','--repo',self.root,'--json']))['cid']
+        link_or_copy(binary(), candidate)
+        cid = json.loads(self.run([binary(),'bin','ingest',candidate,'--tool','epr','--source-commit',self.run(['git','rev-parse','HEAD'],native=False).strip(),'--tree-clean','true','--gate-run','fixture','--repo',self.root,'--json']))['cid']
         write(self.base / 'cid', cid)
         (self.base / 'launch').mkdir()
-        link_or_copy(BINARY.with_name('bin-launch'), self.base / 'launch/epr')
+        link_or_copy(binary().with_name('bin-launch'), self.base / 'launch/epr')
         write(self.base / 'hook-bin/epr', f'#!/bin/sh\nexec {sys.executable} {self.base}/exec.py {self.base}/launch/epr "$@"\n')
         (self.base / 'hook-bin/epr').chmod(0o755)
         for runtime in RUNTIMES:
-            self.run([BINARY,'bin','pin','--tool','epr','--cid',cid,'--json'], runtime)
+            self.run([binary(),'bin','pin','--tool','epr','--cid',cid,'--json'], runtime)
         # Unpinned context projection is set up before the launcher lazily opens an envelope.
-        self.run([BINARY,'flow','project','--root',self.root,'--json'])
+        self.run([binary(),'flow','project','--root',self.root,'--json'])
 
     def runtime_child(self, session):
         # Claude assigns its id after exec: the runtime's exec environment is empty,
@@ -172,10 +179,10 @@ recipes:
         session = self.id('claude')
         shutil.rmtree(self.base/'proc/4101')
         env = self.runtime_child(session)
-        opened = json.loads(self.run([BINARY, 'session', 'open', '--json'], extra_env=env))
+        opened = json.loads(self.run([binary(), 'session', 'open', '--json'], extra_env=env))
         assert opened['generation'] == 2 and opened['predecessor'] is not None
         write(self.base/'open-successor.json', json.dumps(opened))
-        view = self.run([BINARY, 'session', 'show', '--json'], extra_env=env)
+        view = self.run([binary(), 'session', 'show', '--json'], extra_env=env)
         write(self.base/'view-successor.json', view)
 
     def id(self, runtime):
@@ -264,7 +271,7 @@ assert 'bootstrap: skipped' not in out,out
         # A fresh file of its own (the candidate may be a link to the shared, read-only epr),
         # mode 0755 as cargo writes it.
         rebuilt = self.base/'cargo-target/debug/rebuilt'
-        shutil.copyfile(BINARY,rebuilt); rebuilt.chmod(0o755)
+        shutil.copyfile(binary(),rebuilt); rebuilt.chmod(0o755)
         with rebuilt.open('ab') as f: f.write(b'\nrebuilt cargo target\n')
         rebuilt.replace(self.base/'cargo-target/debug/epr')
         second = self.run([sys.executable,hook,REPO,self.root,"prompt"])
@@ -289,7 +296,7 @@ class ResumeEnvelopeTest(unittest.TestCase):
             session = f.epr('session', 'open', '--json')['identity']['session']
             env = {}
             def run(*args, expected=0):
-                out = f.run([BINARY, *args], extra_env=env, expected=expected)
+                out = f.run([binary(), *args], extra_env=env, expected=expected)
                 return json.loads(out) if expected == 0 and out.strip() else out
             def entry(name):
                 path = f.root/f'.claude/memory/{name}.md'
@@ -348,7 +355,7 @@ class ResumeEnvelopeTest(unittest.TestCase):
                                 '--session', key, '--as-of', datetime.now(timezone.utc).isoformat(), '--json')
                     assert later['actorClaim'] == claim['recordCid'], later
             assert by[c]['session'] == f'{session}/generations/3' and not by[c]['attributable'], by[c]
-            f.run([BINARY, 'flow', 'memory', 'import', c, '--json'], extra_env=env, expected=2)
+            f.run([binary(), 'flow', 'memory', 'import', c, '--json'], extra_env=env, expected=2)
             assert not (f.root/'.eprfs/status/memory/contributions/generation-unclaimed.json').exists()
 
     def test_runtime_child_resumes_without_inheriting_authority(self):
@@ -426,7 +433,7 @@ rules:
                     shutil.rmtree(f.base/'proc/4101')
                 else:
                     write(f.base/'proc/sys/kernel/random/boot_id', 'next boot')
-                collected = json.loads(f.run([BINARY, 'session', 'gc', '--json']))
+                collected = json.loads(f.run([binary(), 'session', 'gc', '--json']))
                 assert len(collected['closed']) == 1
                 path = f.base/f'config-home/elohim/device/sessions/{session}.json'
                 before = path.read_bytes()
@@ -435,7 +442,7 @@ rules:
                 seal_bytes = seal.read_bytes()
                 resumed_env = f.runtime_child(session)
                 def run(*args):
-                    out = f.run([BINARY, *args], extra_env=resumed_env)
+                    out = f.run([binary(), *args], extra_env=resumed_env)
                     return json.loads(out) if out.strip() else None
                 # Retained dead-owner facets are governed by berth expiry/takeover, not resume.
                 write(f.base/'berth/leases.json', '{"old-lease":{"holder":"'+session+'","pid":4101}}')
@@ -470,7 +477,7 @@ rules:
                     (['flow', 'memory', 'affiliate', '--session', session, '--member', 'human:carol',
                       '--kind', 'person', '--role', 'observer', '--json'], 'has no actor claim'),
                 ]:
-                    result = subprocess.run([sys.executable, str(f.base/'exec.py'), str(BINARY), *args],
+                    result = subprocess.run([sys.executable, str(f.base/'exec.py'), str(binary()), *args],
                                             cwd=f.root, env={**f.env(), **resumed_env},
                                             text=True, capture_output=True, timeout=45)
                     with self.subTest(reader=args[:3]):
@@ -538,15 +545,15 @@ rules:
             session = 'real-live-owner'
             env = {'EPR_UNDER_TEST': '0', 'EPR_PROC_ROOT': '/proc',
                    'ELOHIM_SESSION_ID': session, 'ELOHIM_SESSION_OWNER_PID': str(os.getpid())}
-            opened = json.loads(f.run([BINARY, 'session', 'open', '--json'], extra_env=env, native=False))
+            opened = json.loads(f.run([binary(), 'session', 'open', '--json'], extra_env=env, native=False))
             assert opened['identity']['ownerPid'] == os.getpid()
-            f.run([BINARY, 'session', 'close', '--json'], extra_env=env, native=False)
+            f.run([binary(), 'session', 'close', '--json'], extra_env=env, native=False)
             sessions = f.base/'config-home/elohim/device/sessions'
             before = {p: p.read_bytes() for p in sessions.rglob('*') if p.is_file()}
             # A valid fixture successor sees a different boot and no live parent's PID.
             # Neither an absent switch nor 0 may use that evidence to admit takeover.
             child = {**f.env(), **f.runtime_child(session)}
-            args = [sys.executable, str(f.base/'exec.py'), str(BINARY), 'session', 'open', '--json']
+            args = [sys.executable, str(f.base/'exec.py'), str(binary()), 'session', 'open', '--json']
             for switch in (None, '0'):
                 child.pop('EPR_UNDER_TEST', None)
                 if switch is not None:
@@ -556,7 +563,7 @@ rules:
                 assert result.returncode != 0 and 'envelope-owner-mismatch' in result.stderr, result
                 assert {p: p.read_bytes() for p in sessions.rglob('*') if p.is_file()} == before
             # Positive control: only explicit fixture mode permits this simulated death.
-            resumed = json.loads(f.run([BINARY, 'session', 'open', '--json'],
+            resumed = json.loads(f.run([binary(), 'session', 'open', '--json'],
                                       extra_env=f.runtime_child(session)))
             assert resumed['generation'] == 2 and resumed['identity']['ownerPid'] == 4201
 
@@ -565,11 +572,11 @@ rules:
             f = Fixture(base); f.setup()
             env = {'EPR_UNDER_TEST': '0', 'EPR_PROC_ROOT': '/proc',
                    'ELOHIM_SESSION_ID': 'real-live-owner', 'ELOHIM_SESSION_OWNER_PID': str(os.getpid())}
-            opened = json.loads(f.run([BINARY, 'session', 'open', '--json'], extra_env=env, native=False))
+            opened = json.loads(f.run([binary(), 'session', 'open', '--json'], extra_env=env, native=False))
             assert opened['identity']['ownerPid'] == os.getpid()
             # GC retains the supplied view, even when it hides a real live owner.
             env['EPR_PROC_ROOT'] = str(f.base/'proc')
-            result = json.loads(f.run([BINARY, 'session', 'gc', '--json'], extra_env=env, native=False))
+            result = json.loads(f.run([binary(), 'session', 'gc', '--json'], extra_env=env, native=False))
             assert len(result['closed']) == 1
 
     def test_prepare_berth_invalid_destination_does_not_publish_successor(self):
@@ -586,7 +593,7 @@ rules:
                     path.write_text('not a store')
                 sessions = f.base/'config-home/elohim/device/sessions'
                 before = {p: p.read_bytes() for p in sessions.rglob('*') if p.is_file()}
-                args = [BINARY, 'session', 'prepare-berth', '--session', session, '--store', str(path)]
+                args = [binary(), 'session', 'prepare-berth', '--session', session, '--store', str(path)]
                 result = subprocess.run([sys.executable, str(f.base/'exec.py'), *map(str, args)],
                     cwd=f.root, env={**f.env(), **env}, capture_output=True, text=True, timeout=45)
                 assert result.returncode != 0 and 'envelope-berth-unreachable' in result.stderr, result
@@ -629,7 +636,7 @@ rules:
                     env.update(ELOHIM_SESSION_ID=session, ELOHIM_SESSION_OWNER_PID='4201')
                 sessions = f.base/'config-home/elohim/device/sessions'
                 before = {p: p.read_bytes() for p in sessions.rglob('*') if p.is_file()}
-                result = subprocess.run([sys.executable, str(f.base/'exec.py'), str(BINARY), 'session', 'open'],
+                result = subprocess.run([sys.executable, str(f.base/'exec.py'), str(binary()), 'session', 'open'],
                     cwd=f.root, env=env, capture_output=True, text=True, timeout=45)
                 assert result.returncode != 0 and 'envelope-owner-mismatch' in result.stderr, result
                 assert {p: p.read_bytes() for p in sessions.rglob('*') if p.is_file()} == before
@@ -638,8 +645,8 @@ rules:
                     namespace.with_suffix('.old').replace(namespace)
                 shutil.rmtree(f.base/'proc/4101', ignore_errors=True)
                 env.pop('ELOHIM_SESSION_ID', None); env.pop('ELOHIM_SESSION_OWNER_PID', None)
-                f.run([BINARY, 'session', 'gc', '--json'], extra_env=env)
-                successor = json.loads(f.run([BINARY, 'session', 'open', '--json'], extra_env=env))
+                f.run([binary(), 'session', 'gc', '--json'], extra_env=env)
+                successor = json.loads(f.run([binary(), 'session', 'open', '--json'], extra_env=env))
                 assert successor['generation'] == 2
 
 
@@ -728,7 +735,7 @@ class EnvelopeTest(unittest.TestCase):
             assert message.read_text() == 'unchanged message\n'
             registry = f.base / 'no-agent-runtimes.json'
             registry.write_text(json.dumps({'runtimes': [{'id': 'unused-runtime', 'comm': ['unused-runtime'], 'sessionEnv': []}]}))
-            result = json.loads(f.run([BINARY, 'session', 'commit-trailers', '--json'],
+            result = json.loads(f.run([binary(), 'session', 'commit-trailers', '--json'],
                                      extra_env={'EPR_AGENT_RUNTIMES': str(registry)}))
             assert result == {'status': 'not-applicable', 'trailers': []}, result
 
@@ -757,7 +764,7 @@ class EnvelopeTest(unittest.TestCase):
                 stat.unlink(missing_ok=True)
                 if action=='malformed': stat.write_text('malformed')
                 if action=='unreadable': stat.mkdir()
-                assert json.loads(f.run([BINARY,'session','gc','--json']))['closed']==[]
+                assert json.loads(f.run([binary(),'session','gc','--json']))['closed']==[]
                 if action=='unreadable': stat.rmdir()
             stat.write_text(original)
             namespace=f.base/'proc/self/ns/pid'
@@ -767,13 +774,13 @@ class EnvelopeTest(unittest.TestCase):
             # the holder exit and release its lock, which across a foreign namespace is proof of
             # death by design, so gc would then be right to close the envelope and this line
             # would pass only while the holder had not yet noticed.
-            assert json.loads(f.run([BINARY,'session','gc','--json']))['closed']==[]
+            assert json.loads(f.run([binary(),'session','gc','--json']))['closed']==[]
             shutil.rmtree(stat.parent)
             write(f.base/'proc/sys/kernel/random/boot_id','another boot')
-            closed=json.loads(f.run([BINARY,'session','gc','--json']))['closed']
+            closed=json.loads(f.run([binary(),'session','gc','--json']))['closed']
             assert len(closed)==1 and closed[0]['identity']['session']==f.id('claude')
             f.witnesses(1)
-            assert json.loads(f.run([BINARY,'session','gc','--json']))['closed']==[]
+            assert json.loads(f.run([binary(),'session','gc','--json']))['closed']==[]
 
     def test_reused_session_owner_cannot_read_close_or_mutate(self):
         with tempfile.TemporaryDirectory(prefix='envelope-owner-') as base:
@@ -786,7 +793,7 @@ class EnvelopeTest(unittest.TestCase):
                          ('session','validate','--session',f.id('claude')),
                          ('flow','claim','--on','envelope#1'),
                          ('covenant','record'), ('actor','claim','--as','agent:reader@haiku')]:
-                result=subprocess.run([sys.executable,str(f.base/'exec.py'),str(BINARY),*args,'--json'],
+                result=subprocess.run([sys.executable,str(f.base/'exec.py'),str(binary()),*args,'--json'],
                     cwd=f.root,env={**f.env(),'CLAUDE_SESSION_ID':f.id('claude')},capture_output=True,text=True)
                 assert result.returncode != 0 and 'envelope-owner-mismatch' in result.stderr, result
             assert path.read_bytes() == before
@@ -829,7 +836,7 @@ class EnvelopeTest(unittest.TestCase):
             f=Fixture(base); f.setup()
             f.epr('session','open','--json')
             f.epr('actor','claim','--as','human:matthew','--json')
-            f.run([BINARY,'actor','claim','--as','agent:reader@claude-haiku-4-5',
+            f.run([binary(),'actor','claim','--as','agent:reader@claude-haiku-4-5',
                    '--root',f.root/'docs','--json'])
             assert not (f.root/'docs/.eprfs').exists()
             assert f.epr('session','show','--json')['capabilityTier']=='claude-haiku-4-5'
@@ -838,16 +845,16 @@ class EnvelopeTest(unittest.TestCase):
             before={str(p.relative_to(other)):p.read_bytes() for p in other.rglob('*') if p.is_file()}
             for args in [('actor','claim','--as','agent:reader@haiku','--root',other),
                          ('covenant','record','--repo',other)]:
-                r=subprocess.run([sys.executable,str(f.base/'exec.py'),str(BINARY),*map(str,args),'--json'],
+                r=subprocess.run([sys.executable,str(f.base/'exec.py'),str(binary()),*map(str,args),'--json'],
                     cwd=f.root,env=f.env(),capture_output=True,text=True)
                 assert r.returncode != 0 and 'envelope-checkout-mismatch' in r.stderr, r
             assert before=={str(p.relative_to(other)):p.read_bytes() for p in other.rglob('*') if p.is_file()}
             # A subdirectory and a symlink resolving to the same checkout remain valid.
             alias=f.base/'alias'; alias.symlink_to(f.root, target_is_directory=True)
-            f.run([BINARY,'actor','claim','--as','agent:reader@haiku','--root',alias/'docs','--json'])
+            f.run([binary(),'actor','claim','--as','agent:reader@haiku','--root',alias/'docs','--json'])
             assert not (f.root/'docs/.eprfs').exists()
             assert f.epr('session','show','--json')['capabilityTier']=='haiku'
-            f.run([BINARY,'flow','claim','--on','envelope#1','--root',alias/'docs','--json'])
+            f.run([binary(),'flow','claim','--on','envelope#1','--root',alias/'docs','--json'])
             assert len(f.epr('session','show','--json')['claims'])==1
             assert not (f.root/'docs/.eprfs').exists()
 
@@ -949,7 +956,7 @@ else: b.touch(session,pid=4101)
                   f'just --justfile {f.root}/justfile app_dir={app} a2o_dir={a2o} test mesh fixture.feature\n')
             write(f.base/'no-runtimes.json', '{"runtimes":[]}')
             out=f.run(['bash',script], native=False, expected=42, extra_env={
-                'EPR_BIN':str(BINARY), 'EPR_PROC_ROOT':'/proc',
+                'EPR_BIN':str(binary()), 'EPR_PROC_ROOT':'/proc',
                 'EPR_AGENT_RUNTIMES':str(f.base/'no-runtimes.json')})
             lease=json.loads(snapshot.read_text())['mesh']
             assert lease['holder'].startswith('stage-probe-'), lease
@@ -971,7 +978,7 @@ else: b.touch(session,pid=4101)
                     p=f.base/('proc/sys/kernel/random/boot_id' if missing=='boot' else 'proc/self/ns/pid')
                     p.unlink()
                     if missing=='boot': p.mkdir()  # unreadable as boot-id text
-                r=subprocess.run([sys.executable,str(f.base/'exec.py'),str(BINARY),'session','open','--json'],
+                r=subprocess.run([sys.executable,str(f.base/'exec.py'),str(binary()),'session','open','--json'],
                     cwd=f.root,env={**f.env(),**extra},capture_output=True,text=True)
                 assert r.returncode != 0 and 'envelope-owner-unknown' in r.stderr, r
                 assert not (f.base/'config-home/elohim/device/sessions').exists()
@@ -993,7 +1000,7 @@ else: b.touch(session,pid=4101)
                                  ('session','validate','--session',f.id('claude')),
                                  ('flow','claim','--on','envelope#1'),('covenant','record'),
                                  ('actor','claim','--as','agent:reader@haiku')]:
-                        r=subprocess.run([sys.executable,str(f.base/'exec.py'),str(BINARY),*args],
+                        r=subprocess.run([sys.executable,str(f.base/'exec.py'),str(binary()),*args],
                             cwd=f.root,env=f.env(),capture_output=True,text=True)
                         reason='envelope-owner-mismatch' if state=='different' else 'envelope-owner-unknown'
                         assert r.returncode!=0 and reason in r.stderr, (state,args,r)
@@ -1012,11 +1019,11 @@ else: b.touch(session,pid=4101)
                 r=subprocess.run([sys.executable,str(f.base/'exec.py'),str(REPO/'genesis/agentic/bin/berth'),
                     'claim','wrong-store'],cwd=f.root,env={**f.env(),'BERTH_DIR':str(store_b)},capture_output=True,text=True)
                 assert r.returncode!=0 and 'envelope-berth-mismatch' in r.stderr,r
-                view=json.loads(f.run([BINARY,'session','show','--json'],extra_env={'BERTH_DIR':str(store_b)}))
+                view=json.loads(f.run([binary(),'session','show','--json'],extra_env={'BERTH_DIR':str(store_b)}))
                 assert list(view['berth']['leases'])==['fixture-claude']
                 shutil.rmtree(f.base/'proc/4101')
                 if missing: store_a.rename(f.base/'unreachable-berth')
-                r=subprocess.run([sys.executable,str(f.base/'exec.py'),str(BINARY),'session','gc','--json'],
+                r=subprocess.run([sys.executable,str(f.base/'exec.py'),str(binary()),'session','gc','--json'],
                     cwd=f.root,env={**f.env(),'BERTH_DIR':str(store_b)},capture_output=True,text=True)
                 if missing:
                     # gc reports an unclosable record in `failed` and keeps sweeping the rest.
@@ -1025,7 +1032,7 @@ else: b.touch(session,pid=4101)
                     assert 'envelope-berth-unreachable' in failed[0]['error'],r
                     assert path.read_bytes()==before
                     (f.base/'unreachable-berth').rename(store_a)
-                    f.run([BINARY,'session','gc','--json'],extra_env={'BERTH_DIR':str(store_b)})
+                    f.run([binary(),'session','gc','--json'],extra_env={'BERTH_DIR':str(store_b)})
                 else:
                     assert r.returncode==0,r
                 assert 'fixture-claude' not in json.loads((store_a/'leases.json').read_text())
@@ -1050,7 +1057,7 @@ else: b.touch(session,pid=4101)
             assert leases['fixture-worktree']['holder']==f.id('claude'), leases
             record=json.loads((f.base/f'config-home/elohim/device/sessions/{f.id("claude")}.json').read_text())
             assert record['repository']==opened['repository'] and record['berthStore']==str(f.base/'berth')
-            r=from_worktree(BINARY,'flow','claim','--on','envelope#1','--json')
+            r=from_worktree(binary(),'flow','claim','--on','envelope#1','--json')
             assert r.returncode!=0 and 'envelope-checkout-mismatch' in r.stderr, r
             f.epr('session','close','--json')
             assert 'fixture-worktree' not in json.loads((f.base/'berth/leases.json').read_text())
@@ -1091,13 +1098,13 @@ else: b.touch(session,pid=4101)
             shutil.copytree(f.base/'config-home',home/'.config')
             alias=f.base/'alias'; alias.symlink_to(home/'.config',target_is_directory=True)
             for config in ['', 'relative', str(home/'.config'), str(alias)]:
-                result=subprocess.run([sys.executable,str(f.base/'exec.py'),str(BINARY),'session','open','--json'],
+                result=subprocess.run([sys.executable,str(f.base/'exec.py'),str(binary()),'session','open','--json'],
                     cwd=f.root,env={**f.env(),'HOME':str(home),'XDG_CONFIG_HOME':config},capture_output=True,text=True)
                 assert result.returncode != 0 and 'persistent-config-required' in result.stderr, result
                 assert not (home/'.config/elohim/device/sessions').exists()
             # Explicit home keys receive the same remedy, before the generic key guard.
             for key in [home/'.config/elohim/device/ed25519.seed', home/'missing/ed25519.seed']:
-                result=subprocess.run([sys.executable,str(f.base/'exec.py'),str(BINARY),'session','open','--json'],
+                result=subprocess.run([sys.executable,str(f.base/'exec.py'),str(binary()),'session','open','--json'],
                     cwd=f.root,env={**f.env(),'HOME':str(home),'ELOHIM_DEVICE_KEY_FILE':str(key)},capture_output=True,text=True)
                 assert result.returncode != 0 and 'persistent-config-required' in result.stderr, result
                 assert not (key.parent/'sessions').exists()
@@ -1132,7 +1139,7 @@ assert b.claim('racing', os.environ['SESSION'])[0]
                 deadline=time.monotonic()+10
                 while not rendezvous.exists() and claimant.poll() is None and time.monotonic()<deadline: time.sleep(.01)
                 assert rendezvous.exists(), claimant.communicate(timeout=2) if claimant.poll() is not None else 'guard timed out'
-                closer=subprocess.Popen([sys.executable,str(f.base/'exec.py'),str(BINARY),'session','close','--json'],cwd=f.root,env=f.env(),stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
+                closer=subprocess.Popen([sys.executable,str(f.base/'exec.py'),str(binary()),'session','close','--json'],cwd=f.root,env=f.env(),stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
                 try:
                     time.sleep(.15)
                     assert closer.poll() is None, 'close crossed a live shared guard'
@@ -1155,7 +1162,7 @@ assert b.claim('racing', os.environ['SESSION'])[0]
                 result=subprocess.run([sys.executable,str(f.base/'exec.py'),sys.executable,str(script)],cwd=f.root,env=env,capture_output=True,text=True)
                 assert result.returncode != 0 and 'envelope-closed: '+f.id('claude') in result.stderr,result
             for args in [('flow','claim','--on','envelope#1'),('covenant','record')]:
-                result=subprocess.run([sys.executable,str(f.base/'exec.py'),str(BINARY),*args],cwd=f.root,env=f.env(),capture_output=True,text=True)
+                result=subprocess.run([sys.executable,str(f.base/'exec.py'),str(binary()),*args],cwd=f.root,env=f.env(),capture_output=True,text=True)
                 assert result.returncode != 0 and 'envelope-closed: '+f.id('claude') in result.stderr,result
             f.epr('session','close','--json')
             assert (f.root/'.eprfs/status/flows.jsonl').read_bytes()==before
@@ -1319,25 +1326,25 @@ def run_parallel(jobs, exclude, case_timeout):
     # command guard. (The Rust harness already hands over a stripped epr; stripping it again
     # writes one 66 MB file.)
     # The cases run one stripped copy instead (66 MB), with bin-launch beside it as setup looks
-    # for it. It must be BINARY itself, not only the ingested candidate: cases mix direct BINARY
+    # for it. It must be binary() itself, not only the ingested candidate: cases mix direct binary()
     # calls with launcher calls that run the candidate, and recall's executor digest
     # (`session_envelope::executor_cid`, the running file's CID) holds only while both are the
     # same bytes. Nothing the cases run reads symbols or debug info. Without `strip`, unchanged.
     binary_dir = tempfile.mkdtemp(prefix='envelope-epr-')
-    binary = BINARY
+    selected = binary()
     try:
         stripped = subprocess.run(['strip', '--strip-all', '-o', os.path.join(binary_dir, 'epr'),
-                                   str(BINARY)], capture_output=True, timeout=120).returncode == 0
+                                   str(selected)], capture_output=True, timeout=120).returncode == 0
     except (OSError, subprocess.SubprocessError):
         stripped = False
     if stripped:
-        shutil.copy2(BINARY.with_name('bin-launch'), os.path.join(binary_dir, 'bin-launch'))
-        binary = Path(binary_dir) / 'epr'
+        shutil.copy2(selected.with_name('bin-launch'), os.path.join(binary_dir, 'bin-launch'))
+        selected = Path(binary_dir) / 'epr'
     else:
         print('session_envelope_test: strip unavailable; the cases run the unstripped epr',
               file=sys.stderr, flush=True)
     # Child cases inherit the caller-selected executable, or this per-run stripped derivative.
-    os.environ['EPR_BIN'] = str(binary)
+    os.environ['EPR_BIN'] = str(selected)
     batches = ([i for i in ids if i not in SERIAL_TAIL], jobs), ([i for i in ids if i in SERIAL_TAIL], 1)
     failed, reported, interrupted = [], set(), None
 
