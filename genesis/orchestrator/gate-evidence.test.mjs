@@ -37,6 +37,8 @@ import {
   isHabitAtom,
   patternDigest,
   projectTree,
+  readDirectories,
+  readPathOid,
   recordEvidence,
   reusableHit,
   resolveBin,
@@ -2528,4 +2530,49 @@ for (const [name, stored, success, kept] of [
   assert.equal(result.keptGreen === true, kept);
   assert.equal(fake.calls.filter(c => isPut(c.bin, c.args)).length, kept ? 0 : 1);
   if (kept) assert.deepEqual(warnings, ['[gate] elohim-storage evidence: kept green for closure closure; this run was red for the same closure (a flake: the red stays in this run log and cycle row, and the stored green stands)\n']);
+});
+
+// Backlog row 128: a habit DELTA in a dependency's .epr-meta re-keyed every dependent gate, because a
+// directory read (a crate root reached through CARGO_MANIFEST_DIR) keyed the plain tree. A directory
+// read now keys its tree minus habit atoms, as a project's own tree does; files keep their blob id.
+test('a directory read ignores a habit atom edit and still sees every other change in it', () => {
+  const root = mkdtempSync(join(tmpdir(), 'read-dir-habit-'));
+  const git = (...args) => {
+    const r = spawnSync('git', args, { cwd: root, encoding: 'utf8' });
+    assert.equal(r.status, 0, r.stderr);
+    return r.stdout.trim();
+  };
+  const commitAll = message => { git('add', '-A'); git('commit', '-qm', message); return git('rev-parse', 'HEAD'); };
+  try {
+    git('init', '-q');
+    git('config', 'user.email', 'test@example.invalid');
+    git('config', 'user.name', 'test');
+    mkdirSync(join(root, 'crate/src'), { recursive: true });
+    mkdirSync(join(root, 'crate/.epr-meta'), { recursive: true });
+    writeFileSync(join(root, 'crate/src/lib.rs'), 'pub fn a() {}\n');
+    writeFileSync(join(root, 'crate/.epr-meta/keeps.habit.md'), 'DELTA one\n');
+    writeFileSync(join(root, 'crate/Cargo.toml'), '[package]\nname = "c"\n');
+    const base = commitAll('base');
+    writeFileSync(join(root, 'crate/.epr-meta/keeps.habit.md'), 'DELTA one\nDELTA two\n');
+    const habitOnly = commitAll('a habit delta');
+    writeFileSync(join(root, 'crate/src/lib.rs'), 'pub fn b() {}\n');
+    const source = commitAll('a source change');
+
+    const paths = ['crate', 'crate/Cargo.toml', 'crate/.epr-meta/keeps.habit.md', 'absent'];
+    const dirs = readDirectories(root, base, paths);
+    assert.deepEqual([...dirs], ['crate'], 'only the directory is a tree; a missing path is not');
+
+    const key = (commit, path) => readPathOid(root, commit, path, readDirectories(root, commit, [path]));
+    assert.equal(key(habitOnly, 'crate'), key(base, 'crate'), 'a habit delta leaves the directory read unchanged');
+    assert.notEqual(key(source, 'crate'), key(habitOnly, 'crate'), 'a source change in it still moves the key');
+    assert.equal(key(base, 'crate/Cargo.toml'), git('rev-parse', `${base}:crate/Cargo.toml`), 'a file keeps its blob id');
+    assert.notEqual(key(habitOnly, 'crate/.epr-meta/keeps.habit.md'), key(base, 'crate/.epr-meta/keeps.habit.md'),
+      'a habit atom a gate names on purpose stays keyed');
+    // A failing type check keys every path as before (the plain tree), never narrower.
+    const failing = () => ({ status: 1, stdout: '' });
+    assert.deepEqual([...readDirectories(root, base, paths, failing)], []);
+    assert.equal(readPathOid(root, habitOnly, 'crate', new Set()), git('rev-parse', `${habitOnly}:crate`));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
