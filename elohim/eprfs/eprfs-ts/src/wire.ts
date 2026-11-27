@@ -12,6 +12,7 @@
 export type ReachReason =
   | 'outside-standing'
   | 'no-record'
+  | 'index-warming'
   | 'not-under-root'
   | 'identity-required'
   | 'authorizer-unavailable';
