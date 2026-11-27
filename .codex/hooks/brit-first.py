@@ -120,6 +120,8 @@ LOCAL_VERBS = {
     "count-objects", "check-ignore", "check-attr", "diff-tree", "diff-index", "diff-files",
     "range-diff", "mktree", "mktag", "verify-commit", "verify-tag", "var",
 }
+# The most entries a scratch repository's git directory may hold for the symlink walk to vouch for it.
+SCRATCH_GIT_ENTRIES = 20000
 REPOSITORY_ENV = re.compile(r"(?<![A-Za-z0-9_])GIT_[A-Z_]+")
 URL_LIKE = re.compile(r"://|^[^/\s:@]+@[^/\s:]+:")
 PARENT_SEGMENT = re.compile(r"(^|[/=])\.\.(/|$)")
@@ -266,6 +268,15 @@ def _scan(command):
                 quote = None
             i += 1
             continue
+        if quote == "$'":
+            # ANSI-C quoting: a backslash escapes the next character, so \' does not end it.
+            if ch == "\\":
+                i += 2
+                continue
+            if ch == "'":
+                quote = None
+            i += 1
+            continue
         if quote == '"':
             if ch == "\\":
                 i += 2
@@ -277,6 +288,12 @@ def _scan(command):
         if ch == "\\":
             i += 2
             continue
+        if text.startswith("$'", i):
+            quote = "$'"
+            i += 2
+            continue
+        # $"…" (locale translation) quotes as "…" does: the $ is an ordinary character here and the
+        # double quote that follows opens a double-quoted string.
         if ch in ("'", '"'):
             quote = ch
             i += 1
@@ -341,7 +358,9 @@ def _scan(command):
         if any(elsewhere.count(os.path.basename(name)) > 1 for name in files):
             continue
         blank.append((record["body_start"], record["body_end"]))
-    if not blank:
+    # ANSI-C quoting is tracked above, but shlex, which reads the result, does not know it: when the
+    # two readers could disagree about where a quote ends, no body is treated as data.
+    if not blank or "$'" in text:
         return text
     out = []
     cursor = 0
@@ -439,7 +458,30 @@ def _scratch_repository(real, root, workspace):
         if _under(gitdir, workspace) or not any(_under(gitdir, r) for r in _scratch_roots()):
             return False
         marker = gitdir
-    config = os.path.join(os.path.realpath(marker), "config")
+    gitdir = os.path.realpath(marker)
+    if _under(gitdir, workspace) or not any(_under(gitdir, r) for r in _scratch_roots()):
+        return False
+    # A commondir file makes this git directory a worktree of the repository it names, and an
+    # alternates file borrows another repository's objects: either can tie a scratch path to the
+    # workspace, so both are refused outright (a guard must not run git to ask where they lead).
+    for tie in ("commondir", os.path.join("objects", "info", "alternates")):
+        if os.path.lexists(os.path.join(gitdir, tie)):
+            return False
+    # A symlink anywhere in the git directory (objects, refs/heads, HEAD, packed-refs, any name, at
+    # any depth) that resolves outside the scratch roots, the workspace included, makes a write here a
+    # write there. The walk is bounded; a git directory too large to walk is refused, never trusted.
+    seen = 0
+    for base, dirs, files in os.walk(gitdir, followlinks=False):
+        for name in dirs + files:
+            seen += 1
+            if seen > SCRATCH_GIT_ENTRIES:
+                return False
+            path = os.path.join(base, name)
+            if os.path.islink(path):
+                target = os.path.realpath(path)
+                if _under(target, workspace) or not any(_under(target, r) for r in _scratch_roots()):
+                    return False
+    config = os.path.join(gitdir, "config")
     if os.path.exists(config):
         with open(config, encoding="utf-8", errors="replace") as handle:
             body = handle.read().lower()
