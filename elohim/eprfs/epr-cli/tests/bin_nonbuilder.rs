@@ -394,8 +394,10 @@ enum Offered {
 /// What the draw owes on this host.
 enum Owed {
     Drawn,
-    /// Refused before either binary runs, naming the loader this host's probe does not observe.
-    RefusedForLoader(String),
+    /// Refused before either binary runs, naming one of these loaders, which this host's probe does
+    /// not observe. The draw judges the offered binaries in its own order (bin-launch sorts first)
+    /// and names the first unmet one, so the test accepts any of them rather than assume an order.
+    RefusedForLoader(Vec<String>),
 }
 
 /// The byte offset and length (without its NUL) of an ELF64 little-endian file's PT_INTERP path.
@@ -621,27 +623,33 @@ fn sibling_draw(case: Offered) {
     fs::copy(&bin_launch, offered.join("bin-launch")).unwrap();
     let loaders = observed_loaders();
     let owed = match case {
-        Offered::UnmetLoader => Owed::RefusedForLoader(set_absent_loader(&offered.join("epr"))),
+        // Both offered binaries get an absent loader: whichever the draw judges first is unmet.
+        Offered::UnmetLoader => Owed::RefusedForLoader(
+            ["epr", "bin-launch"]
+                .into_iter()
+                .map(|bin| set_absent_loader(&offered.join(bin)))
+                .collect(),
+        ),
         Offered::Built => {
             // The draw re-extracts what the bytes require and judges it on this host, so the
             // outcome follows how this run's binaries were linked: a build against this host's
             // standard loader is drawn; a build whose loader the probe does not observe (CI's
             // nix-shell build names a /nix/store loader, which the probe's fixed list never
             // holds) is owed the refusal, and the test says which it exercised.
-            let unobserved = ["epr", "bin-launch"]
+            let unobserved: Vec<String> = ["epr", "bin-launch"]
                 .into_iter()
                 .filter_map(|bin| interpreter_of(&offered.join(bin)))
-                .find(|loader| !loaders.contains(loader));
-            match unobserved {
-                None => Owed::Drawn,
-                Some(loader) => {
-                    eprintln!(
-                        "this host's probe does not observe {loader}, the loader this run's \
-                         binaries were linked against (observed: {loaders:?}); asserting the \
-                         refusal the draw owes here instead of the draw"
-                    );
-                    Owed::RefusedForLoader(loader)
-                }
+                .filter(|loader| !loaders.contains(loader))
+                .collect();
+            if unobserved.is_empty() {
+                Owed::Drawn
+            } else {
+                eprintln!(
+                    "this host's probe does not observe {unobserved:?}, the loader(s) this run's \
+                     binaries were linked against (observed: {loaders:?}); asserting the refusal \
+                     the draw owes here instead of the draw"
+                );
+                Owed::RefusedForLoader(unobserved)
             }
         }
     };
@@ -873,13 +881,15 @@ fn sibling_draw(case: Offered) {
             assert_eq!(installed(), release, "{}", text(&output));
             assert!(store.holds_verified_for(&head));
         }
-        Owed::RefusedForLoader(loader) => {
+        Owed::RefusedForLoader(loaders) => {
             assert!(!output.status.success(), "{}", text(&output));
             let stderr = String::from_utf8_lossy(&output.stderr);
             assert!(stderr.contains("abi.loader unmet"), "{}", text(&output));
             assert!(
-                stderr.contains(&loader),
-                "names {loader}: {}",
+                loaders
+                    .iter()
+                    .any(|loader| stderr.contains(loader.as_str())),
+                "names one of {loaders:?}: {}",
                 text(&output)
             );
             assert!(stderr.contains("nothing was ingested"), "{}", text(&output));
