@@ -55,6 +55,7 @@
       {"file": "c-baseline.test.mjs", "tree": "probes this device's C compiler, a machine fact no commit key covers"},
       {"file": "gate-preflight.test.mjs", "reads": ["elohim/eprfs/device-runtime/tests/fixtures/release-recency"]},
       {"file": "device-epr.test.mjs", "reads": []},
+      {"file": "landing-intent.test.mjs", "reads": []},
       {"file": "jenkinsfile-sh-syntax.test.mjs", "tree": "the hand-over trace saw repository object store read: <git-dir>/worktrees/nt-e11/HEAD; not yet retried in the view"},
       {"file": "build-inputs-closure.test.mjs", "reads": ["**/Cargo.lock", "**/Cargo.toml", "**/build-manifest.json", ".gitmodules", "che-devworkspaces", "elohim/brit", "elohim/holochain-conductor", "elohim/rakia", "sophia"]},
       {"file": "gate-oracle.test.mjs", "reads": []},

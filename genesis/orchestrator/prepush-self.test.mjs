@@ -25,7 +25,7 @@ const RECORD = ".eprfs/status/handover/handovers.jsonl";
 const cleanEnv = Object.fromEntries(
   Object.entries(process.env).filter(([k]) =>
     (!k.startsWith("GIT_") || k.startsWith("GIT_CONFIG_")) &&
-    !["HUSKY", "GATE_ON_RED", "GATE_LIVE_RUN", "PUSH_IS_HANDOVER", "RUN_SWEETTEST", "SKIP_SWEETTEST"].includes(k)),
+    !["HUSKY", "GATE_LANDING_INTENT", "GATE_ON_RED", "GATE_LIVE_RUN", "LANDING_INTENT", "PUSH_IS_HANDOVER", "RUN_SWEETTEST", "SKIP_SWEETTEST"].includes(k)),
 );
 // The fixture's git reads no device config: a global or system file can name repository paths
 // (core.hooksPath, include.path) the gate key does not cover (E11). Identity is set per fixture.
@@ -87,6 +87,7 @@ function fixture(t, { hook = readFileSync(HOOK_PATH, "utf8") } = {}) {
 const a = process.argv.slice(2);
 if (a.includes("--names")) { readFileSync(0, "utf8"); console.log("alpha"); console.log("beta"); process.exit(0); }
 appendFileSync("stub.log", "GATE " + a.join(" ") + "\\n");
+appendFileSync("stub.log", "GATE_INTENT " + (process.env.GATE_LANDING_INTENT ?? "unset") + "\\n");
 `);
   exe(join(dir, "genesis/orchestrator/gate-preflight.mjs"), `import {appendFileSync} from "node:fs";
 const a = process.argv.slice(2);
@@ -97,6 +98,11 @@ process.exit(Number(process.env.STUB_PREFLIGHT_RC || 0));
   // The real recorder, reached through a shim at the path the hook names.
   exe(join(dir, "genesis/orchestrator/handover-record.mjs"),
     `import { main } from ${JSON.stringify(join(ROOT, "genesis/orchestrator/handover-record.mjs"))};\nprocess.exitCode = main(process.argv.slice(2));\n`);
+  exe(join(dir, "genesis/orchestrator/landing-intent.mjs"), `import {appendFileSync} from "node:fs";
+appendFileSync("stub.log", "LANDING_INTENT " + process.argv.slice(2).join(" ") + "\\n");
+if (process.env.STUB_LANDING_INTENT) process.stdout.write(process.env.STUB_LANDING_INTENT + "\\n");
+process.stderr.write("[pre-push] landing intent: fixture\\n");
+`);
   // gate-live: absent in effect unless STUB_LIVE=1, then a run opens and a stop is requested on it.
   exe(join(dir, "genesis/orchestrator/gate-live.mjs"), `const a = process.argv.slice(2);
 if (process.env.STUB_LIVE !== "1") process.exit(1);
@@ -391,6 +397,17 @@ test("a dev push of a head already handed over pays full demand and never reads 
     assert.equal(readFileSync(join(fx.dir, RECORD), "utf8"), before, "the record is untouched");
     assert.doesNotMatch(r.log, /BUILDREF build list/, "no hand-over inventory is read on the dev path");
   }
+});
+
+test("a dev landing exports its resolved intent to every gate-runner child", t => {
+  const fx = fixture(t);
+  const cid = "bafyreiintentforthepusheddevhead";
+  const r = push(fx, [line("refs/heads/a", fx.one, "refs/heads/dev", fx.base)], {
+    STUB_LANDING_INTENT: cid,
+  });
+  assert.equal(r.status, 1, r.out);
+  assert.match(r.log, new RegExp(`^LANDING_INTENT --head ${fx.one} --root ${fx.dir}$`, "m"));
+  assert.deepEqual(r.log.match(/^GATE_INTENT .*$/gm), [`GATE_INTENT ${cid}`, `GATE_INTENT ${cid}`]);
 });
 
 test("the hook names the record only inside the hand-over branch", () => {
