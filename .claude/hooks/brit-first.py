@@ -2,6 +2,7 @@
 """Brit habit friction for visible shell commands; not a security boundary."""
 import importlib.util
 import json
+import re
 from pathlib import Path
 import sys
 
@@ -86,28 +87,172 @@ GENERIC = ("Use Brit for this repository operation. Check brit <command> --help 
     "Inspect state before retrying a failed mutation. No human approval is needed.")
 
 
-def git_stages(command, depth=0):
-    """argv of every stage whose program is git, including inside nested bash -c."""
+def _quoted_heredocs(line):
+    """Quoted heredoc delimiters declared outside ordinary quoted arguments."""
+    found = []
+    quote = None
+    i = 0
+    while i < len(line):
+        ch = line[i]
+        if quote:
+            if ch == "\\" and quote == '"' and i + 1 < len(line):
+                i += 2
+                continue
+            if ch == quote:
+                quote = None
+            i += 1
+            continue
+        if ch == "\\":
+            i += 2
+            continue
+        if ch in ("'", '"'):
+            quote = ch
+            i += 1
+            continue
+        if not line.startswith("<<", i):
+            i += 1
+            continue
+        j = i + 2
+        strip_tabs = j < len(line) and line[j] == "-"
+        if strip_tabs:
+            j += 1
+        while j < len(line) and line[j] in " \t":
+            j += 1
+        if j >= len(line) or line[j] not in ("'", '"'):
+            i += 2
+            continue
+        marker_quote = line[j]
+        end = line.find(marker_quote, j + 1)
+        if end < 0:
+            return found
+        delimiter = line[j + 1:end]
+        if delimiter and not any(char.isspace() for char in delimiter):
+            found.append((delimiter, strip_tabs))
+        i = end + 1
+    return found
+
+
+def _without_quoted_heredoc_bodies(command):
+    """Elide quoted heredoc data while retaining commands before and after it."""
+    pending = []
+    output = []
+    for line in command.splitlines(keepends=True):
+        if pending:
+            delimiter, strip_tabs = pending[0]
+            candidate = line.rstrip("\r\n")
+            if strip_tabs:
+                candidate = candidate.lstrip("\t")
+            if candidate == delimiter:
+                pending.pop(0)
+            output.append("\n" if line.endswith("\n") else "")
+            continue
+        output.append(line)
+        pending.extend(_quoted_heredocs(line))
+    return "".join(output)
+
+
+def _workspace_repo_root():
+    root = ROOT.resolve()
+    if root.parent.name == ".worktrees":
+        return root.parent.parent
+    return root
+
+
+def _repository_root(directory):
+    path = Path(directory).expanduser().resolve(strict=False)
+    if path.is_file():
+        path = path.parent
+    for candidate in (path, *path.parents):
+        marker = candidate / ".git"
+        if marker.is_dir() or marker.is_file():
+            return candidate
+    return None
+
+
+def _resolve_directory(base, value):
+    path = Path(value).expanduser()
+    if not path.is_absolute():
+        path = Path(base) / path
+    return path.resolve(strict=False)
+
+
+def _git_directory(argv, cwd):
+    directory = Path(cwd)
+    i = 1
+    while i < len(argv):
+        token = argv[i]
+        if token == "-C" and i + 1 < len(argv):
+            directory = _resolve_directory(directory, argv[i + 1])
+            i += 2
+        elif token.startswith("-C") and token != "-C":
+            directory = _resolve_directory(directory, token[2:])
+            i += 1
+        elif token in GIT_GLOBAL_WITH_VALUE:
+            i += 2
+        elif token.startswith("-"):
+            i += 1
+        else:
+            break
+    return directory
+
+
+# A command that names its repository explicitly (an environment assignment, which the parser strips
+# before the head, or a --git-dir / --work-tree option, whose value _git_directory does not follow) could
+# point a git call at this workspace from any working directory. Such a command is always policed: the
+# outside-repository exemption is only for git calls whose target is established by -C, cd and the cwd.
+_EXPLICIT_REPOSITORY = re.compile(r"(?<![A-Za-z0-9_])(GIT_DIR|GIT_WORK_TREE|GIT_COMMON_DIR)=|--git-dir\b|--work-tree\b")
+
+
+def _targets_workspace(argv, cwd, explicit_repository=False):
+    if explicit_repository:
+        return True
+    repository = _repository_root(_git_directory(argv, cwd))
+    if repository is None:
+        return True  # Preserve the reminder when no different repository can be established.
+    workspace = _workspace_repo_root()
+    return repository == workspace or repository.parent == workspace / ".worktrees"
+
+
+def _cd_directory(argv, cwd):
+    args = argv[1:]
+    if args and args[0] == "--":
+        args = args[1:]
+    if not args or args[0].startswith("-"):
+        return None
+    return _resolve_directory(cwd, args[0])
+
+
+def git_stages(command, depth=0, cwd=None):
+    """argv of in-workspace git stages, including inside nested shell -c commands."""
     found = []
     if depth > 4:
         return found
+    current_dir = Path(cwd or ROOT).resolve(strict=False)
+    command = _without_quoted_heredoc_bodies(command)
+    explicit_repository = bool(_EXPLICIT_REPOSITORY.search(command))
     for chain in parser._chains(command):
+        next_dir = current_dir
         for stage in chain:
             argv = parser._strip_wrappers(stage)
             if not argv:
                 continue
             head = Path(argv[0]).name
-            if head == "git":
+            if head == "git" and _targets_workspace(argv, current_dir, explicit_repository):
                 found.append(argv)
             elif head in ("bash", "sh", "zsh", "dash"):
                 index = parser._find_dash_c(argv[1:])
                 if index is not None and index + 2 < len(argv):
-                    found.extend(git_stages(argv[index + 2], depth + 1))
+                    found.extend(git_stages(argv[index + 2], depth + 1, current_dir))
+            elif head == "cd" and len(chain) == 1:
+                changed = _cd_directory(argv, current_dir)
+                if changed is not None:
+                    next_dir = changed
+        current_dir = next_dir
     return found
 
 
-def uses_git(command, depth=0):
-    return bool(git_stages(command, depth))
+def uses_git(command, depth=0, cwd=None):
+    return bool(git_stages(command, depth, cwd))
 
 
 def git_subcommand(argv):
@@ -151,10 +296,10 @@ def table_for(installed):
     return BRIT_TABLE_VERSION, BRIT_TABLE.get, " (installed brit is %s: the table is stale, read its help)" % installed
 
 
-def steer(command):
-    """Message naming the brit form per git subcommand, or None when unparseable."""
+def steer(command, cwd=None):
+    """Message naming the brit form per in-workspace git subcommand, or None when unparseable."""
     subs = []
-    for argv in git_stages(command):
+    for argv in git_stages(command, cwd=cwd):
         sub = git_subcommand(argv)
         if sub is None:
             return None
@@ -186,9 +331,9 @@ def steer(command):
     return message
 
 
-def deny_reason(command):
+def deny_reason(command, cwd=None):
     try:
-        return steer(command) or GENERIC
+        return steer(command, cwd) or GENERIC
     except Exception:
         return GENERIC
 
@@ -202,14 +347,15 @@ def evaluate(event):
         return None
     args = event.get("tool_input", {})
     command = args.get("command", args.get("cmd", ""))
-    if not isinstance(command, str) or not uses_git(command):
+    cwd = args.get("workdir", args.get("cwd", event.get("cwd", ROOT)))
+    if not isinstance(command, str) or not uses_git(command, cwd=cwd):
         return None
     # A leading comment belongs only to this invocation, never ambient environment.
     first = command.splitlines()[0].strip()
     prefix = "# Brit fallback: "
     if first.startswith(prefix) and len(first[len(prefix):].strip()) >= 12:
         return {"additionalContext": "Brit fallback recorded in this tool call: " + first[len(prefix):]}
-    return {"permissionDecision": "deny", "permissionDecisionReason": deny_reason(command)}
+    return {"permissionDecision": "deny", "permissionDecisionReason": deny_reason(command, cwd)}
 
 
 def main():

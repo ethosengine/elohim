@@ -1,5 +1,6 @@
 import importlib.util
 from pathlib import Path
+from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
 ROOT=Path(__file__).resolve().parents[3]
@@ -54,6 +55,69 @@ class BritHook(unittest.TestCase):
  def test_brit_not_refused(self):
   for c in ['brit merge-base --is-ancestor a b','brit -r /x log','brit -C /x status --no-write','env -u EPR_BIN brit show a:b']:
    self.assertIsNone(hook.evaluate({'tool_name':'Bash','tool_input':{'command':c}}))
+ def test_external_repository_is_not_policed(self):
+  with TemporaryDirectory() as tmp:
+   workspace=Path(tmp)/'workspace'; external=Path(tmp)/'scratch-repo'
+   (workspace/'.git').mkdir(parents=True); (external/'.git').mkdir(parents=True)
+   (workspace/'.epr-meta').mkdir(); (workspace/'.epr-meta/brit-first.json').write_text('{"enabled":true}')
+   events=[
+    {'cwd':str(external),'tool_name':'Bash','tool_input':{'command':'git status'}},
+    {'cwd':str(workspace),'tool_name':'Bash','tool_input':{'command':f'git -C {external} status'}},
+    {'cwd':str(workspace),'tool_name':'Bash','tool_input':{'command':f'cd {external} && git status'}},
+   ]
+   with patch.object(hook,'ROOT',workspace):
+    for event in events:
+     with self.subTest(command=event['tool_input']['command']):
+      self.assertIsNone(hook.evaluate(event))
+ def test_a_command_naming_its_repository_explicitly_is_policed_from_a_scratch_repo(self):
+  # --git-dir / --work-tree values and GIT_DIR / GIT_WORK_TREE assignments can point a git call at the
+  # workspace from any cwd, so the outside-repository exemption never applies to them.
+  with TemporaryDirectory() as tmp:
+   workspace=Path(tmp)/'workspace'; external=Path(tmp)/'scratch-repo'
+   (workspace/'.git').mkdir(parents=True); (external/'.git').mkdir(parents=True)
+   (workspace/'.epr-meta').mkdir(); (workspace/'.epr-meta/brit-first.json').write_text('{"enabled":true}')
+   commands=[
+    f'git --git-dir={workspace}/.git status',
+    f'git --git-dir {workspace}/.git status',
+    f'git --work-tree={workspace} status',
+    f'GIT_DIR={workspace}/.git git status',
+    f'export GIT_DIR={workspace}/.git; git status',
+    f'env GIT_WORK_TREE={workspace} git status',
+   ]
+   with patch.object(hook,'ROOT',workspace):
+    for command in commands:
+     with self.subTest(command=command):
+      self.assertIsNotNone(hook.evaluate({'cwd':str(external),'tool_name':'Bash','tool_input':{'command':command}}))
+    with self.subTest(command='plain git in the scratch repo still passes'):
+     self.assertIsNone(hook.evaluate({'cwd':str(external),'tool_name':'Bash','tool_input':{'command':'git status'}}))
+ def test_workspace_worktree_is_policed(self):
+  with TemporaryDirectory() as tmp:
+   workspace=Path(tmp)/'workspace'; worktree=workspace/'.worktrees'/'one'
+   (workspace/'.git').mkdir(parents=True); worktree.mkdir(parents=True)
+   (worktree/'.git').write_text('gitdir: ../../.git/worktrees/one\n')
+   (workspace/'.epr-meta').mkdir(); (workspace/'.epr-meta/brit-first.json').write_text('{"enabled":true}')
+   events=[
+    {'cwd':str(worktree),'tool_name':'Bash','tool_input':{'command':'git status'}},
+    {'cwd':str(workspace),'tool_name':'Bash','tool_input':{'command':f'git -C {worktree} status'}},
+    {'cwd':str(workspace),'tool_name':'Bash','tool_input':{'command':f'cd {worktree} && git status'}},
+   ]
+   with patch.object(hook,'ROOT',workspace):
+    for event in events:
+     with self.subTest(command=event['tool_input']['command']):
+      self.assertEqual(hook.evaluate(event)['permissionDecision'],'deny')
+ def test_brit_show_pipeline_is_not_git(self):
+  self.assertIsNone(hook.evaluate({'tool_name':'Bash','tool_input':{'command':'brit show a:b | head'}}))
+ def test_git_stage_after_brit_pipeline_is_policed(self):
+  self.assertEqual(hook.evaluate({'tool_name':'Bash','tool_input':{'command':'brit show a:b | git apply'}})['permissionDecision'],'deny')
+ def test_quoted_heredoc_body_is_data(self):
+  command="cat > note <<'EOF'\ngit apply is prose, not a command\ngit call is prose too\nEOF"
+  self.assertIsNone(hook.evaluate({'tool_name':'Bash','tool_input':{'command':command}}))
+ def test_quoted_string_argument_is_data(self):
+  command='printf \'%s\\n\' "git apply and git call are prose"'
+  self.assertIsNone(hook.evaluate({'tool_name':'Bash','tool_input':{'command':command}}))
+ def test_git_after_quoted_heredoc_is_policed(self):
+  command="cat > note <<'EOF'\ngit apply is prose, not a command\nEOF\ngit status"
+  self.assertEqual(hook.evaluate({'tool_name':'Bash','tool_input':{'command':command}})['permissionDecision'],'deny')
  def test_nested_bash_steered(self):
   self.assertIn('brit show',self.reason("bash -c 'git show HEAD:x'"))
  def test_length_bound(self):
