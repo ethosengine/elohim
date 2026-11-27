@@ -167,3 +167,36 @@ files that already exist.
 Queue item 23 in `agentic-context-tooling-consolidation-queue`. Not in sprint 2026-09-08. Pick
 up as a research pass (read-only, three lenses) before any code; the first slice after the spec
 is `epr seams --write-set` in Python over graphs 1–5 plus git co-change.
+
+## Datapoint, 2026-11-27: the same ground reached twice without the first being found
+
+The steward, 2026-11-27: "Discoverability.. that's been a bit a latecomer in the designs we've
+pursued, it'll be something to add to that backlog cluster of concrens when we comeback to that.."
+
+What happened. A session designed how a tool's errors and logs become a named problem that is
+answered and cleaned up (`genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md`).
+It ran a prior-art pass of five read-only surveys, and later a second pass of five more. Neither
+surfaced the Observer Protocol, whose shape the design repeats, nor the SDK pipeline's own named
+gaps, which the design fills. Both were found only when the steward named them. The observability
+epic was found on the second pass, by a survey sent to look for viable-system writing, not by any
+search for logging or telemetry.
+
+Why the searches missed. The surveys were scoped by subsystem and by the words the session
+already had: feedback, algedonic, sense, measure. The Observer Protocol uses none of them. It
+says witness, story, ephemeral. The cite graph could not help either: no document about logs or
+errors cited it. The seam map's section 3.16 routed "is a peer healthy" and had no row for "a
+tool refused" or "a log keeps growing", so a developer arriving with those words was routed
+nowhere.
+
+What was done for this one case. Pointers were added in both directions between the Observer
+Protocol, the observability epic, the seam map and the two feedback documents, each as a sealed
+cite with a relationship hint (plan `feedback-loop-contract-plan`, station FC-10).
+
+What it suggests for this concern, as a reading. Reconciliation by hand after the fact does not
+scale. A design reached from a new direction needs to be asked, at birth, which existing
+documents share its shape under other words, and the answer needs a query the repository can
+run and not a model's memory of it. The companion spec's table of doors
+(`2026-11-27-one-loop-for-every-producer-design.md`, section 1b) is one worked instance of what
+such an answer looks like: who arrives with which words, what they read first, and whether it
+points to the others.
+
