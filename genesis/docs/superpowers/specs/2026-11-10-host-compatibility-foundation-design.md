@@ -22,7 +22,7 @@ cites:
   - "compute-envelope-tevah | manifest/berth split, the reserved closure field, the Wasm process kind and the fingerprint this spec extends | sha256:d427a367f3b01a6e | path: genesis/docs/superpowers/specs/2026-09-02-compute-envelope-tevah-design.md"
   - "what-every-app-inherits-placement-contract-design | rule 14 and section 13 (native variants chosen from device capability) and rule R-P4 (device facts stay local) that this spec implements | sha256:fe10f9dc966c2e9a | path: genesis/docs/superpowers/specs/2026-10-20-what-every-app-inherits-placement-contract-design.md"
   - "native-dev-plane-one-derivation-earned-reach-design | derivation keys and the reach ladder; its 'a differing toolchain computes a different key' sentence is kept literally true | sha256:024a89c3dba2699f | path: genesis/docs/superpowers/specs/2026-11-04-native-dev-plane-one-derivation-earned-reach-design.md"
-  - "elohim-seam-map-concern-routing | seams 3.1-3.3 (hardware, OS/packaging, runtime) whose shared compatibility question this spec answers | sha256:3ce0f9bd564ca1bf | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
+  - "elohim-seam-map-concern-routing | seams 3.1-3.3 (hardware, OS/packaging, runtime) whose shared compatibility question this spec answers | sha256:4beadae30ba30633 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
   - "device-footprint-residency-carrying-capacity-design | the diversity-of-peers epic; capacity stays there, compatibility is here | sha256:99ab8f8330cc3f24 | path: genesis/docs/superpowers/specs/2026-10-06-device-footprint-residency-carrying-capacity-design.md"
 ---
 

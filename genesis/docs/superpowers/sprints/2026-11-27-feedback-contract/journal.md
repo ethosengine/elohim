@@ -7,9 +7,9 @@ steward: human:matthew
 author: shem session 3d494616 (Claude Fable 5.2), designing; shem session cacccb55 integrating
 serves: [private-feedback-loop, dev-system-equilibrium]
 cites:
-  - "feedback-loop-contract-plan | the plan whose FC stations are this sprint | sha256:a6a98a8954fdbaba | path: genesis/docs/superpowers/plans/2026-11-27-feedback-loop-contract-plan.md"
+  - "feedback-loop-contract-plan | the plan whose FC stations are this sprint | sha256:2c3e5df3647bf24c | path: genesis/docs/superpowers/plans/2026-11-27-feedback-loop-contract-plan.md"
   - "feedback-as-a-lifecycle-item-design | the spec the sprint takes into a contract | sha256:120869ada259e93d | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
-  - "one-loop-for-every-producer-design | the companion that sketches the contract and the producers it must serve | sha256:13345fc01925e49e | path: genesis/docs/superpowers/specs/2026-11-27-one-loop-for-every-producer-design.md"
+  - "one-loop-for-every-producer-design | the companion that sketches the contract and the producers it must serve | sha256:49f57459097ec394 | path: genesis/docs/superpowers/specs/2026-11-27-one-loop-for-every-producer-design.md"
 ---
 
 # Feedback contract — sprint journal
@@ -61,6 +61,7 @@ shem, outside the repository.
 - Found while reading brit's diff: brit 0.3.9 sends an operation word no epr accepts. The cure on brit's side is in that branch. The cure on the epr side is part of FB-1.
 - Reported and not fixed: the app's issue report sends a diagnostic bundle with no preview; six domain manifests declare feedback vocabulary no runtime code reads. Both are read from code by a survey.
 - Owed to this sprint by nobody yet: an isolated read of the companion's sections on self-review, the retirement gradient and the levels of the loop, which were written after its one read.
-- The steward asked that this work be reconciled with the Observer Protocol before anything was finalised: "this is us re-discovering the observer epic from the perspctive of logs/telementry/observations we need as developers... and not as visionaries". The companion's section 1b now sets the three side by side, names seven seams and eleven pieces one of them has and the others need, and lists the doors. Stations FC-9 and FC-10 came from it. FC-10 edits canonical documents and waits on his word.
+- The steward asked that this work be reconciled with the Observer Protocol before anything was finalised: "this is us re-discovering the observer epic from the perspctive of logs/telementry/observations we need as developers... and not as visionaries". The companion's section 1b now sets the three side by side, names seven seams and eleven pieces one of them has and the others need, and lists the doors. Stations FC-9 and FC-10 came from it. FC-10 edits canonical documents; he gave his word the same day ("we'd want those edges to surface if an agent returns and is graph walking"), and four of its five pointers landed with this batch.
 - The first landing attempt was refused. A habit line under `elohim/epr/` put that crate's tree into the closure of about thirteen gate projects for a documents landing, and one of those gates failed on a test of its own. Nothing reached dev. The work was rebuilt as one documents commit and one habit commit, which the integrator carries separately.
 - The integrator's reader found one error of fact, since corrected: the feedback store has three write verbs (`capture`, `ingest-genesis`, `record`), not one.
+- The steward, on what the day showed: "Discoverability.. that's been a bit a latecomer in the designs we've pursued". The evidence is in this sprint's own history: five survey lanes and a prior-art pass did not surface the Observer Protocol or the SDK pipeline's named gaps until he pointed at them. Recorded as a datapoint on backlog item `progressive-discovery-substrate-emergent-concern`.

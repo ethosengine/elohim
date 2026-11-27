@@ -5,6 +5,8 @@ date: 2026-06-21
 status: Living reference
 author: workflow:elohim-seam-map-atlas
 cites:
+  - "feedback-as-a-lifecycle-item-design | home for a tool's refusal, a recurring error or a growing log: seam 3.16 on a person's own device | sha256:120869ada259e93d | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
+  - "one-loop-for-every-producer-design | each producer's first move, the reusable patterns, a store's declared limits, and how seam 3.16 relates to the Observer Protocol | sha256:49f57459097ec394 | path: genesis/docs/superpowers/specs/2026-11-27-one-loop-for-every-producer-design.md"
   - "platform-one-sdk-many-apis-design | THE ELOHIM PLATFORM MODEL | sha256:a15b10c68787a460 | path: genesis/docs/superpowers/specs/2026-06-14-platform-one-sdk-many-apis-design.md"
   - "elohim-hub-boundaries-design | elohim-hub / elohim-node / elohim-storage | sha256:233cb996edd7c366 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-02-elohim-hub-boundaries-design.md"
   - "weave-epic-arc-design | The Weave Epic | sha256:69966fdcc15dd7ba | path: genesis/docs/superpowers/specs/2026-06-20-weave-epic-arc-design.md"
@@ -424,11 +426,18 @@ canonical home · the adjacent-seam confusion to avoid.**
 - **Home:** `genesis/docs/content/elohim-protocol/observability/epic.md` (canon);
   `elohim/elohim-storage/src/observation/` and `graduation/`; `elohim/sdk/domains/*/manifest.json`
   (`observation_kinds`); `elohim/epr/src/{witness,measure,algedonic}.rs`;
-  `.claude/epr-meta/measures.yaml` (the dev system's own folds).
+  `.claude/epr-meta/measures.yaml` (the dev system's own folds). For a tool's failures on a
+  person's own device: `elohim/epr-rea/src/feedback.rs` and the feedback lifecycle design
+  (`genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md`), whose
+  companion (`2026-11-27-one-loop-for-every-producer-design.md`) relates it to the observability
+  epic and the Observer Protocol.
 - **Confusion:** self-sense is not a witness (a peer's `/metrics` is self-sense served by the peer,
   never evidence to anyone else); a self-report is self-sense dressed as a witness; the Grafana
   stack is a reader, never the store; a hub's aggregate is 3.11's rollup over fruit; a per-agent
-  label on a series is 3.15's resource-governance seam wearing a surveillance costume.
+  label on a series is 3.15's resource-governance seam wearing a surveillance costume; a tool's
+  refusal recorded on the device that ran it is feedback, a person's own report when it leaves
+  that device, and not a witness; a log that keeps growing is a store with no declared limit,
+  not an observation.
 
 ---
 
@@ -440,6 +449,7 @@ bites, and the **home** to go read/edit. Rows span the full spectrum and every s
 | The concern you have | Seam | Device-scale | Home (where to go) |
 |---|---|---|---|
 | Is a peer / hub / region healthy; add a metric or a health signal | Observation / self-sense (3.16) | any | `observability/epic.md`; 2026-05-11 observation design; the pillar manifest's `observation_kinds` |
+| A tool refused or failed; the same error keeps coming back; a log, a findings ledger or a report directory keeps growing; add an error name or a ledger | Observation / self-sense (3.16), with 3.14's validity horizon | any | `2026-11-26-feedback-as-a-lifecycle-item-design.md` (a declared name per problem, drained when a fix lands); `2026-11-27-one-loop-for-every-producer-design.md` (each producer, the patterns, a store's limits, and the relation to the Observer Protocol); `elohim/epr-rea/src/feedback.rs` |
 | A device is too small to run a conductor | Hardware gradient + T3 spoke (3.1, 3.10) | smartwatch/fob/sensor (L0-1) | device-archetypes-design `:33-41`; complementarity §Track 3 `:225-238` |
 | A wearable must contribute a signal without a node | T3 spoke bridge (3.10) | wearable/IoT (L0-1) | `peer_map.rs:483-489` (Track3Bridge); `peer-hoster-async-sync-readiness` (B7) |
 | A phone keeps OOM'ing / sync floods it | Hardware gradient + runtime footprint (3.1, 3.3) | phone (L2) | device-archetypes `:105`; backpressure; cargo `[features]` thin flavor |
@@ -568,6 +578,7 @@ build-state, see the dated assessments in §6.)
 | Scheduler / Step-Functions / cron | temporal plane (3.14) |
 | Throttling / quotas / autoscaling | resource governance (3.15) + elohim-operator |
 | Observability / monitoring | observation / self-sense (3.16) over the witness log, graduating to attestations; rollup over fruit (3.11); the Grafana stack is a reader, never the store |
+| Logging / error tracking / log retention | one named occurrence per session under a term the producer declared, kept on the device that felt it and drained when a fix lands (3.16; the feedback lifecycle design); a store is born with a declared limit; a central log aggregator has no equivalent here, by design |
 | Analytics / ML platform | recursive aggregation / `CoverageRollup` (3.11) + local inference |
 | IaC / CI-CD | orchestrator + build-manifests + rakia + `deployments.json` |
 | Marketplace / service catalog | "monorepo IS the catalog" (one-SDK-many-APIs) |

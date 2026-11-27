@@ -25,7 +25,7 @@ graduation-trigger: >-
   store that had no declared limit gains one with a probe that reads it
 cites:
   - "feedback-as-a-lifecycle-item-design | the device-plane design this pass generalises: a declared name per problem, a judge, a drain on cure, and a summary that leaves by consent | sha256:120869ada259e93d | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
-  - "observability-epic | the governing vision for a running network: self-sense, witness and fruit kept apart, one cybernetic loop, and fruit and a count as the only things that cross a rung | sha256:e2ed424ac1c3a005 | path: genesis/docs/content/elohim-protocol/observability/epic.md"
+  - "observability-epic | the governing vision for a running network: self-sense, witness and fruit kept apart, one cybernetic loop, and fruit and a count as the only things that cross a rung | sha256:b193d1cff3a60988 | path: genesis/docs/content/elohim-protocol/observability/epic.md"
   - "private-thought-governed-fruit | source of the rule that the aggregator is the dragnet and that no boundary rests on a count | sha256:2945eb608257be1e | path: genesis/docs/architecture/private-thought-governed-fruit.md"
   - "algedonic-feedback-signal | the typed pain signal a breach rides, and the rule that pain is not filtered or priced down | sha256:cf902beac8dd4aec | path: genesis/docs/superpowers/specs/2026-08-10-algedonic-feedback-signal-design.md"
   - "sense-respond-governance-classifier | source of the rules that no aggregate changes a rule and that a positive signal is a candidate | sha256:c716a519ee6cc953 | path: genesis/docs/superpowers/specs/2026-07-15-sense-respond-governance-classifier-design.md"
@@ -37,7 +37,7 @@ cites:
   - genesis/research/beer-designing-freedom-elohim-critique-2026-06-04.md
   - genesis/data/timeline/backlog/2026-08-10-algedonic-phase2-network-phase3-dedupe.md
   - elohim/sdk/README.md
-  - "observer-protocol | the root of the witness shape this method shares: raw capture processed where it was made and destroyed, a four-level response to harm, and the three lists of safeguards | sha256:07cabe912514a628 | path: genesis/docs/content/elohim-protocol/observer-protocol.md"
+  - "observer-protocol | the root of the witness shape this method shares: raw capture processed where it was made and destroyed, a four-level response to harm, and the three lists of safeguards | sha256:efca99bb3cdf89d3 | path: genesis/docs/content/elohim-protocol/observer-protocol.md"
 ---
 
 # One loop for every producer
@@ -169,16 +169,19 @@ Two directions of reuse matter most, and neither is decided here.
 
 ### Doors
 
-Someone will reach this ground again from another side. Each door should name the others in one
-line. Three of these pointers exist; the rest are station FC-10 of the plan.
+Someone will reach this ground again from another side, on foot or by walking the cite graph, so
+each door names the others in one line. The steward, 2026-11-27: "we'd want those edges to
+surface if an agent returns and is graph walking, or there's an embedder that could benefit from
+the relationship". Four of the five doors carry their pointers as of this document's landing; the
+fifth is the remainder of station FC-10.
 
 | Arriving with | Read first | It points to the others |
 |---|---|---|
-| The vision of a witnessed household | The Observer Protocol | To the observability epic: yes. To the feedback loop: not yet |
-| A fleet to run; "is this peer healthy" | The observability epic | To the Observer Protocol: yes. To the feedback loop: not yet |
-| A log, an error list, a metric, a findings ledger | The lifecycle spec and this document | To both: yes, here |
-| "Where does this concern live" | The seam map, section 3.16 | To the observability epic: yes. To the feedback loop: not yet |
-| A domain to build | The SDK pipeline | To none of the three by name |
+| The vision of a witnessed household | The Observer Protocol | Yes: to the observability epic, and to the lifecycle spec and this document |
+| A fleet to run; "is this peer healthy" | The observability epic | Yes: to the Observer Protocol, and to the lifecycle spec and this document |
+| A log, an error list, a metric, a findings ledger | The lifecycle spec and this document | Yes, here |
+| "Where does this concern live" | The seam map: section 3.16, a row in its routing table, and a row in its crosswalk for logging and error tracking | Yes |
+| A domain to build | The SDK pipeline (`elohim/sdk/README.md`) | Not yet. It sits outside the documentation tree, and its pointer lands with station FC-2, which edits the SDK anyway |
 
 ## 1a. Terms
 

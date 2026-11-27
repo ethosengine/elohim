@@ -9,6 +9,8 @@ companion_to:
   - genesis/docs/content/elohim-protocol/observer-protocol.md
   - genesis/docs/content/elohim-protocol/hardware-providence-commons.md
 cites:
+  - "feedback-as-a-lifecycle-item-design | the same witness on a person's own device, for tools: self-sense recorded under declared names, with a claim's runtime life this epic's kinds lack | sha256:120869ada259e93d | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
+  - "one-loop-for-every-producer-design | the reconciliation of this epic with the Observer Protocol and the feedback loop, and the survey of what each producer emits today | sha256:49f57459097ec394 | path: genesis/docs/superpowers/specs/2026-11-27-one-loop-for-every-producer-design.md"
   - "observer-protocol | the witness-not-surveillance epic whose Part VIII cannot / must / humans-control this epic turns on the network's observation of itself | path: genesis/docs/content/elohim-protocol/observer-protocol.md"
   - "observation-event-layer-design | the three-layer cut (Observation / Event / Attestation), the observer's log address, the diversity threshold and the eight-stage hard cutover this epic's witness plane is built on | path: genesis/docs/content/elohim-protocol/architecture/2026-05-11-observation-event-layer-design.md"
   - "attestation-consolidation-design | the consolidated, DNA-hash-neutral attestation kind that a graduated observation lands in; no new entry type | path: genesis/docs/content/elohim-protocol/architecture/2026-05-11-attestation-consolidation-design.md"
@@ -788,6 +790,11 @@ and it is the only version of observability a commons can afford to have.
   [attestation consolidation design](epr:attestation-consolidation-design).
 - The rulings on the observation plane: [plane separation](epr:plane-separation-design) §5.
 - The placement atlas's observation seam: [seam map](epr:elohim-seam-map-concern-routing) §3.16.
+- The same witness turned on tools, on a person's own device:
+  [feedback as a lifecycle item](epr:feedback-as-a-lifecycle-item-design). Its companion,
+  [one loop for every producer](epr:one-loop-for-every-producer-design) §1b, sets this epic, the
+  Observer Protocol and that design side by side: where they agree, where the seams are, and which
+  pieces one has that the others need.
 - The eight-stage prerequisite and the heartbeat cutover:
   [records lifecycle](epr:records-lifecycle-design) §D.5.
 - The infrastructure manifest's observation kinds:

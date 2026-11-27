@@ -11,9 +11,9 @@ serves: [private-feedback-loop, workspace-device-arrival, pain-is-answered, dev-
 refines: native-dev-tooling-over-peers-plan
 cites:
   - "feedback-as-a-lifecycle-item-design | the design whose stations FB-1 to FB-10 this plan restates as claimable | sha256:120869ada259e93d | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
-  - "one-loop-for-every-producer-design | the companion whose contract and store rule the FC stations fix as shapes | sha256:13345fc01925e49e | path: genesis/docs/superpowers/specs/2026-11-27-one-loop-for-every-producer-design.md"
+  - "one-loop-for-every-producer-design | the companion whose contract and store rule the FC stations fix as shapes | sha256:49f57459097ec394 | path: genesis/docs/superpowers/specs/2026-11-27-one-loop-for-every-producer-design.md"
   - "native-dev-tooling-over-peers-plan | the epic's plan this is a child of; its peer link, channel list and bin store are what this work rides | sha256:983afa13e08fe1d3 | path: genesis/docs/superpowers/plans/2026-10-29-native-dev-tooling-over-peers-plan.md"
-  - "observer-protocol | source of the safeguards station FC-9 answers line by line | sha256:07cabe912514a628 | path: genesis/docs/content/elohim-protocol/observer-protocol.md"
+  - "observer-protocol | source of the safeguards station FC-9 answers line by line | sha256:efca99bb3cdf89d3 | path: genesis/docs/content/elohim-protocol/observer-protocol.md"
 ---
 
 # The feedback loop and its contract — the stations
@@ -104,7 +104,7 @@ Verify: one table with a row for each line of Part VIII, in which the feedback l
 
 - [ ] **FC-10 — each of the five doors onto this ground names the others in one line** (serves private-feedback-loop)
 
-State: partly built; waits on the steward's word, because it edits canonical documents. The companion's section 1b lists the doors. The lifecycle spec and the companion point to the Observer Protocol and the observability epic. The other pointers do not exist: the Observer Protocol and the observability epic do not name the feedback loop, the seam map's section 3.16 routes a health signal and not a tool's refusal or a growing log, and the SDK pipeline names none of the three. The edits are a sentence or a table row each. Their cost is in the cite graph: five other documents cite the Observer Protocol (the manifesto and the justice manifesto among them), two cite the observability epic and fifty-two cite the seam map, and each of those cites reads as stale until someone confirms the change was only an added pointer and refreshes it.
+State: four of five built, on the steward's word of 2026-11-27 ("let's make sure we get those pointers"). The Observer Protocol and the observability epic each name the lifecycle spec and the companion; the seam map routes a tool's refusal, a recurring error and a growing log in its section 3.16, its routing table and its crosswalk. Each edit was a sentence or a table row, and the cites that other documents hold on those three were refreshed in the same commit, on the ground that the only change to each target was an added pointer. Not built: the SDK pipeline (`elohim/sdk/README.md`) names none of the three. It is outside the documentation tree, so its pointer lands with FC-2.
 
 Verify: a reader who starts at any one of the five (the Observer Protocol, the observability epic, the seam map's section 3.16, the SDK pipeline, the lifecycle spec) reaches each of the others within two links, and `epr flow cites verify` reports no stale cite among the documents that cite the edited ones.
 
