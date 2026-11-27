@@ -181,6 +181,40 @@ export function projectTree(root, commit, dir, spawn = spawnSync) {
 }
 
 /**
+ * Which of `paths` are directories at `commit`, from ONE `git cat-file --batch-check` (a read set can
+ * hold hundreds of paths). Any failure answers the empty set, so every path keeps its plain object id:
+ * conservative, the old key.
+ */
+export function readDirectories(root, commit, paths, spawn = spawnSync) {
+  if (paths.length === 0) return new Set();
+  try {
+    const r = spawn('git', ['cat-file', '--batch-check=%(objecttype)'], {
+      cwd: root, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024,
+      input: `${paths.map(path => `${commit}:${path}`).join('\n')}\n`,
+    });
+    if (r?.status !== 0 || typeof r.stdout !== 'string') return new Set();
+    const types = r.stdout.split('\n');
+    if (types.length < paths.length) return new Set();
+    return new Set(paths.filter((_, index) => types[index] === 'tree'));
+  } catch {
+    return new Set();
+  }
+}
+
+/**
+ * The key for one audited read path. A directory read (a dependency's crate root, read through a
+ * CARGO_MANIFEST_DIR construction) keys its tree minus habit atoms, as a project's own tree does
+ * (`projectTree`): a habit DELTA in a dependency's `.epr-meta` re-keyed every dependent gate, about 13
+ * projects and some 259 min for one `elohim/epr/.epr-meta` delta (backlog row 128). A file read, and
+ * a habit atom a gate names on purpose, keep their blob id.
+ */
+export function readPathOid(root, commit, path, directories, spawn = spawnSync) {
+  return directories.has(path) && !isHabitAtom(path)
+    ? projectTree(root, commit, path, spawn)
+    : manifestBlob(root, commit, path, spawn);
+}
+
+/**
  * One digest for a `**\/<name>` read: sha256 over the sorted `<blob oid> <path>` lines of every
  * tracked file at `commit` whose basename is `<name>`. Null when the listing cannot be read.
  */
@@ -843,6 +877,10 @@ export function gateKeyMaterials(project, {
   // Deliberately conservative tier for gates whose reads cannot be named: eprfs walks the
   // repository and JS gates read many manifests. A basename read keys every tracked match.
   const pathOids = new Map();
+  const readPaths = [...new Set([...audited.sets.values()]
+    .flatMap(read => read?.paths ?? [])
+    .filter(path => !isReadPattern(path)))];
+  const directories = timed('fingerprintingMs', () => readDirectories(root, commit, readPaths, spawn));
   const fingerprintedReads = new Map();
   const readsFor = entry => timed('fingerprintingMs', () => {
     const read = audited.sets.get(entry.name);
@@ -852,7 +890,7 @@ export function gateKeyMaterials(project, {
       if (!pathOids.has(path)) {
         pathOids.set(path, isReadPattern(path)
           ? patternDigest(root, commit, path, spawn)
-          : manifestBlob(root, commit, path, spawn));
+          : readPathOid(root, commit, path, directories, spawn));
       }
       return pathOids.get(path);
     };
