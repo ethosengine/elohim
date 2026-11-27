@@ -170,7 +170,7 @@ is `epr seams --write-set` in Python over graphs 1–5 plus git co-change.
 
 ## Datapoint, 2026-11-27: the same ground reached twice without the first being found
 
-The steward, 2026-11-27: "Discoverability.. that's been a bit a latecomer in the designs we've
+The steward, 2026-11-27, as typed: "Discoverability.. that's been a bit a latecomer in the designs we've
 pursued, it'll be something to add to that backlog cluster of concrens when we comeback to that.."
 
 What happened. A session designed how a tool's errors and logs become a named problem that is
