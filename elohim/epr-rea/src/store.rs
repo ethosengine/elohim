@@ -563,6 +563,12 @@ fn decode_flow_records_with_reader(
     }
 }
 
+/// Looks up this reader's verified prefix of the flow log and decodes it without verifying cids.
+///
+/// Accepted residual: for the cached prefix, the cache's word stands in for the per-line CID
+/// recompute and the `NewerWriter` check. Someone who can write both the log and the cache file can
+/// add a line whose cid names other content. Both files are in the same user's write domain, and
+/// flow records were never signed or chained.
 #[cfg(feature = "sidecar")]
 fn cached_prefix(cache_directory: &Path, contents: &str, reader: &ReaderIdentity) -> CacheLookup {
     let path = verified_prefix_cache_path(cache_directory, &reader.log_path);
