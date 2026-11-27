@@ -216,7 +216,7 @@ default until the steward rules otherwise.
   3). Its grant declares its limits (condition 4): the compute its agents and pods have, and its reach, which
   for Jenkins is the larger part (it schedules pods, pushes images, deploys to the alpha fleet). That
   declaration is read from the repository's manifests (`genesis/manifests/`, the Jenkinsfiles' agent and pod
-  templates), never from the live cluster, since cluster reads are the operator's; a result the bridge
+  templates), not from the live cluster, since cluster reads are the operator's (CLAUDE.md, "Cluster ops are operator-owned"); a result the bridge
   harvests from beyond the declared reach is an algedonic breach and does not count. `service:jenkins` stays a non-actor: the grant is the authority, the steward the principal. Whether a
   granted Jenkins result then counts toward sufficiency is a separate ruling, not taken here; it counts zero
   until the steward rules.
