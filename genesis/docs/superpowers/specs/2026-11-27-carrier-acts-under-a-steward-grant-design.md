@@ -87,10 +87,20 @@ as typed. Everything else on this page is derivation, marked as such where it mi
 
 Today, with no session, `resolve_attribution_on` (flow/note.rs:1419-1452) gives actor = steward =
 `human:matthew`, so unattended machine work reads as his own labour, told apart only by a tag, while actor.rs:
-256-262 says the substrate must tell them apart. His call 2 settles it: the act is **visibly the runner's**. The
-record's actor is the runner's identity, the device's did:key for a device carrier, and its steward is
-`human:matthew`; the one resolver gains that case rather than a second resolver being written beside it. A
-human's labour is then not inferred from a machine's act.
+256-262 says the substrate must tell them apart. His call 2 settles it: the act is **visibly the runner's**.
+
+The runner cannot go in the actor slot as it is: a bare `did:key` is no `ParticipantRef` form, and every reader
+that parses that slot would refuse or misread it as a malformed agent (actor.rs:310): `named_identity` and
+`parse_acting_participant` (note.rs:1375-1382, used by carry, claim, fulfill, intend, note and habits), the
+author-equality check at note.rs:1234, the recall index's acting filter (recall/index.rs:508) and memory import
+(import.rs:1369). That would be option A's cost by the side door. So the record uses forms those readers
+already accept: the **actor slot is left empty**, the existing authored arm (`Attribution::authored`,
+note.rs:1335), which every reader handles as "no participant"; the **steward slot names `human:matthew`**; and
+the **runner is named by its signature and `env:runner=<did>`**. The one resolver gains this case (empty
+actor, steward set) rather than a second resolver beside it. A human's labour is then not inferred from a
+machine's act, and no reader parses a new form. The cost, stated: a reader that looks only at the actor slot
+sees nobody, not the device; it must read `env:runner` to see who ran. Moving the runner into the slot is
+option A, with its roll, and a later ruling.
 
 ## The grant: his quoted words, traceable to the act that said them
 
@@ -98,7 +108,10 @@ His call 1: a grant needs no act only he can perform, provided the words are tra
 the design must guarantee is that a **false quote is catchable**. The grant is a covenant clause, not a new
 record: `epr covenant record --kind grantsCarry --party human:matthew --quote "<his words>" --valid-until
 <RFC3339>` (covenant.rs:993-1060: quote, validity, revocation, the prior steward affirmation; the clause is a
-brit-signed note). What the grant adds:
+brit-signed note). **This changes what a clause means.** A clause is honoured within its own session today
+(covenant.rs:1-5: the steward answers once per agent session, and each answer is a clause for that session).
+`grantsCarry` is honoured beyond its session: it authorises a sessionless process after the session that
+recorded it ends, until it expires or is revoked. What the grant adds:
 
 - **Provenance recorded with the quote:** the session and device that wrote it, when, and where he said it (the
   session id and turn time, or the surface, such as a terminal command he ran himself). Recorded only from the
@@ -109,10 +122,12 @@ brit-signed note). What the grant adds:
   `grantsCarry` quote of the same party and whose turn is newer than the grant it extends; reusing the old quote
   is refused (today `covenant record` refuses only an empty quote, covenant.rs:1005-1009). Revocation is a new
   clause by the same route. Nothing writes a successor on its own.
-- **A signature that crosses.** Covenant notes stay local by standing ruling, so the crossing copy is the
-  grant's canonical body signed by the recording device's key: `env:grant=<cid>` and `env:grant-doc=<base64
-  signed body>` on every carry claim (the precedent being `env:requires-doc`), which an older epr folds
-  unchanged.
+- **What crosses, pending his ruling.** Covenant content stays on the device until he rules on publishing it,
+  and this grant is not exempt. Every carry claim carries `env:grant=<cid>` (an address, not content). A signed
+  grant digest in `env:grant-doc` (the precedent being `env:requires-doc`, which an older epr folds unchanged)
+  is covenant content leaving the device, even without the quote, so it ships switched off and is listed for
+  his ruling. Until he rules, a lander on another device cannot check the grant, so it does not reuse a carried
+  verdict and runs the gate itself; carries still run and are auditable, but they save nothing across devices.
 - **The device mirror is checked, not trusted.** The carrier reads `<device config>/carry-grant.json` only to
   find the grant quickly; any process can write that file, so before each claim the carrier checks the mirror's
   CID and signature against the brit-signed clause in the covenant notes, and a mismatch refuses the claim and
@@ -122,7 +137,7 @@ brit-signed note). What the grant adds:
 answering session when it acknowledges the grant, before the first claim under it, and (2) by the lander before
 it reuses a carried verdict. It compares the clause's quote with the named session's record of the steward's
 turn. That record is on the recording device, so the full check runs only there: a recipient device, or a
-lander elsewhere, checks the signature, the recording device's standing for the steward, the expiry and the
+lander elsewhere, once the digest crosses (below), checks the signature, the recording device's standing for the steward, the expiry and the
 coverage, and `carry show` names the recording device as the one to ask for the words. A quote the verifier
 cannot find is a lie held against the session that wrote it: the verifier emits `carry-grant-unverified@1`
 naming that session, captures feedback naming the steward, and voids the grant with a revocation clause.
@@ -131,7 +146,7 @@ naming that session, captures feedback naming the steward, and voids the grant w
 
 | Record | Names | Trace to the steward |
 |---|---|---|
-| carry claim (crosses) | actor = the runner; steward = human:matthew; signer = the device did; `env:grant`, `env:grant-doc`, `env:carry=<id>`, the miss, commit, closure | the grant clause names the steward and the session he spoke in |
+| carry claim (crosses) | actor empty; steward = human:matthew; signer = the device did; `env:runner=<did>`, `env:grant`, `env:grant-doc` (once he rules), `env:carry=<id>`, the miss, commit, closure | the grant clause names the steward and the session he spoke in |
 | gate verdict (`gate-verdict@1`, crosses) | the device signer, the closure, `env:grant` | same |
 | feedback item (device-local) | `participant` = the steward; detail key `grant` = the clause CID (the feedback lifecycle spec adds it); `EPR_FEEDBACK_INVOCATION` = the carry id | its closing rule reads `participant` |
 | algedonic observation | `carry-unanswered@1`, `carry-grant-expired@1`, `carry-grant-unverified@1` (a quote not found) | each needs a declaration in the measure registry and a bound, and a slot in the headline, which today renders a closed set (report.rs:100-140, 2367-2385): both are in the carry-watch slice |
@@ -243,6 +258,10 @@ gate-grade.mjs:14-20 already counts sponsored results zero. Wiring it is its own
   sufficiency is a separate ruling, and they count zero until then.
 
 ## Open for the steward
+
+- **Publishing the grant digest across devices** (`env:grant-doc`): it is covenant content, and his ruling on
+  publishing covenant notes covers it. Without it a carried verdict saves nothing on another device.
+- **A clause that outlives its session** (`grantsCarry`), as above.
 
 - **The first carrier ships with condition 4 unmet:** nothing observes a carry exceeding its declared limits
   (above). Whether to ship it before station F4-limits-answerable lands is his call.
