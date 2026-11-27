@@ -126,6 +126,7 @@ fn command_for(key_file: &Path, config: &Path, store: &Path) -> Command {
     command
         .env(device_key::DEVICE_KEY_ENV, key_file)
         .env("XDG_CONFIG_HOME", config)
+        .env("XDG_CACHE_HOME", config.join("cache"))
         .env("EPR_STORE", store)
         // `epr peer serve` mounts a payload store; never the account's own.
         .env("EPR_PAYLOAD_STORE", config.join("payload"))
