@@ -130,6 +130,11 @@ fi
 if [[ -n "\${GATE_TEST_TOKEN_FILE:-}" ]]; then
   printf '%s\\n' "$GATE_SLOT_OWNER_TOKEN" > "$GATE_TEST_TOKEN_FILE"
 fi
+if [[ -n "\${GATE_TEST_STUBBORN_PID:-}" ]]; then
+  # A member of the gate's session that SIGTERM does not end, as a recipe child can be.
+  ( trap '' TERM; while :; do sleep 1; done ) </dev/null >/dev/null 2>&1 &
+  printf '%s\\n' "$!" > "$GATE_TEST_STUBBORN_PID"
+fi
 if [[ -n "\${GATE_TEST_READY:-}" ]]; then
   printf 'ready\\n' > "$GATE_TEST_READY"
   while [[ ! -e "$GATE_TEST_RELEASE" ]]; do read -r -t 0.02 _ || true; done
@@ -355,6 +360,36 @@ test("ending a gate tap releases its outside-the-group slot holder", { timeout: 
   writeFileSync(release, "release\n");
   const killed = await holder.closed;
   assert.equal(killed.status, 143);
+});
+
+test("a gate stopped from outside frees its slot without the drain, even when a member ignores SIGTERM", { timeout: 60_000 }, async (t) => {
+  const fx = slotFixture(t);
+  const ready = join(fx.dir, "stubborn.ready");
+  const release = join(fx.dir, "stubborn.never");
+  const stubbornPid = join(fx.dir, "stubborn.pid");
+  const holder = startSlotGate(t, fx, {
+    projectName: "stubborn-holder",
+    // The drain stays at its 60 s default: only the stop may shorten it. The TERM grace is short.
+    env: { GATE_TEST_READY: ready, GATE_TEST_RELEASE: release, GATE_TEST_STUBBORN_PID: stubbornPid,
+      GATE_SLOT_DRAIN_TERM_MS: "500" },
+  });
+  await waitUntil(() => {
+    try { return readFileSync(ready, "utf8").trim() === "ready"; } catch { return false; }
+  }, "holder never entered its recipe");
+  const waiter = startSlotGate(t, fx, { projectName: "stubborn-waiter" });
+  await waitUntil(() => waiter.stderr().includes("cargo slot still busy"), "waiter never observed contention");
+
+  const killedAt = Date.now();
+  holder.child.kill("SIGTERM");
+  // An unref'd timer: the bound must not keep the test file alive after the waiter is admitted.
+  const waited = await Promise.race([waiter.closed, delay(30_000, { timeout: true }, { ref: false })]);
+  assert.equal(waited.timeout, undefined,
+    slotDiagnosis("a stopped gate's TERM-ignoring member kept the slot for the drain", [holder, waiter], killedAt));
+  assert.equal(waited.status, 0, waited.stderr);
+  assert.ok(Date.now() - killedAt < 30_000, "the stop freed the slot well inside the 60 s drain");
+  assert.match(holder.stderr(), /\[gate-slot\] session \d+ was stopped; sent SIGTERM without the 60000 ms drain/);
+  const pid = Number(readFileSync(stubbornPid, "utf8").trim());
+  assert.throws(() => process.kill(pid, 0), "the TERM-ignoring member was killed");
 });
 
 test("different workspace slots never wait on each other", { timeout: 60_000 }, async (t) => {
