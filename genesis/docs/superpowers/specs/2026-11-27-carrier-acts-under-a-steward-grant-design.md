@@ -72,6 +72,8 @@ as typed. Everything else on this page is derivation, marked as such where it mi
   3. The residual risk (below): "Acceptable, bounded".
   4. The gate-key change in the same lane (a separate commit): "Yes, with shem's guard".
 
+- ~19:15Z, asked whether grants are EPRs and offered the grant as a native REA Commitment instead of tags on
+  other records: "yes that sounds resonable".
 - ~18:40Z, two more calls asked of him in this session (his choices among offered options, quoted as the option
   labels he chose): on checking a quote, "Digest at the turn" (nothing reads conversation text later: when he
   speaks, the harness records only a digest of his turn on the device, and a grant's quote is checked against
@@ -112,10 +114,29 @@ option A, with its roll, and a later ruling.
 ## The grant: his quoted words, traceable to the act that said them
 
 His call 1: a grant needs no act only he can perform, provided the words are traceable to his own act. So what
-the design must guarantee is that a **false quote is catchable**. The grant is a covenant clause, not a new
-record: `epr covenant record --kind grantsCarry --party human:matthew --quote "<his words>" --valid-until
+the design must guarantee is that a **false quote is catchable**.
+
+**Two records, one act (his ruling of ~19:15Z: the grant is an EPR).** The words are recorded as a covenant
+clause: `epr covenant record --kind grantsCarry --party human:matthew --quote "<his words>" --valid-until
 <RFC3339>` (covenant.rs:993-1060: quote, validity, revocation, the prior steward affirmation; the clause is a
-brit-signed note). **This changes what a clause means.** A clause is honoured within its own session today
+brit-signed note, and it stays on the recording device). The **grant itself is a native REA `Commitment`** in
+that device's flow store (epr-rea model.rs:352-371), minted by the same act:
+
+| Field | Value |
+|---|---|
+| `action` | `use` (the steward lends the use of a runner's compute and standing) |
+| `provider`, `receiver` | both `human:matthew`: he lends his own device's work to his own work, so no participant slot holds a form a reader cannot parse |
+| `resourceSpec.classifiedAs` | `carry-grant@1`, `runner:<did>`, `project:<name>` per covered gate (or `project:*`), `ref:<glob>` per covered branch, `words:<clause cid>` |
+| `validUntil` | the expiry, at most 24 hours ahead; `validFrom` the time it was said |
+| `state` | `Active`; revocation is a later record that settles it, as a released carry does |
+| `inScopeOf` | the repository scope, as every carry record |
+
+Its CID is the grant's address. A Commitment stays on the device that wrote it (the fold appends only events),
+so the grant **crosses as one signed `Affirm` event** on the Commitment, built by the landing module's one event
+builder like the carry claim (flow/carry.rs, "Two records"), carrying the Commitment's fields in its env slots.
+Every reader folds it as it folds any flow event; an older epr folds it unchanged and simply does not act on it.
+The quote does not cross (his ruling "Both, quote stays home"): only `words:<clause cid>`, the address of the
+words on the recording device. **This changes what a clause means.** A clause is honoured within its own session today
 (covenant.rs:1-5: the steward answers once per agent session, and each answer is a clause for that session).
 `grantsCarry` is honoured beyond its session: it authorises a sessionless process after the session that
 recorded it ends, until it expires or is revoked. What the grant adds:
@@ -129,16 +150,10 @@ recorded it ends, until it expires or is revoked. What the grant adds:
   `grantsCarry` quote of the same party and whose turn is newer than the grant it extends; reusing the old quote
   is refused (today `covenant record` refuses only an empty quote, covenant.rs:1005-1009). Revocation is a new
   clause by the same route. Nothing writes a successor on its own.
-- **What crosses, pending his ruling.** Covenant content stays on the device until he rules on publishing it,
-  and this grant is not exempt. Every carry claim carries `env:grant=<cid>` (an address, not content). A signed
-  grant digest in `env:grant-doc` (the precedent being `env:requires-doc`, which an older epr folds unchanged)
-  is covenant content leaving the device. His ruling ("Both, quote stays home") lets the signed digest cross
-  to his other devices without the quote: address, kind, party, expiry, coverage, recipient, recording device
-  and signature. The quoted words stay on the recording device.
-- **The device mirror is checked, not trusted.** The carrier reads `<device config>/carry-grant.json` only to
-  find the grant quickly; any process can write that file, so before each claim the carrier checks the mirror's
-  CID and signature against the brit-signed clause in the covenant notes, and a mismatch refuses the claim and
-  records `carry-grant-unverified@1`.
+- **What crosses.** The `Affirm` event above, signed by the recording device, and on every carry claim
+  `env:grant=<commitment cid>` (an address). That is covenant-derived content leaving the device, which his
+  ruling ("Both, quote stays home") allows without the quote. No separate `env:grant-doc` and no device mirror
+  file: the carrier reads the grant from its own fold, so nothing outside the flow store can stand in for it.
 
 **Who audits the quote, and when.** By his ruling ("Digest at the turn"), nothing reads conversation text
 later: when the steward speaks in a session, the harness records a digest of that turn on the device (new
@@ -155,7 +170,7 @@ naming that session, captures feedback naming the steward, and voids the grant w
 
 | Record | Names | Trace to the steward |
 |---|---|---|
-| carry claim (crosses) | actor empty; steward = human:matthew; signer = the device did; `env:runner=<did>`, `env:grant`, `env:grant-doc` (once he rules), `env:carry=<id>`, the miss, commit, closure | the grant clause names the steward and the session he spoke in |
+| carry claim (crosses) | actor empty; steward = human:matthew; signer = the device did; `env:runner=<did>`, `env:grant=<commitment cid>`, `env:carry=<id>`, the miss, commit, closure | the grant clause names the steward and the session he spoke in |
 | gate verdict (`gate-verdict@1`, crosses) | the device signer, the closure, `env:grant` | same |
 | feedback item (device-local) | `participant` = the steward; detail key `grant` = the clause CID (the feedback lifecycle spec adds it); `EPR_FEEDBACK_INVOCATION` = the carry id | its closing rule reads `participant` |
 | algedonic observation | `carry-unanswered@1`, `carry-grant-expired@1`, `carry-grant-unverified@1` (a quote not found) | each needs a declaration in the measure registry and a bound, and a slot in the headline, which today renders a closed set (report.rs:100-140, 2367-2385): both are in the carry-watch slice |
@@ -187,7 +202,7 @@ again. A note addressed to the carrier needs an address berth does not have toda
 ## One attribution resolver
 
 The read feedback capture needs and the carrier needs are one: for whom does this act, and under what
-authority, from files only (the session envelope and claim, the roster, the grant mirror), within capture's 2 s
+authority, from files only (the session envelope and claim, the roster, and the grant Commitment read from the flow sidecar without taking its lock), within capture's 2 s
 and without the store lock. It is the existing resolver extended, not a second one beside it. A read that
 cannot resolve refuses the ACT (the carrier does not carry), not the record of a problem: capture stores an
 unresolved one as "no participant" within its 2 s, so a tool's report of a problem is not lost.
@@ -291,7 +306,7 @@ Slice 0 is the scenario, before any code: `genesis/a2o/features/devflow/carry-un
 does not exist yet), through the blind-reader loop. Its scenarios: the graduation trigger above; a carry
 declined with no acknowledged answering session; a miss declined at each of steps 2, 4 and 5; and a grant whose
 quote is not found being voided. Then, each its own commit: (1) the attribution case, the grant kind with its
-required expiry, new-words renewal, the signed crossing body, the device mirror and `carry verify-grant`; (2)
+required expiry, new-words renewal, the grant Commitment and its signed `Affirm` event, the turn digest and `carry verify-grant`; (2)
 the lander's intent, the yields and the lander's grant check; (3) carry-watch under the supervisor with steps
 1-6, the grant-held cargo lease, the acknowledged answering agent and the three measures with their registry
 declarations and headline slot, together, so no carrier ships without an answering agent; (4) carry show; (5)
