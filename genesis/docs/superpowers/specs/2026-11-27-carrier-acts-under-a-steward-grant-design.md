@@ -133,7 +133,8 @@ recorded it ends, until it expires or is revoked. What the grant adds:
   CID and signature against the brit-signed clause in the covenant notes, and a mismatch refuses the claim and
   records `carry-grant-unverified@1`.
 
-**Who audits the quote, and when.** The verifier is one read, `epr flow carry verify-grant <cid>`, run (1) by the
+**Who audits the quote, and when.** (Blocked on his ruling, below: finding the quote means reading the
+steward's turn, and conversation text is read by nothing today.) The verifier is one read, `epr flow carry verify-grant <cid>`, run (1) by the
 answering session when it acknowledges the grant, before the first claim under it, and (2) by the lander before
 it reuses a carried verdict. It compares the clause's quote with the named session's record of the steward's
 turn. That record is on the recording device, so the full check runs only there: a recipient device, or a
@@ -191,7 +192,9 @@ unresolved one as "no participant" within its 2 s, so a tool's report of a probl
   seat held under a grant with no session is therefore a **new berth holder kind**, scoped to `cargo`, live
   while the grant is valid and the supervised process is alive.
 - **The bounds he accepted, each with where it is enforced, in this order.** Every refusal records a declined
-  carry claim (`env:declined=<reason>`), which crosses like any carry claim and shows in `carry show`.
+  carry claim (`env:declined=<reason>`), which crosses like any carry claim and shows in `carry show`. An older
+  epr ignores the `env:` tag, so a declined claim also carries a `valid_until` at or before its own time: every
+  reader, old or new, sees it lapsed and does not wait on it.
   1. *At grant admission* (when carry-watch loads the grant): the carrying device is on the roster standing for
      the grant's steward, the grant names this device, and it verifies as above. Else no carries; reason
      `grant`.
@@ -201,12 +204,13 @@ unresolved one as "no participant" within its 2 s, so a tool's report of a probl
      `expired` or `unanswered`.
   4. *Fetch, with no checkout:* the commit the miss names is fetched by exact id into the runner's object store,
      and must be reachable from a ref the grant names (`merge-base --is-ancestor`). Else reason `ref`.
-  5. *Before any worktree exists:* the closure is recomputed from the object store with the RUNNER's trusted
-     orchestrator code from a private execution root, not the candidate's own gate runner, and must equal the
-     miss's key. Else reason `key`.
-  6. *Only then* a worktree is created with checkout hooks, LFS and attribute filters disabled and the Cargo home
-     outside it (kept from held-tool-watch:47-60, :1064-1090), and the vouched-for recipe runs. The candidate's
-     code first runs here.
+  5. *A detached worktree, read as data:* as held-tool-watch does today (:47-60, :1064-1090), a detached
+     worktree is created with checkout hooks, LFS and attribute filters disabled and checked clean, and the
+     Cargo home kept outside it. The closure is then recomputed with the RUNNER's trusted orchestrator code from
+     a private execution root, reading the worktree as data (the closure includes cargo-derived and directory
+     reads, so a key from the object store alone exists nowhere today), and must equal the miss's key. Else
+     reason `key`, and the worktree is removed.
+  6. *Only then* the vouched-for recipe runs in that worktree. The candidate's code first runs here.
 - **What isolates, stated plainly:** `ark task run` gives no isolation today (`EffectiveTier::None` →
   `Isolation::None`, ark core task.rs:666). Only the separate worktree and the disabled hooks and filters
   separate the candidate; its recipe runs with the device user's rights. That is part of the residual below.
@@ -258,6 +262,15 @@ gate-grade.mjs:14-20 already counts sponsored results zero. Wiring it is its own
   sufficiency is a separate ruling, and they count zero until then.
 
 ## Open for the steward
+
+- **Reading the steward's turn to verify a quote** (blocks slice 1). Attribution reads no conversation text
+  today, and the Codex adapter reads only its thread's model; a terminal command has nothing defined to read.
+  Verifying a quote against the session record is therefore a boundary change. Two shapes for his choice: (a)
+  the verifier reads the one named turn of the recording session, on that device only, and nothing else; (b)
+  nothing reads conversation text: at the moment he speaks, the harness records only a digest of his turn on
+  the device, and the grant's quote is checked against that digest. Either is his to rule; until then slice 1
+  waits. Also to verify in slice 1: that `brit covenant list` reads clauses across sessions, which the
+  new-words rule needs.
 
 - **Publishing the grant digest across devices** (`env:grant-doc`): it is covenant content, and his ruling on
   publishing covenant notes covers it. Without it a carried verdict saves nothing on another device.
