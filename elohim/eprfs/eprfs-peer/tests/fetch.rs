@@ -301,6 +301,7 @@ struct Scripted {
     connections: Arc<AtomicUsize>,
     answered: Arc<AtomicUsize>,
     manifest_answered: Arc<AtomicUsize>,
+    manifest_answered_at: Arc<Mutex<Vec<Instant>>>,
 }
 
 impl std::fmt::Debug for Scripted {
@@ -337,6 +338,10 @@ impl Scripted {
         self.asked.lock().expect("asked").push(request.clone());
         let answer = match &request {
             TierRequest::Manifest { .. } | TierRequest::Record { cid: None, .. } => {
+                self.manifest_answered_at
+                    .lock()
+                    .expect("manifest attempt times")
+                    .push(Instant::now());
                 let answered = self.manifest_answered.fetch_add(1, Ordering::SeqCst);
                 let reason = if answered < self.faults.manifest_warming {
                     Some(ReachReason::IndexWarming)
@@ -427,6 +432,13 @@ impl Scripted {
             })
             .count()
     }
+
+    fn manifest_attempt_times(&self) -> Vec<Instant> {
+        self.manifest_answered_at
+            .lock()
+            .expect("manifest attempt times")
+            .clone()
+    }
 }
 
 impl ProtocolHandler for Scripted {
@@ -488,6 +500,7 @@ async fn scripted(held: &Held, faults: Faults) -> Running {
         connections: Arc::default(),
         answered: Arc::default(),
         manifest_answered: Arc::default(),
+        manifest_answered_at: Arc::default(),
     };
     let endpoint = bind(&key, None, vec![TIER_ALPN.to_vec()])
         .await
@@ -590,7 +603,7 @@ async fn no_record_is_not_retried() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn index_warming_that_outlasts_the_existing_bound_refuses_by_name() {
+async fn index_warming_retries_are_spaced_and_stay_within_the_existing_deadline() {
     let t = three();
     let key = key_for("warming-past-bound");
     let held = held_artifact(&key, artifact_bytes(11, 1024)).await;
@@ -606,9 +619,10 @@ async fn index_warming_that_outlasts_the_existing_bound_refuses_by_name() {
     let (_dir, store) = payload();
     let budget = FetchBudget {
         stall: Duration::from_secs(1),
-        total: Duration::from_millis(30),
+        total: Duration::from_secs(1),
         ..FetchBudget::default()
     };
+    let started = Instant::now();
 
     let gap = fetch_artifact(
         &endpoint,
@@ -624,7 +638,32 @@ async fn index_warming_that_outlasts_the_existing_bound_refuses_by_name() {
     assert_eq!(gap, FetchGap::IndexWarming);
     assert_eq!(gap.kind(), "index-warming");
     assert_eq!(gap.to_string(), "the sibling is still indexing");
-    assert!(server.tier.manifest_asks() > 1);
+    // The retry never sleeps past the deadline: it gives up when the next wait would cross it. The
+    // slack covers only scheduling and the last round trip, not another wait.
+    let elapsed = started.elapsed();
+    assert!(
+        elapsed <= budget.total + Duration::from_millis(50),
+        "{elapsed:?} past {:?}",
+        budget.total
+    );
+    // The waits double from 50 ms (50, 100, 200, 400 within one second), so the asks are few: a
+    // fixed small delay would make dozens. Each gap is at least its scheduled wait; a sleep never
+    // returns early, so these lower bounds hold on a loaded host too.
+    let attempts = server.tier.manifest_attempt_times();
+    assert!(
+        (3..=6).contains(&attempts.len()),
+        "expected a few backed-off asks, got {}: {attempts:?}",
+        attempts.len()
+    );
+    for (i, pair) in attempts.windows(2).enumerate() {
+        let wait = Duration::from_millis(50) * 2u32.pow(u32::try_from(i).expect("few attempts"));
+        assert!(
+            pair[1].duration_since(pair[0]) >= wait,
+            "ask {} came {:?} after the one before, under its {wait:?} wait: {attempts:?}",
+            i + 1,
+            pair[1].duration_since(pair[0])
+        );
+    }
 }
 
 #[tokio::test(flavor = "multi_thread")]

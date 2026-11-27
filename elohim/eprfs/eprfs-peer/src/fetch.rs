@@ -60,6 +60,7 @@ use tokio::task::JoinSet;
 mod inputs;
 pub use inputs::{fetch_input_document, put_input_document};
 
+use crate::daemon::RetryBackoff;
 use crate::error::PeerError;
 use crate::local_blob::{stream_local_blob_with, LocalBlobContext};
 use crate::tier::{tier_request_counted, TierAnswer, TierRequest, FRAME_DEADLINE, TIER_ALPN};
@@ -79,6 +80,13 @@ pub const FETCH_STALL: Duration = Duration::from_secs(30);
 
 /// The default bound on a whole fetch.
 pub const FETCH_TOTAL: Duration = Duration::from_secs(1800);
+
+/// The first wait before re-asking a holder whose index is still warming.
+const INDEX_WARMING_RETRY_FIRST: Duration = Duration::from_millis(50);
+/// The longest wait between those asks. A warming index is transient, but the retry runs under the
+/// whole fetch's deadline (`FETCH_TOTAL` is 30 minutes), so a fixed small delay would still be a
+/// reconnect loop: the wait doubles to this cap, about one ask every two seconds per holder.
+const INDEX_WARMING_RETRY_MAX: Duration = Duration::from_secs(2);
 
 /// The default manifest cap: 1 MiB admits an artifact of about 13 GB at the 1 MiB average chunk.
 pub const FETCH_MANIFEST_CAP: u32 = 1024 * 1024;
@@ -570,6 +578,7 @@ async fn accept_manifest(
     let mut last = FetchGap::NoRecord;
     let mut candidates: Vec<usize> = (0..holders.len()).collect();
     let mut retried_warming = false;
+    let mut warming_retry = RetryBackoff::new(INDEX_WARMING_RETRY_FIRST, INDEX_WARMING_RETRY_MAX);
     loop {
         if retried_warming && Instant::now() >= deadline {
             return Err(FetchGap::IndexWarming);
@@ -720,7 +729,12 @@ async fn accept_manifest(
         }
         candidates = warming;
         retried_warming = true;
-        tokio::task::yield_now().await;
+        let now = Instant::now();
+        let delay = warming_retry.schedule(now);
+        if deadline.saturating_duration_since(now) <= delay {
+            return Err(FetchGap::IndexWarming);
+        }
+        tokio::time::sleep(delay).await;
     }
 }
 
