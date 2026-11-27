@@ -65,10 +65,21 @@ Feature: A felt problem is named, answered, drained and remembered
     leaves a device only when someone the household has given consent to asks for one, the person
     is shown that exact text, and the person agrees to send that one. Each person answers for
     their own sessions.
+  - The RECORDER is the command a tool runs to put a record in the feedback store. It is part
+    of a program named "epr" that every device here has. Sometimes the recorder fails the tool:
+    it is missing, or it does not finish in time. The tool then leaves a small GAP NOTE in a
+    holding place on the device, one for each session. A gap note says that the recorder failed,
+    why, when, and which release of the tool left it; it says nothing else. That failure is a
+    claim like any other, named after the program at fault and the reason; for a recorder that
+    did not finish in time the name is "epr/recorder-unavailable:timeout". The CATCH-UP COMMAND
+    turns each gap note into a record under that claim, from the release the note names, and
+    removes the note.
+  - The device's STATUS is the list of lines it prints about its own health when asked. One line
+    is for the feedback recorder. It says either that the recorder is well, or how many gap
+    notes are waiting and since when, and then it names the catch-up command.
   - The store's REPORT is what the device prints about its own feedback store: how much it holds,
     and how many bytes each fix returned when its records were drained.
 
-  @wip
   Scenario: A refused command names its problem, and one session leaves one record
     Given device A runs "ferry" release 1 and its feedback store is empty
     When a session of "matthew" on device A runs "ferry list --since yesterday" five times
@@ -189,3 +200,12 @@ Feature: A felt problem is named, answered, drained and remembered
     When that session runs "ferry list --since yesterday" and is refused
     Then the judge reads the claim "behind", and names the cure: restart the session
     And the claim is not counted toward the bound that tells the person a fix is needed
+
+  Scenario: A device that could not keep its records says so, and says how to catch up
+    Given the recorder on device A did not finish in time in two sessions, and each session left a gap note saying so
+    When "matthew" asks device A for its status
+    Then the status line for the feedback recorder says 2 gap notes are waiting and since when, and names the catch-up command
+    When a session of "matthew" on device A runs that command
+    Then device A's feedback store holds one record for each of the two sessions, under the claim "epr/recorder-unavailable:timeout" and from the release its note names
+    And the two gap notes are gone
+    And the status line for the feedback recorder says the recorder is well

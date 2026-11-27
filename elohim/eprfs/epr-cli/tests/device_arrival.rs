@@ -161,6 +161,7 @@ fn status_keeps_dependency_order_and_does_not_mint_a_key() {
             "object packs",
             "device layout",
             "device capacity",
+            "feedback recorder",
             "next step"
         ]
     );

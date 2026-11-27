@@ -177,6 +177,9 @@ pub(crate) fn status_at(root: &Path, remember: bool) -> Vec<Check> {
         packs_check(root),
         layout_check(device_layout),
         Check::new("device capacity", State::Ok, capacity.line(), None).with_capacity(capacity),
+        feedback_recorder_check(&feedback_recorder_fact(root, &|name: &str| {
+            std::env::var_os(name)
+        })),
     ];
     // Each admitted sibling that has acknowledged none (or too little) of this device's records,
     // beside the exchange line (arrival backlog row 77, delta 2). Degraded, never refused; the
@@ -900,6 +903,160 @@ fn gate_toolchain(root: &Path) -> Option<String> {
                 .as_str()
                 .map(str::to_owned)
         })
+}
+
+const FEEDBACK_RECORDER_CHECK: &str = "feedback recorder";
+
+/// What one read of Brit's capture-gap spool found.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SpoolReading {
+    /// The spool directory read.
+    dir: PathBuf,
+    /// Each valid gap note's `(at, cause)`, oldest first.
+    gaps: Vec<(String, String)>,
+    /// `*.json` files that could not be read as gap notes.
+    invalid: usize,
+    /// The read stopped at the spool bound; more notes wait.
+    bounded: bool,
+}
+
+/// What the status reads about the feedback recorder: whether a feedback policy stands above the
+/// root, and what Brit's capture-gap spool holds. Gathered without draining, without starting a
+/// process and without opening the store.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum FeedbackRecorderFact {
+    /// No `.epr-meta/feedback-policy.json` at or above the root.
+    NoPolicy,
+    /// A policy stands at `root`; `spool` is what the spool holds, or why it could not be read.
+    Spool {
+        root: PathBuf,
+        spool: std::result::Result<SpoolReading, String>,
+    },
+}
+
+/// Find the policy by walking up from `root` (as ambient discovery does) and read the spool the
+/// drain reads.
+fn feedback_recorder_fact(
+    root: &Path,
+    env: &dyn Fn(&str) -> Option<std::ffi::OsString>,
+) -> FeedbackRecorderFact {
+    let Some(policy_root) = root
+        .ancestors()
+        .find(|p| p.join(".epr-meta/feedback-policy.json").is_file())
+    else {
+        return FeedbackRecorderFact::NoPolicy;
+    };
+    let spool = match crate::feedback::spool::dir(env) {
+        None => Err("no state directory (XDG_STATE_HOME and HOME are unset)".to_owned()),
+        Some(dir) => crate::feedback::spool::scan(&dir)
+            .map(|scan| SpoolReading {
+                gaps: scan
+                    .gaps
+                    .into_iter()
+                    .map(|gap| (gap.at, gap.cause))
+                    .collect(),
+                invalid: scan.skipped,
+                bounded: scan.bounded,
+                dir,
+            })
+            .map_err(|error| error.kind().to_string()),
+    };
+    FeedbackRecorderFact::Spool {
+        root: policy_root.to_path_buf(),
+        spool,
+    }
+}
+
+/// The `feedback recorder` line: a pure reading of [`FeedbackRecorderFact`].
+fn feedback_recorder_check(fact: &FeedbackRecorderFact) -> Check {
+    let check = |state, detail: String, cure: Option<String>| {
+        Check::new(FEEDBACK_RECORDER_CHECK, state, detail, cure)
+    };
+    let (root, reading) = match fact {
+        FeedbackRecorderFact::NoPolicy => {
+            return check(
+                State::Unknown,
+                "no feedback policy in this repository".into(),
+                None,
+            )
+        }
+        FeedbackRecorderFact::Spool {
+            spool: Err(kind), ..
+        } => {
+            return check(
+                State::Degraded,
+                format!("spool unreadable: {kind}"),
+                Some("check the directory's permissions".into()),
+            )
+        }
+        FeedbackRecorderFact::Spool {
+            root,
+            spool: Ok(reading),
+        } => (root, reading),
+    };
+    let plural = |n: usize, one: &str, many: &str| if n == 1 { one } else { many }.to_owned();
+    let unreadable = (reading.invalid > 0).then(|| {
+        format!(
+            "{} {} not readable as gap notes",
+            reading.invalid,
+            plural(reading.invalid, "file", "files")
+        )
+    });
+    // At the bound the counts are of the first notes read; say that more wait.
+    let unreadable = match (unreadable, reading.bounded) {
+        (unreadable, false) => unreadable,
+        (None, true) => Some(format!(
+            "{} or more files in the spool",
+            crate::feedback::spool::BATCH
+        )),
+        (Some(unreadable), true) => Some(format!(
+            "{unreadable}; {} or more files in the spool",
+            crate::feedback::spool::BATCH
+        )),
+    };
+    let Some((oldest, _)) = reading.gaps.first() else {
+        return match unreadable {
+            None => check(
+                State::Ok,
+                "recorder reachable; no capture gaps waiting".into(),
+                None,
+            ),
+            Some(unreadable) => check(
+                State::Degraded,
+                unreadable,
+                Some(format!(
+                    "inspect or remove the files in {}",
+                    reading.dir.display()
+                )),
+            ),
+        };
+    };
+    let mut causes = std::collections::BTreeMap::<&str, usize>::new();
+    for (_, cause) in &reading.gaps {
+        *causes.entry(cause).or_default() += 1;
+    }
+    let causes: Vec<String> = causes
+        .iter()
+        .map(|(cause, n)| format!("{cause}×{n}"))
+        .collect();
+    let mut detail = format!(
+        "{} capture {} waiting since {oldest}: {}",
+        reading.gaps.len(),
+        plural(reading.gaps.len(), "gap", "gaps"),
+        causes.join(", ")
+    );
+    if let Some(unreadable) = unreadable {
+        detail.push_str("; ");
+        detail.push_str(&unreadable);
+    }
+    check(
+        State::Degraded,
+        detail,
+        Some(format!(
+            "epr feedback drain-spool --root {}",
+            root.display()
+        )),
+    )
 }
 
 #[path = "arrival_sysroot.rs"]
@@ -3568,6 +3725,150 @@ mod tests {
         assert_eq!(
             before,
             "ok next step: nothing owed; this device is arrived and exchanging"
+        );
+    }
+
+    #[test]
+    fn feedback_recorder_line_reads_each_row_of_its_table() {
+        let none = feedback_recorder_check(&FeedbackRecorderFact::NoPolicy);
+        assert_eq!(none.state, State::Unknown);
+        assert_eq!(none.detail, "no feedback policy in this repository");
+        assert!(none.cure.is_none());
+
+        let root = PathBuf::from("/repo");
+        let read = |gaps: Vec<(&str, &str)>, invalid: usize| FeedbackRecorderFact::Spool {
+            root: root.clone(),
+            spool: Ok(SpoolReading {
+                dir: PathBuf::from("/state/brit/feedback-spool"),
+                gaps: gaps
+                    .into_iter()
+                    .map(|(at, cause)| (at.to_owned(), cause.to_owned()))
+                    .collect(),
+                invalid,
+                bounded: false,
+            }),
+        };
+        let well = feedback_recorder_check(&read(vec![], 0));
+        assert_eq!(well.state, State::Ok);
+        assert_eq!(well.detail, "recorder reachable; no capture gaps waiting");
+        assert!(well.cure.is_none());
+
+        let waiting = feedback_recorder_check(&read(
+            vec![
+                ("2026-11-26T09:00:00Z", "timeout"),
+                ("2026-11-26T10:00:00Z", "refused"),
+                ("2026-11-27T10:00:00Z", "timeout"),
+            ],
+            0,
+        ));
+        assert_eq!(waiting.state, State::Degraded);
+        assert_eq!(
+            waiting.detail,
+            "3 capture gaps waiting since 2026-11-26T09:00:00Z: refused×1, timeout×2"
+        );
+        assert_eq!(
+            waiting.cure.as_deref(),
+            Some("epr feedback drain-spool --root /repo")
+        );
+        let one = feedback_recorder_check(&read(vec![("2026-11-26T09:00:00Z", "not-found")], 0));
+        assert_eq!(
+            one.detail,
+            "1 capture gap waiting since 2026-11-26T09:00:00Z: not-found×1"
+        );
+
+        // Files that are not gap notes never read as well.
+        let mixed = feedback_recorder_check(&read(vec![("2026-11-26T09:00:00Z", "timeout")], 2));
+        assert_eq!(mixed.state, State::Degraded);
+        assert_eq!(
+            mixed.detail,
+            "1 capture gap waiting since 2026-11-26T09:00:00Z: timeout×1; \
+             2 files not readable as gap notes"
+        );
+        assert_eq!(
+            mixed.cure.as_deref(),
+            Some("epr feedback drain-spool --root /repo")
+        );
+        let only_invalid = feedback_recorder_check(&read(vec![], 1));
+        assert_eq!(only_invalid.state, State::Degraded);
+        assert_eq!(only_invalid.detail, "1 file not readable as gap notes");
+        assert_eq!(
+            only_invalid.cure.as_deref(),
+            Some("inspect or remove the files in /state/brit/feedback-spool")
+        );
+
+        let bounded = feedback_recorder_check(&FeedbackRecorderFact::Spool {
+            root: root.clone(),
+            spool: Ok(SpoolReading {
+                dir: PathBuf::from("/state/brit/feedback-spool"),
+                gaps: vec![("2026-11-26T09:00:00Z".into(), "timeout".into()); 256],
+                invalid: 0,
+                bounded: true,
+            }),
+        });
+        assert_eq!(bounded.state, State::Degraded);
+        assert_eq!(
+            bounded.detail,
+            "256 capture gaps waiting since 2026-11-26T09:00:00Z: timeout×256; \
+             256 or more files in the spool"
+        );
+        assert_eq!(
+            bounded.cure.as_deref(),
+            Some("epr feedback drain-spool --root /repo")
+        );
+
+        let unreadable = feedback_recorder_check(&FeedbackRecorderFact::Spool {
+            root,
+            spool: Err("permission denied".into()),
+        });
+        assert_eq!(unreadable.state, State::Degraded);
+        assert_eq!(unreadable.detail, "spool unreadable: permission denied");
+        assert_eq!(
+            unreadable.cure.as_deref(),
+            Some("check the directory's permissions")
+        );
+    }
+
+    #[test]
+    fn feedback_recorder_fact_walks_up_to_the_policy_and_reads_the_spool() {
+        let temp = tempfile::tempdir().unwrap();
+        let nested = temp.path().join("repo/a/b");
+        fs::create_dir_all(&nested).unwrap();
+        let state = temp.path().join("state");
+        let env = |name: &str| (name == "XDG_STATE_HOME").then(|| state.clone().into_os_string());
+        assert_eq!(
+            feedback_recorder_fact(&nested, &env),
+            FeedbackRecorderFact::NoPolicy
+        );
+        fs::create_dir_all(temp.path().join("repo/.epr-meta")).unwrap();
+        fs::write(
+            temp.path().join("repo/.epr-meta/feedback-policy.json"),
+            "{}",
+        )
+        .unwrap();
+        let spool = state.join("brit/feedback-spool");
+        let reading = |gaps: Vec<(String, String)>, invalid| FeedbackRecorderFact::Spool {
+            root: temp.path().join("repo"),
+            spool: Ok(SpoolReading {
+                dir: spool.clone(),
+                gaps,
+                invalid,
+                bounded: false,
+            }),
+        };
+        assert_eq!(feedback_recorder_fact(&nested, &env), reading(vec![], 0));
+        fs::create_dir_all(&spool).unwrap();
+        fs::write(
+            spool.join("0123456789abcdef0123456789abcdef.json"),
+            json!({"v":1,"claim":"epr/recorder-unavailable:timeout","cause":"timeout",
+                "at":"2026-11-27T10:00:00Z","emitter":"brit/0.3.6","session":"c".repeat(64),
+                "recorder":{"path":null,"size":null,"mtime":null},"stderr":null})
+            .to_string(),
+        )
+        .unwrap();
+        fs::write(spool.join("bad.json"), "{").unwrap();
+        assert_eq!(
+            feedback_recorder_fact(&nested, &env),
+            reading(vec![("2026-11-27T10:00:00Z".into(), "timeout".into())], 1)
         );
     }
 }

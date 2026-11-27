@@ -2,10 +2,12 @@
 //! discovery: recording never needs HEAD, Git, network, or a conductor.
 
 mod capacity;
+mod claim;
 mod genesis;
 mod qualify;
 mod repair;
 mod response;
+pub(crate) mod spool;
 
 use cid::Cid;
 use elohim_epr_rea::{
@@ -21,7 +23,7 @@ use std::{
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 const INPUT_LIMIT: u64 = 2 * 1024 * 1024;
-const HELP: &str = "epr feedback <qualify|capacity|reclaim|migrate|policy|capture|record|list|show|group|evidence|triage|propose|link|repair|ingest-genesis> [--root DIR] [--json]
+const HELP: &str = "epr feedback <qualify|capacity|reclaim|migrate|policy|capture|drain-spool|record|list|show|group|evidence|triage|propose|link|repair|ingest-genesis> [--root DIR] [--json]
   qualify --brit PATH          Qualify this recorder and an explicit Brit in an isolated store
   qualify --recorder-only      Check initial recorder arrival; never qualifies the tool pair
   capacity                     Effective policy, file accounting, eligibility and waiting reasons
@@ -30,7 +32,11 @@ const HELP: &str = "epr feedback <qualify|capacity|reclaim|migrate|policy|captur
                                Explicit offline v2 cutover; stop all legacy writers first
   policy                       Explain the nearest contextual capture/retention/response policy
   capture --producer brit|brit-guard --operation NAME --outcome STATUS [--invocation ID] [--elapsed-ms N]
-                               Structured automatic capture; no arguments or diagnostics
+                               Structured automatic capture; no arguments or diagnostics.
+                               With EPR_FEEDBACK_CLAIM=<producer>/<name>[:<param>] one session's
+                               reports of one claim and outcome are one record
+  drain-spool [--dir DIR]      Record and remove Brit's capture-gap notes (default spool:
+                               $XDG_STATE_HOME or ~/.local/state, then brit/feedback-spool)
   record [--protect]           Deliberately author a Feedback JSON atom on stdin
   list                         Retained experiences, distinct from rebuildable interpretations
   show --id CID                One immutable record and its governing policy
@@ -57,6 +63,10 @@ pub fn run(args: &[String]) -> Result<()> {
     }
     let command = &args[0];
     let (options, machine) = options(&args[1..])?;
+    // `--dir` names the spool `drain-spool` reads; every other verb refuses it as before.
+    if options.contains_key("dir") && command != "drain-spool" {
+        return Err("unknown feedback option".into());
+    }
     if command == "qualify" {
         return qualify::run(&options, machine);
     }
@@ -95,8 +105,19 @@ pub fn run(args: &[String]) -> Result<()> {
             "retention":"private retained evidence; summaries rebuildable; only policy-eligible groups may be reclaimed",
             "coverage":"native adapters only; unsupported shell adapters are unmeasured"}),
         "capture" => {
-            let record = capture(&options, &policy)?;
+            let record = match claim::declared()? {
+                Some(claim) => claim::capture(&claim, &options, &policy)?,
+                None => capture(&options, &policy)?,
+            };
             json!({"cid":store.append(Feedback::Occurrence(record), false)?.to_string()})
+        }
+        "drain-spool" => {
+            let dir = match options.get("dir") {
+                Some(dir) => PathBuf::from(dir),
+                None => spool::dir(&|name: &str| std::env::var_os(name))
+                    .ok_or("no spool directory: set XDG_STATE_HOME or HOME, or pass --dir")?,
+            };
+            spool::drain(&store, &dir)?
         }
         "record" => {
             let record: Feedback = serde_json::from_slice(&input()?)?;
@@ -245,6 +266,7 @@ fn options(args: &[String]) -> Result<(BTreeMap<String, String>, bool)> {
             "relation",
             "contract",
             "runtime",
+            "dir",
         ]
         .contains(&key)
         {
