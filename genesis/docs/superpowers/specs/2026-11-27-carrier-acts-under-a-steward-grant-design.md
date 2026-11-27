@@ -147,7 +147,62 @@ gate. berth (the grant-held cargo lease): agentic tools. epr-rea: nothing (no ne
 pin-lag refusal and no roll from it. Slices, each its own commit: the grant and `acting`; the lander's intent
 and the yields; `carry-watch` under the supervisor; `carry show`; the answering agent and the two measures.
 
-## Open for the steward
+## Working postures on the open questions
 
-Whether a grant may name a narrower set of gate projects than every miss, and whether a second device of the
-same steward may issue a grant to the first (today only the device's own live session can).
+The steward, asked these on 2026-11-27, said he was not sure and asked for each to be green- and red-teamed to
+a working posture, adding (as typed): "i'm thinking jenkins sholud have it's grants.. as long as it's results
+can carry the accountability, and it's runtime can be asked.. and can reach the elohim network to consider and
+answer the question if necessary then I think it's ok." Those three conditions are the test every grant must
+pass, whoever holds it: **(1) its results carry the accountability** (each cites the grant, and the grant names
+the steward); **(2) its runtime can be asked** (a question about any result reaches something that can answer
+from the records); **(3) it can reach the elohim network** to consider and answer a question when one comes.
+A posture below is a working default until the steward rules otherwise.
+
+### Q1. May a grant cover only some gate projects?
+
+- **Green.** Least privilege, and the ruling's "wholistic limits" in practice: a steward can let a small
+  device (a repurposed Chromebook) carry the cheap gates and leave the 45-minute storage gate to a larger one; it mirrors the
+  scope list the one native grant already has (`GRANT_SCOPES`, elohim-storage api/compute_grants.rs:46); and a
+  narrowing can only reduce what runs.
+- **Red.** A narrower grant leaves misses nobody carries, and a silent skip would look like an idle carrier;
+  gate projects are renamed, and a list of stale names would quietly cover nothing; and capacity admission
+  (ram-guard, io-guard, the build role) already limits what a device takes, so two filters can disagree.
+- **Posture: yes, narrowing only.** `projects` is `"*"` by default or a list of gate project names, checked
+  against the gate registry when the grant is issued (an unknown name refuses the issue) and again at claim
+  (a name that no longer exists is reported). Capacity admission still applies on top; in this design a grant does not add
+  what the build role or the device's capacity refuses. A miss the grant does not cover is recorded as
+  `declined-by-grant`, visible in `epr flow carry show`, rather than skipped silently.
+
+### Q2. May one of the steward's devices issue a grant to another?
+
+- **Green.** It is how a headless device (the Chromebook fleet the steward opened on 2026-11-25, a media PC)
+  joins without anyone opening a session on it; the roster already proves both devices are the steward's;
+  and it adds little attack surface, because a sibling standing for the same steward can already post misses
+  the other device would carry.
+- **Red.** The ruling wants a live agent answering for the service, and a headless recipient has none of its
+  own; a recipient whose roster has not folded the issuer's binding cannot verify it; a revocation issued
+  while the recipient is offline does not reach it until it reconnects; and one compromised device could
+  grant itself work on another.
+- **Posture: yes, bounded.** The issuer is a live session standing for the same steward on any of the
+  steward's bound devices; the grant is signed by the issuing device's key and names exactly one recipient
+  device. The recipient admits it only when its own roster fold shows the issuer bound to the same steward
+  (it does not fetch anything to decide). The answering live agent may be on the issuing device, so a headless carrier
+  is answered for by the issuer's session, and with no live answering session on either device it does not
+  start. A cross-device grant is short (at most 24 hours), a revocation crosses as a successor grant, and a
+  recipient that has folded no head of the issuer within berth's `freshness_s` stops taking new carries.
+
+### Q3. Jenkins has its grants too
+
+- **Green.** It is the same shape: a service with no agent of its own, acting under a steward's grant. It
+  gives Jenkins's results the accountability they lack today: `gate-grade` counts a sponsored runner's result
+  as zero (genesis/orchestrator/gate-grade.mjs:17-19) because nothing traces it to a principal.
+- **Red.** `service:jenkins` is provenance and not an actor (actor.rs:269-272), and making it one would
+  reopen that boundary; counting its results toward sufficiency would change what work is skipped, which is
+  integrity-class; and Jenkins today reaches the network only through what the jenkins bridge harvests.
+- **Posture: yes, as a grant, not as an actor.** A grant may name `service:jenkins` as its runner, with the
+  steward as grantor, the pipelines or gate projects it covers, and an expiry. Its results cite the grant
+  (condition 1), it is asked through the answering live agent that reads its harvested results (condition
+  2), and it reaches the network through the bridge that already harvests and offers its records (condition
+  3). `service:jenkins` stays a non-actor: the grant is the authority, the steward the principal. Whether a
+  granted Jenkins result then counts toward sufficiency is a separate ruling, not taken here; it counts zero
+  until the steward rules.
