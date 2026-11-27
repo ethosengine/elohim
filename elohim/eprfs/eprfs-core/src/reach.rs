@@ -76,9 +76,26 @@ impl ReachRefusal {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum ReachReason {
+macro_rules! reach_reasons {
+    ($( $(#[$meta:meta])* $variant:ident ),+ $(,)?) => {
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+        #[serde(rename_all = "kebab-case")]
+        pub enum ReachReason {
+            $(
+                $(#[$meta])*
+                $variant,
+            )+
+        }
+
+        impl ReachReason {
+            /// Every serialized reason, in the schema's declared order. The same invocation emits
+            /// the enum and this list, so neither side of the schema pin can omit a Rust variant.
+            pub const ALL: &'static [Self] = &[$(Self::$variant),+];
+        }
+    };
+}
+
+reach_reasons! {
     OutsideStanding,
     NoRecord,
     /// The serving daemon has not completed its first artifact-index rebuild, so absence is not
