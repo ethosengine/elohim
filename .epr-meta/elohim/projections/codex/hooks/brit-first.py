@@ -1,7 +1,14 @@
 #!/usr/bin/env python3
-"""Brit habit friction for visible shell commands; not a security boundary."""
+"""Brit habit friction for visible shell commands; not a security boundary.
+
+It still fails closed: a command it cannot read with certainty is refused when a git token is in it,
+and the one exemption (a call into a scratch repository) is a narrow allow-list.
+"""
 import importlib.util
 import json
+import os
+import re
+import shlex
 from pathlib import Path
 import sys
 
@@ -86,11 +93,281 @@ GENERIC = ("Use Brit for this repository operation. Check brit <command> --help 
     "Inspect state before retrying a failed mutation. No human approval is needed.")
 
 
+class Unparseable(Exception):
+    """The command could not be read with certainty; a git token in it is then refused."""
+
+
+# A git token anywhere in the raw text: what fails closed when the command cannot be read.
+GIT_TOKEN = re.compile(r"(?<![A-Za-z0-9_.-])git(?![A-Za-z0-9_-])")
+SHELLS = ("bash", "sh", "zsh", "dash")
+# Characters that end a simple command outside quotes, for deciding which command owns a heredoc.
+SEGMENT_END = ";&|\n()`"
+# The operators a qualifying heredoc's command may sit between: a list, never a pipe or a subshell.
+LIST_OPERATORS = (None, ";", "&&", "||", "&", "\n")
+
+# The outside-repository exemption is a narrow allow-list (ruling 2026-11-27): a git call is let
+# through only when it names a scratch repository by one literal absolute -C and runs a verb that
+# stays inside that repository. Verbs that reach another repository (push, fetch, pull, clone,
+# remote, submodule, ls-remote, config, worktree, archive, bundle, the pack and transport verbs)
+# are absent from it, so they are always policed.
+LOCAL_VERBS = {
+    "init", "status", "add", "rm", "mv", "commit", "log", "show", "diff", "rev-parse", "rev-list",
+    "branch", "tag", "checkout", "switch", "restore", "reset", "merge", "rebase", "cherry-pick",
+    "revert", "stash", "apply", "am", "format-patch", "ls-files", "ls-tree", "cat-file",
+    "hash-object", "update-index", "write-tree", "read-tree", "commit-tree", "update-ref",
+    "symbolic-ref", "for-each-ref", "show-ref", "merge-base", "describe", "blame", "grep", "notes",
+    "reflog", "fsck", "gc", "prune", "repack", "pack-refs", "clean", "shortlog", "name-rev",
+    "count-objects", "check-ignore", "check-attr", "diff-tree", "diff-index", "diff-files",
+    "range-diff", "mktree", "mktag", "verify-commit", "verify-tag", "var",
+}
+REPOSITORY_ENV = re.compile(r"(?<![A-Za-z0-9_])GIT_[A-Z_]+")
+URL_LIKE = re.compile(r"://|^[^/\s:@]+@[^/\s:]+:")
+PARENT_SEGMENT = re.compile(r"(^|[/=])\.\.(/|$)")
+# What the shell would expand in a word: a parameter or command, a glob, a leading tilde, a brace list.
+EXPANDS = re.compile(r"[$`*?\[]|(^|[=:])~|\{[^}]*,[^}]*\}")
+# The variables that move where git finds a repository, its config or its objects.
+LOCATING_ENV = ("GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY",
+                "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_NAMESPACE", "GIT_CONFIG", "GIT_CONFIG_GLOBAL",
+                "GIT_CONFIG_SYSTEM", "GIT_CONFIG_COUNT", "GIT_CONFIG_PARAMETERS", "GIT_EXEC_PATH",
+                "GIT_TEMPLATE_DIR")
+
+
+def _segment_bounds(text, start, end):
+    """(operator before, operator after) a simple command spanning text[start:end]."""
+    before = None
+    j = start - 1
+    while j >= 0 and text[j] in " \t":
+        j -= 1
+    if j >= 0:
+        before = text[j]
+        if before in "&|" and j > 0 and text[j - 1] == before:
+            before = before * 2
+    after = None
+    if end < len(text):
+        after = text[end]
+        if after in "&|" and end + 1 < len(text) and text[end + 1] in (after, "&"):
+            after = text[end:end + 2]
+    return before, after
+
+
+def _writes_only_to_file(segment, before, after):
+    """Names of the files a `cat > file <<'X'` or `tee file <<'X'` writes, or None when it does not qualify.
+
+    The command must be cat or tee and nothing else: no environment, no wrapper, no pipe on either
+    side, no process substitution, no other redirection, exactly one heredoc."""
+    if before not in LIST_OPERATORS or after not in LIST_OPERATORS:
+        return None
+    try:
+        tokens = shlex.split(segment)
+    except ValueError:
+        return None
+    if not tokens or tokens[0] not in ("cat", "tee"):
+        return None
+    heredocs = 0
+    targets = []
+    args = []
+    i = 1
+    while i < len(tokens):
+        token = tokens[i]
+        if token.startswith("<<"):
+            heredocs += 1
+            i += 2 if token in ("<<", "<<-") else 1
+            continue
+        if token in (">", ">>"):
+            if i + 1 >= len(tokens):
+                return None
+            targets.append(tokens[i + 1])
+            i += 2
+            continue
+        if token.startswith(">"):
+            targets.append(token.lstrip(">"))
+            i += 1
+            continue
+        if re.match(r"^\d*[<>]", token) or "<" in token or "&" in token or "(" in token or ")" in token:
+            return None
+        args.append(token)
+        i += 1
+    if heredocs != 1:
+        return None
+    if tokens[0] == "cat":
+        if args or len(targets) != 1:
+            return None
+        files = targets
+    else:
+        if targets:
+            return None
+        files = [a for a in args if a not in ("-a", "--append")]
+        if not files or any(a.startswith("-") for a in files):
+            return None
+    for name in files:
+        if not name or EXPANDS.search(name) or name.startswith(("&", "|")) or "(" in name:
+            return None
+    return files
+
+
+def _heredoc_word(text, j):
+    """(delimiter, quoted, index after the word) of a heredoc word starting at text[j]."""
+    k = j
+    parts = []
+    quoted = False
+    while k < len(text) and text[k] not in " \t\n;&|()<>":
+        ch = text[k]
+        if ch in ("'", '"'):
+            end = text.find(ch, k + 1)
+            if end < 0 or "\n" in text[k + 1:end]:
+                raise Unparseable("heredoc delimiter")
+            parts.append(text[k + 1:end])
+            quoted = True
+            k = end + 1
+        elif ch == "\\":
+            if k + 1 >= len(text):
+                raise Unparseable("heredoc delimiter")
+            parts.append(text[k + 1])
+            quoted = True
+            k += 2
+        else:
+            parts.append(ch)
+            k += 1
+    delimiter = "".join(parts)
+    if not delimiter:
+        raise Unparseable("empty heredoc delimiter")
+    return delimiter, quoted, k
+
+
+def _scan(command):
+    """The command with each heredoc body that is only data blanked; raises Unparseable.
+
+    A body is data only when its delimiter is quoted and its command is cat or tee writing to a
+    file with nothing piped onward, and that file is not named again anywhere else in the command
+    (so a script written and then run stays scanned). Every other body is scanned as on dev.
+    Quotes are tracked across lines; a comment ends the line before any << in it is read."""
+    text = command
+    n = len(text)
+    heredocs = []
+    pending = []
+    quote = None
+    segment_start = 0
+    segment_heredocs = []
+    i = 0
+
+    def close_segment(end):
+        nonlocal segment_heredocs
+        if segment_heredocs:
+            before, after = _segment_bounds(text, segment_start, end)
+            files = _writes_only_to_file(text[segment_start:end], before, after)
+            for record in segment_heredocs:
+                record["files"] = files if record["quoted"] and len(segment_heredocs) == 1 else None
+        segment_heredocs = []
+
+    while i < n:
+        ch = text[i]
+        if quote == "'":
+            if ch == "'":
+                quote = None
+            i += 1
+            continue
+        if quote == '"':
+            if ch == "\\":
+                i += 2
+                continue
+            if ch == '"':
+                quote = None
+            i += 1
+            continue
+        if ch == "\\":
+            i += 2
+            continue
+        if ch in ("'", '"'):
+            quote = ch
+            i += 1
+            continue
+        if ch == "#" and (i == 0 or text[i - 1] in " \t\n;&|()"):
+            end = text.find("\n", i)
+            i = n if end < 0 else end
+            continue
+        if text.startswith("<<<", i):
+            i += 3
+            continue
+        if text.startswith("<<", i):
+            j = i + 2
+            strip_tabs = j < n and text[j] == "-"
+            if strip_tabs:
+                j += 1
+            while j < n and text[j] in " \t":
+                j += 1
+            delimiter, quoted, k = _heredoc_word(text, j)
+            record = {"delimiter": delimiter, "strip": strip_tabs, "quoted": quoted, "files": None}
+            heredocs.append(record)
+            pending.append(record)
+            segment_heredocs.append(record)
+            i = k
+            continue
+        if ch in SEGMENT_END:
+            close_segment(i)
+            segment_start = i + 1
+            if ch == "\n" and pending:
+                i += 1
+                for record in pending:
+                    record["body_start"] = i
+                    while True:
+                        if i >= n:
+                            raise Unparseable("unterminated heredoc")
+                        end = text.find("\n", i)
+                        end = n if end < 0 else end
+                        line = text[i:end]
+                        candidate = line.lstrip("\t") if record["strip"] else line
+                        if candidate == record["delimiter"]:
+                            record["body_end"] = i
+                            i = min(end + 1, n)
+                            break
+                        i = end + 1
+                pending = []
+                segment_start = i
+                continue
+            i += 1
+            continue
+        i += 1
+    close_segment(n)
+    if quote or pending:
+        raise Unparseable("open quote or heredoc")
+    blank = []
+    for record in heredocs:
+        files = record.get("files")
+        if not files or "body_start" not in record:
+            continue
+        elsewhere = text[:record["body_start"]] + text[record["body_end"]:]
+        # Its own command names the file once; any other mention (a later bash, chmod, source,
+        # cat or ./ of it) keeps the body scanned.
+        if any(elsewhere.count(os.path.basename(name)) > 1 for name in files):
+            continue
+        blank.append((record["body_start"], record["body_end"]))
+    if not blank:
+        return text
+    out = []
+    cursor = 0
+    for start, end in sorted(blank):
+        out.append(text[cursor:start])
+        out.append("\n" * text.count("\n", start, end))
+        cursor = end
+    out.append(text[cursor:])
+    return "".join(out)
+
+
+def _tokens_or_raise(text):
+    tokens = parser._tokenize(text)
+    if not tokens and text.strip():
+        raise Unparseable("tokenize")
+    return tokens
+
+
 def git_stages(command, depth=0):
-    """argv of every stage whose program is git, including inside nested bash -c."""
+    """argv of every stage whose program is git, including inside nested bash -c; raises Unparseable."""
     found = []
     if depth > 4:
+        if GIT_TOKEN.search(command):
+            raise Unparseable("nesting")
         return found
+    _tokens_or_raise(command)
     for chain in parser._chains(command):
         for stage in chain:
             argv = parser._strip_wrappers(stage)
@@ -99,15 +376,128 @@ def git_stages(command, depth=0):
             head = Path(argv[0]).name
             if head == "git":
                 found.append(argv)
-            elif head in ("bash", "sh", "zsh", "dash"):
+            elif head in SHELLS:
                 index = parser._find_dash_c(argv[1:])
                 if index is not None and index + 2 < len(argv):
                     found.extend(git_stages(argv[index + 2], depth + 1))
     return found
 
 
-def uses_git(command, depth=0):
-    return bool(git_stages(command, depth))
+def _workspace_repo_root():
+    root = ROOT.resolve()
+    if root.parent.name == ".worktrees":
+        return root.parent.parent
+    return root
+
+
+def _under(path, root):
+    return path == root or path.startswith(root.rstrip("/") + "/")
+
+
+def _scratch_roots():
+    roots = ["/tmp"]
+    tmpdir = os.environ.get("TMPDIR")
+    if tmpdir and os.path.isabs(tmpdir):
+        roots.append(tmpdir)
+    return [os.path.realpath(root) for root in roots]
+
+
+def _names_workspace(value, workspace):
+    """Whether an argument names the workspace, a URL, a parent segment, or anything not literal."""
+    if EXPANDS.search(value) or URL_LIKE.search(value) or PARENT_SEGMENT.search(value):
+        return True
+    if workspace in value or str(ROOT) in value:
+        return True
+    for piece in [value] + value.split("=")[1:]:
+        if piece.startswith("/") and _under(os.path.realpath(piece), workspace):
+            return True
+    return False
+
+
+def _scratch_repository(real, root, workspace):
+    """Whether the repository at or above `real` (inside `root`) stands apart from the workspace."""
+    path = real
+    while True:
+        marker = os.path.join(path, ".git")
+        if os.path.lexists(marker):
+            break
+        if path == root or not _under(path, root):
+            return False
+        parent = os.path.dirname(path)
+        if parent == path:
+            return False
+        path = parent
+    if os.path.islink(marker) and _under(os.path.realpath(marker), workspace):
+        return False
+    if os.path.isfile(marker):
+        with open(marker, encoding="utf-8") as handle:
+            line = handle.readline().strip()
+        if not line.startswith("gitdir:"):
+            return False
+        gitdir = line[len("gitdir:"):].strip()
+        gitdir = os.path.realpath(os.path.join(path, gitdir))
+        if _under(gitdir, workspace) or not any(_under(gitdir, r) for r in _scratch_roots()):
+            return False
+        marker = gitdir
+    config = os.path.join(os.path.realpath(marker), "config")
+    if os.path.exists(config):
+        with open(config, encoding="utf-8", errors="replace") as handle:
+            body = handle.read().lower()
+        if "worktree" in body or "include" in body:
+            return False
+    return True
+
+
+def _exempt(argv):
+    """Whether one git stage is let through as a call into a scratch repository."""
+    i = 1
+    target = None
+    while i < len(argv) and argv[i].startswith("-"):
+        if argv[i] == "-C" and target is None and i + 1 < len(argv):
+            target = argv[i + 1]
+            i += 2
+            continue
+        return False  # any other global option, or a second -C
+    if target is None or i >= len(argv):
+        return False
+    verb = argv[i]
+    rest = argv[i + 1:]
+    if verb not in LOCAL_VERBS:
+        return False
+    if verb == "rebase" and any(a == "--exec" or a.startswith("--exec=") or a.startswith("-x") for a in rest):
+        return False
+    if not os.path.isabs(target) or EXPANDS.search(target):
+        return False
+    workspace = os.path.realpath(_workspace_repo_root())
+    real = os.path.realpath(target)
+    if not os.path.isdir(real) or _under(real, workspace):
+        return False
+    roots = [r for r in _scratch_roots() if _under(real, r) and not _under(r, workspace)]
+    if not roots:
+        return False
+    if any(_names_workspace(a, workspace) for a in rest):
+        return False
+    if verb == "init":
+        return True  # nothing exists yet to point anywhere; its arguments were checked above
+    return _scratch_repository(real, roots[0], workspace)
+
+
+def policed_stages(command):
+    """The git stages the hook refuses; raises Unparseable when the command cannot be read."""
+    text = _scan(command)
+    stages = git_stages(text)
+    if not stages:
+        return stages
+    if REPOSITORY_ENV.search(command) or any(os.environ.get(k) for k in LOCATING_ENV):
+        return stages
+    if all(Path(argv[0]).name == "git" and argv[0] in ("git", "/usr/bin/git") and _exempt(argv)
+           for argv in stages):
+        return []
+    return stages
+
+
+def uses_git(command):
+    return bool(policed_stages(command))
 
 
 def git_subcommand(argv):
@@ -154,7 +544,7 @@ def table_for(installed):
 def steer(command):
     """Message naming the brit form per git subcommand, or None when unparseable."""
     subs = []
-    for argv in git_stages(command):
+    for argv in policed_stages(command):
         sub = git_subcommand(argv)
         if sub is None:
             return None
@@ -202,7 +592,13 @@ def evaluate(event):
         return None
     args = event.get("tool_input", {})
     command = args.get("command", args.get("cmd", ""))
-    if not isinstance(command, str) or not uses_git(command):
+    if not isinstance(command, str):
+        return None
+    try:
+        stages = policed_stages(command)
+    except Exception:
+        stages = None  # unreadable: refused below when a git token is in it, never passed
+    if stages == [] or (stages is None and not GIT_TOKEN.search(command)):
         return None
     # A leading comment belongs only to this invocation, never ambient environment.
     first = command.splitlines()[0].strip()
@@ -213,13 +609,22 @@ def evaluate(event):
 
 
 def main():
+    raw = b""
     try:
         raw = sys.stdin.buffer.read(1572865)
         if len(raw) > 1572864:
             raise ValueError("event too large")
         result = evaluate(json.loads(raw))
     except Exception:
-        result = {"additionalContext": "Brit reminder coverage gap: shell event could not be decoded."}
+        # An event that cannot be read is refused when a git token is in it; only one without passes.
+        try:
+            text = raw.decode("utf-8", "replace")
+        except Exception:
+            text = ""
+        if GIT_TOKEN.search(text):
+            result = {"permissionDecision": "deny", "permissionDecisionReason": GENERIC}
+        else:
+            result = {"additionalContext": "Brit reminder coverage gap: shell event could not be decoded."}
     if result:
         print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", **result}}))
     return 0

@@ -1,5 +1,11 @@
+from contextlib import redirect_stdout
 import importlib.util
+import io
+import json
+import os
 from pathlib import Path
+from tempfile import TemporaryDirectory
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 ROOT=Path(__file__).resolve().parents[3]
@@ -163,5 +169,126 @@ class VersionProbe(unittest.TestCase):
   self.assertIsNone(self.probe(return_value=Odd)[0])
   self.assertIsNone(self.probe(side_effect=subprocess.TimeoutExpired('brit',0.5))[0])
   self.assertIsNone(self.probe(side_effect=FileNotFoundError())[0])
+
+
+class ScratchExemption(unittest.TestCase):
+ """Ruling 2026-11-27: the outside-repository exemption is a narrow allow-list that fails closed.
+
+ A git call passes only when every git stage names a scratch repository by one literal absolute -C
+ and runs a local verb; a quoted heredoc body is data only for cat or tee writing to a file; any
+ command the hook cannot read with certainty is refused when a git token is in it."""
+ def setUp(self):
+  p=patch.object(hook,'installed_brit_version',return_value=hook.BRIT_TABLE_VERSION)
+  p.start(); self.addCleanup(p.stop)
+  env=patch.dict(os.environ,{}); env.start(); self.addCleanup(env.stop)
+  for name in hook.LOCATING_ENV: os.environ.pop(name,None)
+  self.tmpdir=TemporaryDirectory(dir='/tmp'); self.addCleanup(self.tmpdir.cleanup)
+  self.tmp=Path(self.tmpdir.name).resolve()
+  self.ws=self.tmp/'workspace'; (self.ws/'.git').mkdir(parents=True)
+  (self.ws/'.epr-meta').mkdir(); (self.ws/'.epr-meta/brit-first.json').write_text('{"enabled":true}')
+  (self.ws/'elohim/brit/.git').mkdir(parents=True)
+  wt=self.ws/'.worktrees'/'one'; wt.mkdir(parents=True); (wt/'.git').write_text('gitdir: ../../.git/worktrees/one\n')
+  self.scratch=self.tmp/'scratch-repo'; (self.scratch/'.git').mkdir(parents=True); (self.scratch/'.git/config').write_text('[core]\n\tbare = false\n')
+  root=patch.object(hook,'ROOT',self.ws); root.start(); self.addCleanup(root.stop)
+ def verdict(self,command):
+  r=hook.evaluate({'tool_name':'Bash','tool_input':{'command':command}})
+  return None if r is None else r.get('permissionDecision','context')
+ def assertPasses(self,commands):
+  for c in commands:
+   with self.subTest(command=c): self.assertIsNone(self.verdict(c))
+ def assertRefused(self,commands):
+  for c in commands:
+   with self.subTest(command=c): self.assertEqual(self.verdict(c),'deny')
+
+ def test_a_scratch_repository_named_by_absolute_C_passes(self):
+  s=self.scratch
+  link=self.tmp/'link-to-scratch'; link.symlink_to(s)
+  self.assertPasses([f'git -C {s} status',f'git -C {s} add a.txt && git -C {s} commit -m fixture',
+   f'git -C {s} reset --hard HEAD~1',f'git -C {s} stash list',f'git -C {s} log -n 1 stash@{{0}}',
+   f'git -C {link} status',f'git -C {self.tmp} init fixture'])
+ def test_data_heredocs_pass(self):
+  t=self.tmp
+  self.assertPasses([
+   f"cat > {t}/brief.md <<'EOF'\nquote `brit show X | git apply` and git push origin HEAD:dev\nEOF",
+   f"cat <<'EOF' > {t}/brief2.md\ngit reset --hard\nEOF",
+   f"tee {t}/notes.md <<'EOF'\n- git stash is absent; git reset too\nEOF",
+   f"cat > {t}/a.md <<'EOF'\ngit status\nEOF\nbrit status --no-write",
+   'brit show a:b | head','brit show HEAD:x | wc -l'])
+
+ def test_dev_refused_stays_refused(self):
+  ws,s,t=self.ws,self.scratch,self.tmp
+  table={
+   'submodules are this workspace':[
+    'git -C elohim/brit push','cd elohim/rakia && git reset --hard',f'git -C {ws}/elohim/brit push',
+    f'git -C {ws}/.worktrees/one reset --hard'],
+   'a heredoc fed to a shell is scanned':[
+    "sh <<'EOF'\ngit reset --hard\nEOF","bash -s <<'EOF'\ngit reset --hard\nEOF",
+    "cat <<'EOF' | sh\ngit reset --hard\nEOF","python3 - <<'EOF'\ngit reset --hard\nEOF",
+    f"cat > {t}/x.sh <<'EOF'\ngit reset --hard\nEOF\nbash {t}/x.sh",
+    f"cat > {t}/y.sh <<'EOF' && bash {t}/y.sh\ngit reset --hard\nEOF",
+    f"cat > {t}/z.sh <<'EOF'\ngit reset --hard\nEOF\nchmod +x {t}/z.sh; {t}/z.sh",
+    "tee >(sh) <<'EOF'\ngit reset --hard\nEOF",f"cat > {t}/p.md <<'EOF' | sh\ngit reset --hard\nEOF",
+    f"cat <<EOF > {t}/u.md\ngit reset --hard\nEOF",f"(cat > {t}/q.md <<'EOF')\ngit reset --hard\nEOF"],
+   'a comment ends the line before any heredoc':[
+    "# note <<'EOF'\ngit push origin HEAD:dev","echo hi # <<'EOF'\ngit push origin HEAD:dev\nEOF"],
+   'quotes span lines':['echo "\ncat > f <<\'EOF\'\n" ; git push origin HEAD:dev\nEOF'],
+   'cd and pushd are never tracked':[
+    f'cd {s} || git push',f'cd {s} & git push',f'(cd {s}) && git push',f'pushd {s} && git reset --hard',
+    f'cd {s} && cd - && git reset --hard',f'cd {s} && cd && git status',f'cd {s} && git status'],
+   'an unexpanded path is not literal':[
+    'cd "$VAR" && git status','git -C "$SCRATCH" status','git -C ~/x status',f'git -C {t}/scr* status',
+    f'git -C $(echo {s}) status'],
+   'an outside repository cannot reach this one or a remote':[
+    f'git -C {s} push {ws} HEAD:dev',f'git -C {s} push origin HEAD:dev',f'git -C {s} fetch origin',
+    f'git -C {s} pull',f'git -C {s} remote add w {ws}',f'git -C {s} submodule update',f'git -C {s} clone x',
+    f'git -C {s} ls-remote origin',f'git -C {s} config core.worktree {ws}',f'git -C {s} worktree add {ws}/x',
+    f'git -C {s} apply --directory=../../workspace p.diff',f'git -C {s} diff --output={ws}/x',
+    f'git -C {s} add {ws}/../workspace/file',f'git -C {s} log --format=x https://example.com/r',
+    f'git -C {s} rebase --exec "git -C {ws} reset --hard" main',f'git -C {s} rebase -x true main',
+    f'git -C {s} -c core.worktree=/y status',f'git -C {s} -C ../workspace status',
+    f'GIT_DIR={ws}/.git git -C {s} status',f'export GIT_WORK_TREE={ws}; git -C {s} status',
+    f'git -C {s} --git-dir={ws}/.git status',f'git -C {s} status && git status'],
+  }
+  for cls,commands in table.items():
+   with self.subTest(cls=cls): self.assertRefused(commands)
+ def test_a_scratch_directory_tied_to_the_workspace_is_policed(self):
+  ws,t=self.ws,self.tmp
+  worktree=t/'wt'; worktree.mkdir(); (worktree/'.git').write_text(f'gitdir: {ws}/.git/worktrees/wt\n')
+  linked=t/'linked'; linked.mkdir(); (linked/'.git').symlink_to(ws/'.git')
+  configured=t/'configured'; (configured/'.git').mkdir(parents=True)
+  (configured/'.git/config').write_text(f'[core]\n\tworktree = {ws}\n')
+  included=t/'included'; (included/'.git').mkdir(parents=True); (included/'.git/config').write_text('[include]\n\tpath = /x\n')
+  bare=t/'no-repository'; bare.mkdir()
+  alias=t/'alias'; alias.symlink_to(ws)
+  self.assertRefused([f'git -C {d} status' for d in (worktree,linked,configured,included,bare,alias)])
+ def test_a_scratch_root_inside_the_workspace_is_not_scratch(self):
+  inner=self.ws/'tmp'; (inner/'repo/.git').mkdir(parents=True)
+  with patch.dict(os.environ,{'TMPDIR':str(inner)}):
+   self.assertRefused([f'git -C {inner}/repo status'])
+ def test_a_locating_variable_in_the_environment_removes_the_exemption(self):
+  with patch.dict(os.environ,{'GIT_DIR':str(self.ws/'.git')}):
+   self.assertRefused([f'git -C {self.scratch} status'])
+  with patch.dict(os.environ,{'GIT_PAGER':'cat'}):
+   self.assertPasses([f'git -C {self.scratch} status'])
+
+ def test_unreadable_with_a_git_token_is_refused(self):
+  s=self.scratch
+  self.assertRefused(['echo "unbalanced && git status',"git status <<'EOF'\nno end",
+   f'echo $((1<<2)); git -C {s} status',"bash -c 'echo \"x'; git status"])
+  self.assertPasses(['echo "unbalanced and no token','brit status --no-write'])
+ def test_an_internal_error_with_a_git_token_is_refused(self):
+  with patch.object(hook,'_exempt',side_effect=OSError('boom')):
+   self.assertRefused([f'git -C {self.scratch} status'])
+ def test_an_undecodable_event_with_a_git_token_is_refused(self):
+  for raw,expected in [(b'{not json git status',"deny"),(b'{not json at all',None)]:
+   with self.subTest(raw=raw):
+    out=io.StringIO()
+    with patch.object(hook.sys,'stdin',SimpleNamespace(buffer=io.BytesIO(raw))), redirect_stdout(out):
+     hook.main()
+    payload=json.loads(out.getvalue())['hookSpecificOutput']
+    self.assertEqual(payload.get('permissionDecision'),expected)
+ def test_a_fallback_line_still_passes_a_refused_class(self):
+  self.assertEqual(self.verdict("# Brit fallback: fixture needs a reset brit lacks\nsh <<'EOF'\ngit reset --hard\nEOF"),'context')
+
 if __name__=='__main__':
  unittest.main()
