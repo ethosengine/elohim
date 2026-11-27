@@ -213,6 +213,8 @@ class ScratchExemption(unittest.TestCase):
    f"cat <<'EOF' > {t}/brief2.md\ngit reset --hard\nEOF",
    f"tee {t}/notes.md <<'EOF'\n- git stash is absent; git reset too\nEOF",
    f"cat > {t}/a.md <<'EOF'\ngit status\nEOF\nbrit status --no-write",
+   # $"…" quotes as "…" does, so an apostrophe inside it does not open a quote.
+   f"echo $\"it's\" ; cat > {t}/b.md <<'EOF'\nprose about git push\nEOF",
    'brit show a:b | head','brit show HEAD:x | wc -l'])
 
  def test_dev_refused_stays_refused(self):
@@ -232,6 +234,10 @@ class ScratchExemption(unittest.TestCase):
    'a comment ends the line before any heredoc':[
     "# note <<'EOF'\ngit push origin HEAD:dev","echo hi # <<'EOF'\ngit push origin HEAD:dev\nEOF"],
    'quotes span lines':['echo "\ncat > f <<\'EOF\'\n" ; git push origin HEAD:dev\nEOF'],
+   # The integrator's reader's construction: an escaped quote inside ANSI-C quoting must not end it,
+   # or the heredoc it seems to open swallows a git call bash runs.
+   'ANSI-C quoting cannot hide a call':[
+    "echo $'\\'' '; cat > f <<\\EOF ; $'\\'' '\ngit push origin HEAD:dev\nEOF"],
    'cd and pushd are never tracked':[
     f'cd {s} || git push',f'cd {s} & git push',f'(cd {s}) && git push',f'pushd {s} && git reset --hard',
     f'cd {s} && cd - && git reset --hard',f'cd {s} && cd && git status',f'cd {s} && git status'],
@@ -260,7 +266,19 @@ class ScratchExemption(unittest.TestCase):
   included=t/'included'; (included/'.git').mkdir(parents=True); (included/'.git/config').write_text('[include]\n\tpath = /x\n')
   bare=t/'no-repository'; bare.mkdir()
   alias=t/'alias'; alias.symlink_to(ws)
-  self.assertRefused([f'git -C {d} status' for d in (worktree,linked,configured,included,bare,alias)])
+  # The integrator's reader's construction: a commondir makes the git directory a worktree of the
+  # workspace repository, directly or behind a gitdir: file to a scratch directory.
+  (ws/'.git/refs/heads').mkdir(parents=True)
+  common=t/'common'; (common/'.git').mkdir(parents=True); (common/'.git/HEAD').write_text('ref: refs/heads/dev\n')
+  (common/'.git/commondir').write_text(f'{ws}/.git\n')
+  gd=t/'gd'; gd.mkdir(); (gd/'HEAD').write_text('ref: refs/heads/dev\n'); (gd/'commondir').write_text(f'{ws}/.git\n')
+  via=t/'via'; via.mkdir(); (via/'.git').write_text(f'gitdir: {gd}\n')
+  borrowed=t/'borrowed'; (borrowed/'.git/objects/info').mkdir(parents=True)
+  (borrowed/'.git/objects/info/alternates').write_text(f'{ws}/.git/objects\n')
+  nested=t/'nested'; (nested/'.git/refs').mkdir(parents=True); (nested/'.git/refs/heads').symlink_to(ws/'.git/refs/heads')
+  dirs=(worktree,linked,configured,included,bare,alias,common,via,borrowed,nested)
+  self.assertRefused([f'git -C {d} status' for d in dirs]+[f'git -C {common} commit --allow-empty -m x',
+   f'git -C {via} update-ref refs/heads/dev HEAD'])
  def test_a_scratch_root_inside_the_workspace_is_not_scratch(self):
   inner=self.ws/'tmp'; (inner/'repo/.git').mkdir(parents=True)
   with patch.dict(os.environ,{'TMPDIR':str(inner)}):
@@ -274,7 +292,10 @@ class ScratchExemption(unittest.TestCase):
  def test_unreadable_with_a_git_token_is_refused(self):
   s=self.scratch
   self.assertRefused(['echo "unbalanced && git status',"git status <<'EOF'\nno end",
-   f'echo $((1<<2)); git -C {s} status',"bash -c 'echo \"x'; git status"])
+   f'echo $((1<<2)); git -C {s} status',"bash -c 'echo \"x'; git status",
+   # Dev passes this one (its tokenizer cannot read ANSI-C quoting and so sees no stage); now the body
+   # is never data when $' appears, and the git call in it is refused.
+   f"echo $'it\\'s' ; cat > {self.tmp}/c.md <<'EOF'\ngit push origin HEAD:dev\nEOF"])
   self.assertPasses(['echo "unbalanced and no token','brit status --no-write'])
  def test_an_internal_error_with_a_git_token_is_refused(self):
   with patch.object(hook,'_exempt',side_effect=OSError('boom')):
