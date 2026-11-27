@@ -1025,6 +1025,30 @@ mod tests {
         })
     }
 
+    /// Reads through the cache as this process's reader and returns how many fallbacks the read
+    /// reported, so a test can tell a full verification from a trusted cached prefix.
+    #[cfg(feature = "sidecar")]
+    fn records_and_fallbacks_for_test_cache(
+        store: &SidecarFlowStore,
+        cache_directory: &Path,
+    ) -> (Vec<(Cid, FlowRecord)>, usize) {
+        let reader = reader_identity(store.log_path()).unwrap();
+        let fallbacks = std::cell::Cell::new(0);
+        let write_failures = std::cell::Cell::new(0);
+        let records = records_for_test_reader(
+            store,
+            Some(cache_directory),
+            Some(&reader),
+            &fallbacks,
+            &write_failures,
+        )
+        .unwrap()
+        .into_iter()
+        .map(|(_, cid, record)| (cid, record))
+        .collect();
+        (records, fallbacks.get())
+    }
+
     #[cfg(feature = "sidecar")]
     fn directory_files(path: &Path) -> std::collections::BTreeMap<std::ffi::OsString, Vec<u8>> {
         std::fs::read_dir(path)
@@ -1328,11 +1352,19 @@ mod tests {
             + "\n";
         assert_eq!(replacement.len(), original.len());
         let expected = decode_flow_records(&replacement).unwrap();
-        std::fs::write(replaced_store.log_path(), replacement).unwrap();
-        assert_eq!(
-            records_for_test_cache(&replaced_store, replaced_cache.path()).unwrap(),
-            expected
-        );
+        std::fs::write(replaced_store.log_path(), &replacement).unwrap();
+        // Same length, same record count and valid cids: only the prefix digest tells this log
+        // from the one the cache vouched for, so the lookup must refuse the cached prefix and the
+        // read must verify every line.
+        let reader = reader_identity(replaced_store.log_path()).unwrap();
+        assert!(matches!(
+            cached_prefix(replaced_cache.path(), &replacement, &reader),
+            CacheLookup::Mismatch("prefix digest mismatch")
+        ));
+        let (records, fallbacks) =
+            records_and_fallbacks_for_test_cache(&replaced_store, replaced_cache.path());
+        assert_eq!(records, expected);
+        assert_eq!(fallbacks, 1);
     }
 
     #[cfg(feature = "sidecar")]
@@ -1362,12 +1394,19 @@ mod tests {
         let edited = lines.join("\n") + "\n";
         assert_eq!(edited.len(), original.len());
         let expected = decode_flow_records(&edited).unwrap();
-        std::fs::write(store.log_path(), edited).unwrap();
+        std::fs::write(store.log_path(), &edited).unwrap();
 
-        assert_eq!(
-            records_for_test_cache(&store, cache.path()).unwrap(),
-            expected
-        );
+        // The edit kept the line's length and recomputed its cid, so only the prefix digest tells
+        // this log from the one the cache vouched for. The lookup must refuse the cached prefix,
+        // and the read must then verify every line.
+        let reader = reader_identity(store.log_path()).unwrap();
+        assert!(matches!(
+            cached_prefix(cache.path(), &edited, &reader),
+            CacheLookup::Mismatch("prefix digest mismatch")
+        ));
+        let (records, fallbacks) = records_and_fallbacks_for_test_cache(&store, cache.path());
+        assert_eq!(records, expected);
+        assert_eq!(fallbacks, 1);
     }
 
     #[cfg(feature = "sidecar")]
