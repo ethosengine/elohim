@@ -208,7 +208,27 @@ test('plan never names a destination outside devices/', () => {
 });
 
 const brit = spawnSync('brit', ['--version'], { encoding: 'utf8' });
-test('DEVICE_NOTES_PUSH=brit publishes through brit push', { skip: brit.status !== 0 && 'brit not on PATH' }, () => {
+// Whether the installed brit pushes a MAPPED notes refspec (source and destination refs differ), which
+// the publisher needs (refs/notes/brit/build/* -> refs/notes/brit/devices/<did>/build/*). brit 0.3.5
+// refuses it ("notes transfers require one named ref in the form refs/notes/X:refs/notes/X"). Probed
+// against a throwaway forge; returns the refusal line when it refuses, null when it pushes.
+function mappedNotesPushRefusal() {
+  const { forge, clones: [probe] } = world('probe');
+  note(probe, '{"probe":1}');
+  const r = spawnSync('brit', ['push', forge, `${STEP_REF}:${destinationOf(STEP_REF, 'did:key:zProbe')}`],
+    { cwd: probe, encoding: 'utf8' });
+  if (r.status === 0) return null;
+  const said = `${r.stdout || ''}${r.stderr || ''}`.split('\n').find(line => /notes transfers require/.test(line));
+  return said ? said.replace(/\x1b\[[0-9;]*[A-Za-z]/g, '').trim().replace(/^.*?Error:\s*/, '') : null;
+}
+
+test('DEVICE_NOTES_PUSH=brit publishes through brit push', { skip: brit.status !== 0 && 'brit not on PATH' }, t => {
+  const refusal = mappedNotesPushRefusal();
+  if (refusal) {
+    const version = (`${brit.stdout || ''}`.match(/brit \d+\.\d+\.\d+/) || ['the installed brit'])[0];
+    t.skip(`${version} refuses a mapped notes push, which the brit publisher needs: ${refusal}`);
+    return;
+  }
   const { forge, legacy, clones: [a] } = world('shem');
   note(a, '{"n":1}');
   const r = run(a, { did: SHEM, env: { ...ENV, DEVICE_NOTES_PUSH: 'brit' } });
