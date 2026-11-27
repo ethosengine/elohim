@@ -7,7 +7,7 @@ steward: human:matthew
 author: shem session 3d494616 (Claude Fable 5.2), designing; shem session cacccb55 integrating
 serves: [private-feedback-loop, dev-system-equilibrium]
 cites:
-  - "feedback-loop-contract-plan | the plan whose FC stations are this sprint | sha256:c86fbf24763b3838 | path: genesis/docs/superpowers/plans/2026-11-27-feedback-loop-contract-plan.md"
+  - "feedback-loop-contract-plan | the plan whose FC stations are this sprint | sha256:37fd9ff8f91c8771 | path: genesis/docs/superpowers/plans/2026-11-27-feedback-loop-contract-plan.md"
   - "feedback-as-a-lifecycle-item-design | the spec the sprint takes into a contract | sha256:bb8216eb2f736464 | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
   - "one-loop-for-every-producer-design | the companion that sketches the contract and the producers it must serve | sha256:e7361b750b95dce3 | path: genesis/docs/superpowers/specs/2026-11-27-one-loop-for-every-producer-design.md"
 ---
@@ -142,3 +142,28 @@ What it shows the next stations:
 
 The table chooses nothing. FC-2 to FC-5 choose, and where a choice is the steward's it waits for
 him.
+
+### 2026-11-27, a draft declaration schema (FC-2) and the table of acts (FC-5)
+
+Who did what: Codex (astra) drafted the schema with its fixtures and check script, and separately
+read the code for the table of acts; a Claude Haiku agent opened the table's code citations; a
+Claude scribe agent wrote the table's prose; the designing session set the working rules, ran
+every check itself, corrected what the checks and the readers found, and placed the documents.
+
+FC-2. `fc2-declaration-draft.md` and `fc2/` hold a draft schema for the file a producer ships. To
+check it against real bytes the designing session built brit 0.3.10 from brit's branch at
+`a99143327`, in its own cargo slot, since no installed brit prints the declaration. The schema
+accepts that output unchanged (72 claims, no cures) and refuses twenty-four fixtures. It is a
+draft outside the SDK, and where it lives is still the steward's to decide. The integrator
+advised that a check script in a documents directory would be run by no gate, so the script is
+held back and comes as a test in the orchestrator's suite in its own batch.
+
+FC-5. `fc5-acts-and-authority.md` is the table. Its finding is that the station's condition does
+not hold today: nine of the eighteen acts that write need no named actor, and where one is needed
+the code checks only that a string was given. The designing session's own slice is one of the
+nine. Astra's first table had three citations that did not support their cell, found by the agent
+that opened them, and the scribe's prose changed the meaning of six cells, found by the designing
+session reading it against the code. All nine are corrected.
+
+Not done: no gate ran for these documents beyond the address lint on the staged tree, and the
+schema's check is not yet a test.

@@ -1,0 +1,160 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:manifest:producer-declaration-draft",
+  "title": "ProducerDeclarationDraft",
+  "description": "Draft producer release declaration for station FC-2; placement in the SDK awaits the steward ruling.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "claims",
+    "cures"
+  ],
+  "properties": {
+    "claims": {
+      "type": "array",
+      "description": "Published claim declarations, including superseded ids.",
+      "items": {
+        "$ref": "#/$defs/claim"
+      }
+    },
+    "cures": {
+      "type": "array",
+      "description": "Release declarations of handled claims; may be empty.",
+      "items": {
+        "$ref": "#/$defs/cure"
+      }
+    }
+  },
+  "$defs": {
+    "claimId": {
+      "type": "string",
+      "maxLength": 128,
+      "pattern": "^[a-z0-9-]+/[a-z0-9-]+(?::[a-z0-9.-]+)?$"
+    },
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "asserts",
+        "contradictedBy",
+        "validityHorizon",
+        "supersedes",
+        "clears",
+        "polarity",
+        "severity",
+        "weight",
+        "ceiling",
+        "retireWhen"
+      ],
+      "properties": {
+        "id": {
+          "description": "Full published claim id; ASCII grammar makes the 128-character limit exactly 128 bytes.",
+          "$ref": "#/$defs/claimId"
+        },
+        "asserts": {
+          "type": "string",
+          "description": "Sentence stating what the claim asserts."
+        },
+        "contradictedBy": {
+          "type": "string",
+          "description": "Sentence describing the observation that contradicts the claim."
+        },
+        "validityHorizon": {
+          "type": "string",
+          "description": "ISO 8601 duration before unanswered validity needs review.",
+          "pattern": "^P(?:[0-9]+(?:[.,][0-9]+)?W|(?:[0-9]+(?:[.,][0-9]+)?Y|(?:[0-9]+Y)?[0-9]+(?:[.,][0-9]+)?M|(?:[0-9]+Y)?(?:[0-9]+M)?[0-9]+(?:[.,][0-9]+)?D)|(?:[0-9]+Y)?(?:[0-9]+M)?(?:[0-9]+D)?T(?:[0-9]+(?:[.,][0-9]+)?H|(?:[0-9]+H)?[0-9]+(?:[.,][0-9]+)?M|(?:[0-9]+H)?(?:[0-9]+M)?[0-9]+(?:[.,][0-9]+)?S))$"
+        },
+        "supersedes": {
+          "type": "array",
+          "description": "Declared claim ids this claim replaces.",
+          "items": {
+            "$ref": "#/$defs/claimId"
+          }
+        },
+        "clears": {
+          "type": "array",
+          "description": "Alternative clearing conditions; any one holding is sufficient.",
+          "items": {
+            "type": "string",
+            "pattern": "^(?:observed|release-current:[^\\s]+|release-at-least:[^@\\s]+@[^@\\s]+|path:[^\\r\\n]+|bound:[^@\\s]+@[^@\\s]+)$"
+          }
+        },
+        "polarity": {
+          "type": "string",
+          "description": "Classification of the declared command or problem.",
+          "enum": [
+            "negative",
+            "positive"
+          ],
+          "$comment": "Lifecycle polarity classifies the claim, unlike the SDK observation-polarity enum which describes support or strain, so that enum is not referenced."
+        },
+        "severity": {
+          "type": "string",
+          "description": "Producer concern expressed in the six standard logging names.",
+          "enum": [
+            "trace",
+            "debug",
+            "info",
+            "warn",
+            "error",
+            "fatal"
+          ],
+          "$comment": "The six standard names of the lifecycle design (its section on severity); elohim/epr/src/algedonic.rs has three levels and the Genesis adapter three other names, so neither list is referenced."
+        },
+        "weight": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255,
+          "description": "Occurrence cost serialized by brit as u8; zero includes intentional refusals."
+        },
+        "ceiling": {
+          "type": "string",
+          "description": "Highest permitted graduation rung for a summary.",
+          "enum": [
+            "device",
+            "steward",
+            "collective",
+            "commons"
+          ],
+          "$comment": "Lifecycle graduation rungs differ from SDK reach visibility rings, so the reach enum is not referenced."
+        },
+        "retireWhen": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Quiet duration before retirement, or null for the retention-policy watch; always serialized.",
+          "pattern": "^quiet:P(?:[0-9]+(?:[.,][0-9]+)?W|(?:[0-9]+(?:[.,][0-9]+)?Y|(?:[0-9]+Y)?[0-9]+(?:[.,][0-9]+)?M|(?:[0-9]+Y)?(?:[0-9]+M)?[0-9]+(?:[.,][0-9]+)?D)|(?:[0-9]+Y)?(?:[0-9]+M)?(?:[0-9]+D)?T(?:[0-9]+(?:[.,][0-9]+)?H|(?:[0-9]+H)?[0-9]+(?:[.,][0-9]+)?M|(?:[0-9]+H)?(?:[0-9]+M)?[0-9]+(?:[.,][0-9]+)?S))$"
+        },
+        "cure": {
+          "type": "string",
+          "description": "Available action text; omitted when absent, never serialized as null."
+        }
+      }
+    },
+    "cure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "claim",
+        "cite",
+        "summary"
+      ],
+      "properties": {
+        "claim": {
+          "description": "Declared id handled by this release.",
+          "$ref": "#/$defs/claimId"
+        },
+        "cite": {
+          "type": "string",
+          "description": "Commit, landing or flow-note citation holding the root-cause analysis."
+        },
+        "summary": {
+          "type": "string",
+          "description": "Release-reviewed plain-text sentence describing the cure."
+        }
+      }
+    }
+  }
+}

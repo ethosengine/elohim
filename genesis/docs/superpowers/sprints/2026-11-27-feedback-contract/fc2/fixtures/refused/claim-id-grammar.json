@@ -1,0 +1,46 @@
+{
+  "claims": [
+    {
+      "id": "demo/old",
+      "asserts": "The operation is available.",
+      "contradictedBy": "The operation fails.",
+      "validityHorizon": "P14D",
+      "supersedes": [],
+      "clears": [],
+      "polarity": "negative",
+      "severity": "warn",
+      "weight": 1,
+      "ceiling": "device",
+      "retireWhen": null
+    },
+    {
+      "id": "Demo/bad",
+      "asserts": "The replacement succeeds.",
+      "contradictedBy": "The replacement fails.",
+      "validityHorizon": "PT1H",
+      "supersedes": [
+        "demo/old"
+      ],
+      "clears": [
+        "observed",
+        "release-current:demo",
+        "release-at-least:demo@1.0",
+        "path:/example/state",
+        "bound:health@1"
+      ],
+      "polarity": "positive",
+      "severity": "info",
+      "weight": 0,
+      "ceiling": "steward",
+      "retireWhen": "quiet:P45D",
+      "cure": "Follow the current release."
+    }
+  ],
+  "cures": [
+    {
+      "claim": "demo/old",
+      "cite": "example:release-1",
+      "summary": "The replacement handles the operation."
+    }
+  ]
+}
