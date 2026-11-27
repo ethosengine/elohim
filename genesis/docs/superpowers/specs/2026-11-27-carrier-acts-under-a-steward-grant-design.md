@@ -72,6 +72,12 @@ as typed. Everything else on this page is derivation, marked as such where it mi
   3. The residual risk (below): "Acceptable, bounded".
   4. The gate-key change in the same lane (a separate commit): "Yes, with shem's guard".
 
+- ~22:20Z, on the integrator's staging question (portal consent done properly is its own work: a presence
+  factor, a field binding the record to the grant, resolving the signer against his controllers, a node on each
+  device, an Edge roll and a brit release; option 1, make it a station and keep the supervised script until then;
+  option 2, ship the native carrier on a same-device covenant clause asked through the main conversation, the
+  residual he already accepted as bounded, and upgrade to portal consent when that station lands): "go with
+  option 2 then."
 - ~20:00Z, told that "Digest at the turn" fails twice (an agent with a shell can append and sign a forged turn,
   since the device key is a plain file of the same user, and the chain catches only rewrites; and the log is a
   standing, easily reversed record of every turn he types), he chose the offered option "Approve in the portal":
@@ -118,80 +124,81 @@ option A, with its roll, and a later ruling.
 
 ## The grant: his quoted words, traceable to the act that said them
 
-His call 1: a grant needs no act only he can perform, provided the words are traceable to his own act. So what
-the design must guarantee is that a **false quote is catchable**.
+His call 1: a grant needs no act only he can perform, provided the words are traceable to his own act. His call
+of ~22:20Z ("go with option 2 then") sets the first stage: a **same-device covenant clause asked through the main
+conversation**, with portal consent as a later upgrade (station F4-portal-consent, below).
 
-**Two records, one act (his ruling of ~19:15Z: the grant is an EPR).** The words are recorded as a covenant
-clause: `epr covenant record --kind grantsCarry --party human:matthew --quote "<his words>" --valid-until
-<RFC3339>` (covenant.rs:993-1060: quote, validity, revocation, the prior steward affirmation; the clause is a
-brit-signed note, and it stays on the recording device). The **grant itself is a native REA `Commitment`** in
-that device's flow store (epr-rea model.rs:352-371), minted by the same act:
+**Two records, one act.** The words are recorded as a covenant clause on the carrying device: `epr covenant
+record --kind grantsCarry --party human:matthew --quote "<his words>" --valid-until <RFC3339>` (covenant.rs:993-1060:
+quote, validity, revocation, the prior steward affirmation; the clause is a brit-signed note and stays on the
+device). The **grant itself is a native REA `Commitment`** in the same device's flow store (epr-rea
+model.rs:352-371), minted by the same act:
 
 | Field | Value |
 |---|---|
 | `action` | `use` (the steward lends the use of a runner's compute and standing) |
-| `provider`, `receiver` | both `human:matthew`: he lends his own device's work to his own work, so no participant slot holds a form a reader cannot parse |
+| `provider` | `human:matthew` |
+| `receiver` | the repository agent, as on every carry commitment (flow/carry.rs): the work is received by the repository's scope, and both forms are ones every reader already parses |
 | `resourceSpec.classifiedAs` | `carry-grant@1`, `runner:<did>`, `project:<name>` per covered gate (or `project:*`), `ref:<glob>` per covered branch, `words:<clause cid>` |
-| `validUntil` | the expiry, at most 24 hours ahead; `validFrom` the time it was said |
+| `validUntil` | the expiry, at most 24 hours after `validFrom`, the time it was recorded |
 | `state` | `Active`; revocation is a later record that settles it, as a released carry does |
 | `inScopeOf` | the repository scope, as every carry record |
 
-Its CID is the grant's address. A Commitment stays on the device that wrote it (the fold appends only events),
-so the grant **crosses as one signed `Affirm` event** on the Commitment, built by the landing module's one event
-builder like the carry claim (flow/carry.rs, "Two records"), carrying the Commitment's fields in its env slots.
-Every reader folds it as it folds any flow event; an older epr folds it unchanged and simply does not act on it.
-The quote does not cross (his ruling "Both, quote stays home"): only `words:<clause cid>`, the address of the
-words on the recording device. **This changes what a clause means.** A clause is honoured within its own session today
-(covenant.rs:1-5: the steward answers once per agent session, and each answer is a clause for that session).
-`grantsCarry` is honoured beyond its session: it authorises a sessionless process after the session that
-recorded it ends, until it expires or is revoked. What the grant adds:
+Its CID is the grant's address. The record binds his words **by hash only** (`words:<clause cid>`): the quote
+itself stays on the device (his ruling "Both, quote stays home").
 
-- **Provenance recorded with the quote:** the session and device that wrote it, when, and where he said it (the
-  session id and turn time, or the surface, such as a terminal command he ran himself). Recorded only from the
-  main conversation: the subagent-stamp guard refuses it from a subagent.
-- **A required, short expiry:** `--valid-until` is required for `grantsCarry` and at most 24 hours ahead, on the
-  same device as across devices (today the flag is optional; the grant kind makes it required).
-- **Renewal needs new words.** An extension is a new clause whose quote differs from every earlier
-  `grantsCarry` quote of the same party and whose turn is newer than the grant it extends; reusing the old quote
-  is refused (today `covenant record` refuses only an empty quote, covenant.rs:1005-1009). Revocation is a new
-  clause by the same route. Nothing writes a successor on its own.
-- **What crosses.** The `Affirm` event above, signed by the recording device, and on every carry claim
-  `env:grant=<commitment cid>` (an address). That is covenant-derived content leaving the device, which his
-  ruling ("Both, quote stays home") allows without the quote. No separate `env:grant-doc` and no device mirror
-  file: the carrier reads the grant from its own fold, so nothing outside the flow store can stand in for it.
+- **Where it may be recorded.** Only in the main conversation of a session on the device the grant names as its
+  runner: the covenant's own route (asked through the main conversation; the subagent-stamp guard refuses a
+  subagent), and the recording device's did must equal `runner:<did>`. A grant for another device, from a Codex
+  session, or from a bare terminal command is refused in this stage, saying why: none of them is the main
+  conversation of a session on the runner.
+- **This changes what a clause means.** A clause is honoured within its own session today (covenant.rs:1-5: the
+  steward answers once per agent session, and each answer is a clause for that session). `grantsCarry` is
+  honoured beyond its session: it authorises a sessionless process after the session that recorded it ends,
+  until it expires or is revoked (his ruling "Both, quote stays home" allows this).
+- **Expiry.** `--valid-until` is required for `grantsCarry` and at most 24 hours ahead. Every reader (carrier,
+  lander, `carry show`) also refuses a grant whose `validUntil` is more than 24 hours after its `validFrom`,
+  whoever wrote it (the reader-side check, slice 3).
+- **Renewal needs new words.** An extension is a new clause whose quote differs from every earlier `grantsCarry`
+  clause of the same party on that device, checked against those clauses only (there is no turn log); reusing an
+  old quote is refused (today `covenant record` refuses only an empty quote, covenant.rs:1005-1009). Revocation is
+  a new clause by the same route. Nothing writes a successor on its own.
+- **How it crosses.** A Commitment stays on the device that wrote it, so the grant crosses as one signed `Cite`
+  event on the Commitment, a new kind `grant` under `dev-landing@1` built by the landing module's one event builder
+  as the carry claim is (flow/carry.rs, "Two records"), with the Commitment's fields in its env slots, and carry
+  claims carry `env:grant=<commitment cid>`. The kind joins `KINDS` (flow/intend.rs) and the policy's
+  `berth.channel.crosses` entry. To verify in slice 1: that an older epr's reader ignores a kind it does not
+  know rather than refusing the event.
+- **Addresses.** `words:<clause cid>` is the CID of the clause body without its signature, so re-signing a
+  clause does not move it (to verify against brit's note layout in slice 1); and that `brit covenant list`
+  reads clauses across sessions, which the new-words rule needs.
 
-**The portal witness** (slice 1; his ruling of ~20:00Z, "Approve in the portal").
-
-His words are still recorded, as the covenant clause above, but what proves he granted it is an act of his own
-on a surface no agent on the device drives: an approval in the consent portal, through the ceremony
-`crates/consent-grant` already runs for device enrollment (`ceremony`: the asking side sends a request, a portal
-where his controller is signed in shows a consent screen, his controller cell signs, and a single-use code bound
-to the asker by PKCE comes back; `ConsentRecord` is content-addressed and can be shown to anyone).
-
-- *The ask.* Recording a grant sends a request naming one new act, `carry.grant`, with what the screen must
-  show: the runner device, the covered projects and branches, the expiry, and the quoted words. He may agree to
-  less than was asked (the crate's rule), never more.
-- *The witness.* The returned `ConsentRecord` (asked acts, agreed acts, his identity root, the device) is the
-  grant's witness. Its CID is added to the Commitment as `consent:<cid>`, and the crossing `Affirm` event carries
-  it, so a sibling or a lander verifies the controller cell's signature over the record, not the device key.
-- *What this changes in the crate.* Its acts are recognition today ("Both acts here are recognition ... Neither
-  says what the device may do to any content", act.rs:8-9; "It grants no authority over any content",
-  lib.rs:33-34). `carry.grant` is the first act of authority, so the crate's stated boundary moves: listed for
-  him below, and the module documentation changes with it.
-- *Surfaces.* Any session on any runtime may ask, Codex and a terminal command included, because the witness is
-  his portal approval, not the session. No log of his turns is kept, nothing reads conversation text, and his
-  turn count and timing do not cross.
-- *Residual.* An agent that can drive the browser in which his controller is signed in (a browser-automation tool
-  in his own session) could approve for him. The portal therefore asks for a fresh confirmation on the consent
-  screen (the crate's witness beat) and the grant records which portal approved it.
+**The residual of this stage, accepted by the steward.** Nothing witnesses that he said the quoted words: a
+session that types a quote he did not say writes a grant that verifies. The false grant is not caught; it is
+**attributable**: the clause names the session that recorded it and that session's claim, so asking that device
+which session wrote it, and reading that session's own records, traces the lie to its writer. His rulings accept
+this for now ("quoted words suffice, because as long as the words are traceable.. there's a chain of
+acconutability.. back to my own act"; the residual "Acceptable, bounded"; "go with option 2 then"). Station
+F4-portal-consent removes it.
 
 **Who audits the grant, and when.** The verifier is one read, `epr flow carry verify-grant <cid>`, run (1) by the
-answering session before the first claim under a grant and (2) by the lander before it reuses a carried verdict,
-on any device: it checks the `ConsentRecord`'s controller signature and its agreed acts against the
-Commitment's coverage and expiry. A grant with no valid consent record carries nothing; a grant whose consent
-record does not match it (wider coverage, longer expiry, another runner) is a false grant held against the
-session that wrote it: the verifier emits `carry-grant-unverified@1` naming that session, captures feedback
-naming the steward, and voids the grant with a revocation.
+answering session before the first claim under a grant and (2) by the lander before it reuses a carried verdict.
+On the recording device it checks that the clause exists in the covenant notes, is signed, names the steward,
+was recorded in a main conversation on this device, and matches the Commitment (runner, coverage, expiry); a
+lander elsewhere checks the `Cite` event's signature, the recording device's standing for the steward, the expiry
+and the coverage. A grant that fails is carried under by nobody: the verifier emits `carry-grant-unverified@1`
+naming the session that recorded it, captures feedback naming the steward, and voids the grant with a revocation.
+
+**Station F4-portal-consent (the upgrade, its own work).** A grant is then witnessed by his approval in the
+consent portal (`crates/consent-grant`'s ceremony), which needs, per the integrator's sixth read: a presence factor
+only he can give for the `carry.grant` act (a passkey, or a secret re-entered with no echo), and refusing
+`epr device approve --yes` for it (approver.rs:46 lets any shell on a signed-in device approve today); a field the
+`ConsentRecord`'s address covers that holds the Commitment's CID or body hash (optional, so existing record CIDs
+hold); resolving the signer against his identity's controllers (a DHT read, or a controller set the roster pins),
+since a signature alone proves only the key (verify.rs); a node that approves for the real steward on each device
+(the household mesh's matthew is a fixture); the Edge roll that `crates/consent-grant/**` selects, with every
+portal upgraded before the new act is asked (an older node refuses an unknown act); and a brit release. It also
+moves the crate's boundary from recognition to authority (act.rs:8-9; lib.rs:33-34).
 
 ## The record a carry act leaves, and the trace
 
@@ -233,6 +240,14 @@ authority, from files only (the session envelope and claim, the roster, and the 
 and without the store lock. It is the existing resolver extended, not a second one beside it. A read that
 cannot resolve refuses the ACT (the carrier does not carry), not the record of a problem: capture stores an
 unresolved one as "no participant" within its 2 s, so a tool's report of a problem is not lost.
+
+The same gap already exists in a landed store: of the eighteen `epr feedback` write acts, nine take no named actor
+(capture, ingest-genesis, record, drain-spool, link, repair, reclaim, migrate, qualify), an ordinary append can
+start a reclaim with no actor named (generation.rs:437-440), and where `--as` is required the check is only that
+it is non-empty (mod.rs:285-290): nothing under the feedback code calls `parse_acting_participant` (actor.rs:321),
+so `service:jenkins` passes as an author (the feedback lane's acts table,
+`genesis/docs/superpowers/sprints/2026-11-27-feedback-contract/fc5-acts-and-authority.md`, confirmed by an
+independent reader). It is cited here, not fixed here.
 
 ## The carry-watch, its isolation, and which commits it may run
 
@@ -317,22 +332,20 @@ gate-grade.mjs:14-20 already counts sponsored results zero. Wiring it is its own
 
 ## Open for the steward
 
-- **`carry.grant` moves the consent crate's boundary** from recognition to authority (above).
-- **The browser residual:** an agent able to drive the browser where his controller is signed in could approve.
-
-Ruled at ~18:40Z and no longer open: the quote check (digest at the turn, replaced at ~20:00Z by the portal witness), the signed digest crossing without
-the quote, and a grant outliving its session. Still to verify in slice 1: that `brit covenant list` reads
-clauses across sessions, which the new-words rule needs.
+Ruled and no longer open: a grant outliving its session and its signed summary crossing without the quote
+("Both, quote stays home", ~18:40Z); no log of his turns ("Approve in the portal", ~20:00Z, which also retired the
+turn digest); the first stage being a same-device clause, portal consent its own station ("go with option 2 then",
+~22:20Z). A grant said on one device for another is not possible in this stage.
 
 - **The first carrier ships with condition 4 unmet:** nothing observes a carry exceeding its declared limits
   (above). Whether to ship it before station F4-limits-answerable lands is his call.
-- Whether cross-device recording (a grant said on one device for another) stands. With the portal witness any
-  device can verify the grant, so the earlier reason against it is gone.
 - The liveness standard: the 120-second acknowledgement bound, and whether a live follow without an
   acknowledgement is enough.
 - The runner-spawned accountability above: whether a child workload's grant-forwarding is the shape he means
   by "epr-service compliant". A named follow-on, not in these slices.
 - Whether a granted Jenkins result should ever count toward sufficiency.
+- For station F4-portal-consent, when it starts: the consent crate's boundary moving from recognition to
+  authority, and the residual of an agent that drives the browser where his controller is signed in.
 
 ## Known gaps in slice 2, from its review
 
@@ -347,14 +360,16 @@ Change-Id.
 
 ## Story first, then slices, and what rolls
 
-Slice 0 is the scenario, before any code: `genesis/a2o/features/devflow/carry-under-steward-grant.feature` (it
-does not exist yet), through the blind-reader loop. Its scenarios: the graduation trigger above; a carry
-declined with no acknowledged answering session; a miss declined at each of steps 2, 4 and 5; and a grant whose
-quote is not found being voided. Then, each its own commit: (1) the attribution case, the grant kind with its
-required expiry, new-words renewal, the grant Commitment and its signed `Affirm` event, the `carry.grant` consent act and portal witness, and `carry verify-grant`; (2)
-the lander's intent, the yields and the lander's grant check; (3) carry-watch under the supervisor with steps
+Slice 0 is the scenario, before any code: `genesis/a2o/features/devflow/carry-under-steward-grant.feature`,
+through the blind-reader loop. Its scenarios: the graduation trigger above; a carry declined with no acknowledged
+answering session; a miss declined at each of steps 2, 4 and 5; a grant recorded outside the runner's main
+conversation refused; and a grant that does not verify voided and traced to the session that wrote it. Then, each
+its own commit: (1) the attribution case, the `grantsCarry` clause kind with its required expiry and new-words
+renewal, the grant Commitment and its signed `Cite` event of kind `grant`, and `carry verify-grant`; (2) the
+lander's intent and the yields (landed as 59725bf2c), and the lander's grant check; (3) carry-watch under the supervisor with steps
 1-6, the grant-held cargo lease, the acknowledged answering agent and the three measures with their registry
 declarations and headline slot, together, so no carrier ships without an answering agent; (4) carry show; (5)
 the `carrier@<device>` berth address. device-runtime/** is an Edge watch glob (holochain build-manifest.json:126),
 so slices that touch it ride an authorised roll bundle; epr-cli is the eprfs gate; berth is agentic tools;
-epr-rea is untouched.
+epr-rea is untouched. A new clause kind may need a brit release and pin move, if brit's covenant notes validate
+kinds (the integrator's reading; to confirm in slice 1). Station F4-portal-consent rolls the fleet on its own.
