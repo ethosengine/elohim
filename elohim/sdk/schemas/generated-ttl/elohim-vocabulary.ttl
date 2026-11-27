@@ -2148,9 +2148,9 @@
 
 <epr:schema:enum:reach-reason> a skos:ConceptScheme ;
   skos:prefLabel "ReachReason" ;
-  dct:description "Why a tier refused to serve an object under a root (interfaces spec §A.3). To a requester outside reach, a missing object and a private one get the same refusal, naming the requester's missing standing and not the object (spec §12.3 rule 2). `not-under-root` is said only for a path proved absent in a held node; `no-record` means the tier holds no reach record for the root and refused rather than fetching one; there is no admit-on-error path. Source of truth: this schema; Rust mirror `eprfs_core::ReachReason` (eprfs-core/src/reach.rs, kebab-case serde). Not named in §2.G's enum list; added because objects/item-absence's `refused.refusal.reason` needs a referenced vocabulary (CONVENTIONS rule 7). Carries neither `_dna` nor `_codegen`: it is a field vocabulary for the placement wire schemas, generated only as a TypeScript union where those schemas inline it, and adds no constant to schema-enums.ts. Not yet pinned: no test holds the Rust enum equal to this list (follow-on: a case in a test crate that depends on eprfs-core, such as eprfs-serve's tests)." ;
+  dct:description "Why a tier refused to serve an object under a root (interfaces spec §A.3). To a requester outside reach, a missing object and a private one get the same refusal, naming the requester's missing standing and not the object (spec §12.3 rule 2). `not-under-root` is said only for a path proved absent in a held node; `no-record` means the tier holds no reach record for the root and refused rather than fetching one; `index-warming` means the serving daemon has not completed its first artifact-index rebuild, so absence is not established yet; there is no admit-on-error path. Source of truth: this schema; Rust mirror `eprfs_core::ReachReason` (eprfs-core/src/reach.rs, kebab-case serde), pinned in eprfs-core's schema_contract test. Not named in §2.G's enum list; added because objects/item-absence's `refused.refusal.reason` needs a referenced vocabulary (CONVENTIONS rule 7). Carries neither `_dna` nor `_codegen`: it is a field vocabulary for the placement wire schemas, generated only as a TypeScript union where those schemas inline it, and adds no constant to schema-enums.ts." ;
   <epr:vocab#ordered> false ;
-  skos:hasTopConcept <epr:schema:enum:reach-reason#outside-standing>, <epr:schema:enum:reach-reason#no-record>, <epr:schema:enum:reach-reason#not-under-root>, <epr:schema:enum:reach-reason#identity-required>, <epr:schema:enum:reach-reason#authorizer-unavailable> .
+  skos:hasTopConcept <epr:schema:enum:reach-reason#outside-standing>, <epr:schema:enum:reach-reason#no-record>, <epr:schema:enum:reach-reason#index-warming>, <epr:schema:enum:reach-reason#not-under-root>, <epr:schema:enum:reach-reason#identity-required>, <epr:schema:enum:reach-reason#authorizer-unavailable> .
 
 <epr:schema:enum:reach-reason#outside-standing> a skos:Concept ;
   skos:inScheme <epr:schema:enum:reach-reason> ;
@@ -2161,6 +2161,11 @@
   skos:inScheme <epr:schema:enum:reach-reason> ;
   skos:prefLabel "no-record" ;
   skos:notation "no-record" .
+
+<epr:schema:enum:reach-reason#index-warming> a skos:Concept ;
+  skos:inScheme <epr:schema:enum:reach-reason> ;
+  skos:prefLabel "index-warming" ;
+  skos:notation "index-warming" .
 
 <epr:schema:enum:reach-reason#not-under-root> a skos:Concept ;
   skos:inScheme <epr:schema:enum:reach-reason> ;
@@ -2698,4 +2703,4 @@
   <epr:vocab#orthogonalTo> "retention (the temporal half of the same disclosure gradient — not yet carded)" ;
   <epr:vocab#verdictClosure> "closed" .
 
-# 65 vocabularies · 449 concepts · 2 axes
+# 65 vocabularies · 450 concepts · 2 axes
