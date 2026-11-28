@@ -537,8 +537,12 @@ each hold a grant can both claim one miss is not established (above, "Three case
    enabling jenkins to build incremental gate coverage.. that allows a developer to shorten their own gats, one
    module at a time or something, ideally that grant should enable incremnetal feedback (ie incremental gate
    coverage)". So the ruling's purpose, in his words, is offloading for a thin client and incremental gate
-   coverage that lets a workspace shorten its own push ladder, with lvi (gates run on a remote machine on the
-   thin client's behalf) named as the bigger unlock. The follow-on is to be asked with that purpose in view, not
+   coverage that lets a workspace shorten its own push ladder, with lvi named as the bigger unlock. He then
+   clarified what lvi means here, as typed: "lvi, gates run on a remote machine for the thin client, as the
+   bigger unlock.. is about the ecilpse-che like analogue over our p2p-dataplanes (ie.. replacing k8s) for this
+   kind of developer workspace." So lvi is the developer workspace itself served over the p2p dataplanes, an
+   Eclipse Che analogue that replaces k8s, in which a thin client's gates run on the machine that hosts its
+   workspace. The follow-on is to be asked with that purpose in view, not
    built from the option label.
 7. **When station F4-portal-consent starts.** Asked: "Carrier decision 7: when should the portal-consent station
    start? It replaces quoted words with your own approval in the consent portal, and rolls the fleet." Offered:
