@@ -555,7 +555,7 @@
       "differentCure": true
     },
     "expect": "cure-available",
-    "because": "R12 (D5), R18: Aggregates and counter-evidence against the current cure permit moving to a different present cure."
+    "because": "R12, R5, R18: Aggregates and counter-evidence against the current cure permit moving to a different present cure."
   },
   {
     "name": "condition-reopening-ended-by-release",
@@ -569,7 +569,7 @@
       "curedAgain": true
     },
     "expect": "cure-available",
-    "because": "R10 (D4), R12 (D5): A release cure ends the condition reopening and enables moving aggregates."
+    "because": "R10, R12, R5: A release cure ends the condition reopening and enables moving aggregates."
   },
   {
     "name": "aggregate-branch-same-cure",
@@ -583,7 +583,7 @@
       "curedAgain": true
     },
     "expect": "open",
-    "because": "R12 (D5), R16: The counted-against current cure cannot supply the aggregate branch itself."
+    "because": "R12, R5, R16: The counted-against current cure cannot supply the aggregate branch itself."
   },
   {
     "name": "aggregate-branch-not-counted-against",
@@ -597,7 +597,7 @@
       "curedAgain": true
     },
     "expect": "on-watch",
-    "because": "R12 (D5), R13: A different cure alone does not move an unchallenged watch."
+    "because": "R12, R5, R13: A different cure alone does not move an unchallenged watch."
   },
   {
     "name": "aggregate-branch-no-present-cure",
@@ -611,7 +611,7 @@
       "curedAgain": true
     },
     "expect": "open",
-    "because": "R12 (D5), R16: Aggregates cannot move without a present cure."
+    "because": "R12, R5, R16: Aggregates cannot move without a present cure."
   },
   {
     "name": "aggregate-branch-note-only",
@@ -626,7 +626,7 @@
       "note": true
     },
     "expect": "open",
-    "because": "R12 (D5), R14, R16: An invalidated note alone cannot move to the new cure."
+    "because": "R12, R5, R14, R16: An invalidated note alone cannot move to the new cure."
   },
   {
     "name": "aggregate-branch-kept-only",
@@ -640,7 +640,7 @@
       "curedAgain": true
     },
     "expect": "open",
-    "because": "R12 (D5), R16: Kept records supply neither covered records nor aggregates."
+    "because": "R12, R5, R16: Kept records supply neither covered records nor aggregates."
   },
   {
     "name": "aggregate-branch-still-reopened",
@@ -654,7 +654,7 @@
       "curedAgain": false
     },
     "expect": "reopened",
-    "because": "R10 (D4), R12 (D5): Reopening takes precedence."
+    "because": "R10, R12, R5: Reopening takes precedence."
   },
   {
     "name": "aggregate-branch-still-lagging",
@@ -669,7 +669,7 @@
       "pinLag": true
     },
     "expect": "stale-emitter",
-    "because": "R11, R12 (D5): Pin lag takes precedence."
+    "because": "R11, R12, R5: Pin lag takes precedence."
   },
   {
     "name": "kept-report-blocks-aggregate-transfer",
@@ -684,7 +684,7 @@
       "keptReportBlocksMove": true
     },
     "expect": "open",
-    "because": "R12 (D5): Pending decision 10 blocks D5 while the report stands."
+    "because": "R12, R5: Pending decision 10 blocks the R12, R5 transfer while the report stands."
   },
   {
     "name": "machine-may-close-aggregate-transfer",
@@ -699,7 +699,7 @@
       "keptReportBlocksMove": false
     },
     "expect": "cure-available",
-    "because": "R12 (D5): The alternative posture permits D5."
+    "because": "R12, R5: The alternative posture permits the R12, R5 transfer."
   },
   {
     "name": "kept-report-does-not-block-covered-branch",
@@ -715,6 +715,6 @@
       "coveredRecords": true
     },
     "expect": "cure-available",
-    "because": "R12 (D5): The covered-record branch remains available."
+    "because": "R12, R5: The covered-record branch remains available."
   }
 ]

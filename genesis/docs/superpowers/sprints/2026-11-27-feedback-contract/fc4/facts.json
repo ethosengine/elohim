@@ -2,20 +2,20 @@
   "$comment": "R9–R18: exactly the boolean vocabulary consumed by read(); absent facts are false.",
   "facts": {
     "failed": "R9: At least one observation did not pass.",
-    "coveredRecords": "R1, R5, R12: At least one covered session record remains.",
+    "coveredRecords": "R1, R5, R12: At least one covered record remains, at most one per failing session. Every kept failure adds a separate record without replacing a covered record, even after compaction; compaction never touches kept records.",
     "curePresent": "R4, R12, R18: The latest entry by SemVer precedence in the head declaration is cured; its release identifies the cure even if never taken. Otherwise only a holding condition supplies a cure. Entries later than the head they arrive with are ignored.",
-    "aggregates": "R2, R5 and R12 (D5), R13: The device holds at least one aggregate; retire on cure-available moves existing aggregates to the present cure without moving notes.",
-    "retireMet": "R6, R5 (D5), R14: Aggregates exist and every named participant passed in a session later than the retire that made the present cure current, followed by a quiet watch; unnamed aggregates cannot qualify.",
+    "aggregates": "R2, R5 and R12, R5, R13: The device holds at least one aggregate; retire on cure-available moves existing aggregates to the present cure without moving notes.",
+    "retireMet": "R6, R5, R12, R14: Aggregates exist and every named participant passed in a session later than the retire that made the present cure current, followed by a quiet watch; unnamed aggregates cannot qualify.",
     "note": "R3, R14: A note is held for the current cure, selected by the latest compaction or ruling.",
-    "recurred": "R10 (D4), R18: A failure counts against the latest cured entry at or before its emitter in the head declaration. Only if none qualifies, it counts against a condition cure compacted before the observation. A withdrawal counts against its preceding cured entry for a unit whose current cure that is.",
-    "curedAgain": "R10 (D4), R18: Every counted-against release has a later cured entry in the head declaration (withdrawn is insufficient); every counted-against condition has a holding edge after the observation OR a release cure is present.",
+    "recurred": "R10, R18: A failure counts against the latest cured entry at or before its emitter in the head declaration. Only if none qualifies, the model counts it against every condition cure compacted before the observation. A withdrawal counts against its preceding cured entry for a unit whose current cure that is.",
+    "curedAgain": "R10, R18: Every counted-against release has a later cured entry in the head declaration (withdrawn is insufficient); every counted-against condition has a holding edge after the observation OR a release cure is present.",
     "pinLag": "R11: The newest failure came from a release behind the head, after that head landed.",
     "laterHead": "R11: A later observation than the newest failure came from the head release.",
     "unknownRelease": "R15: The unit emitter is not a known release.",
     "horizonNoCure": "R15: The known emitter has passed its validity horizon with no cure present; excludes unknownRelease.",
     "superseded": "R15: A declared claim names this claim in supersedes.",
     "currentCureCountedAgainst": "R10, R13, R14, R18: Observation or declared withdrawal counter-evidence counts against the current cure, even if a later entry cures again.",
-    "differentCure": "R12 (D5): A cure is present and its identity differs from the current cure.",
-    "keptReportBlocksMove": "R12 (D5), pending decision 10: The posture holds claims open and a kept session record has an observation counted against the current cure; this blocks only the aggregate-transfer branch."
+    "differentCure": "R12, R5: A cure is present and its identity differs from the current cure.",
+    "keptReportBlocksMove": "R12, R5, pending decision 10: The posture holds claims open and a kept record’s own observation counted against the current cure; sharing a session with counter-evidence is insufficient. This blocks only the aggregate-transfer branch."
   }
 }

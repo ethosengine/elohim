@@ -342,7 +342,7 @@
         },
         "reading": "open",
         "state": "open",
-        "rule": "R12 (D5), R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
+        "rule": "R12, R5, R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
       },
       {
         "event": {
@@ -350,7 +350,7 @@
         },
         "reading": "open",
         "state": "open",
-        "rule": "R12 (D5), R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
+        "rule": "R12, R5, R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
       },
       {
         "event": {
@@ -360,7 +360,7 @@
         },
         "reading": "open",
         "state": "open",
-        "rule": "R12 (D5), R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
+        "rule": "R12, R5, R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
       },
       {
         "event": {
@@ -368,7 +368,7 @@
         },
         "reading": "open",
         "state": "open",
-        "rule": "R12 (D5), R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
+        "rule": "R12, R5, R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
       },
       {
         "event": {
@@ -376,7 +376,7 @@
         },
         "reading": "open",
         "state": "open",
-        "rule": "R12 (D5), R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
+        "rule": "R12, R5, R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
       }
     ]
   },
@@ -2269,7 +2269,7 @@
         },
         "reading": "open",
         "state": "open",
-        "rule": "R12 (D5), R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
+        "rule": "R12, R5, R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
       },
       {
         "event": {
@@ -2277,7 +2277,7 @@
         },
         "reading": "open",
         "state": "open",
-        "rule": "R12 (D5), R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
+        "rule": "R12, R5, R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
       },
       {
         "event": {
@@ -2287,7 +2287,7 @@
         },
         "reading": "open",
         "state": "open",
-        "rule": "R12 (D5), R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
+        "rule": "R12, R5, R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
       },
       {
         "event": {
@@ -2295,7 +2295,7 @@
         },
         "reading": "open",
         "state": "open",
-        "rule": "R12 (D5), R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
+        "rule": "R12, R5, R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
       },
       {
         "event": {
@@ -2303,7 +2303,7 @@
         },
         "reading": "open",
         "state": "open",
-        "rule": "R12 (D5), R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
+        "rule": "R12, R5, R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
       }
     ],
     "about": " Pending decision 10 (section 16): with a person's report standing, the claim stays open."
@@ -2786,7 +2786,7 @@
         },
         "reading": "open",
         "state": "open",
-        "rule": "R12 (D5), R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
+        "rule": "R12, R5, R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
       },
       {
         "event": {
@@ -2796,7 +2796,7 @@
         },
         "reading": "open",
         "state": "open",
-        "rule": "R12 (D5), R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
+        "rule": "R12, R5, R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
       },
       {
         "event": {
@@ -2804,7 +2804,7 @@
         },
         "reading": "open",
         "state": "open",
-        "rule": "R12 (D5), R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
+        "rule": "R12, R5, R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
       },
       {
         "event": {
@@ -2812,7 +2812,7 @@
         },
         "reading": "open",
         "state": "open",
-        "rule": "R12 (D5), R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
+        "rule": "R12, R5, R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
       },
       {
         "event": {
@@ -2822,7 +2822,7 @@
         },
         "reading": "open",
         "state": "open",
-        "rule": "R12 (D5), R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
+        "rule": "R12, R5, R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
       },
       {
         "event": {
@@ -2830,7 +2830,7 @@
         },
         "reading": "open",
         "state": "open",
-        "rule": "R12 (D5), R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
+        "rule": "R12, R5, R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
       },
       {
         "event": {
@@ -2838,7 +2838,7 @@
         },
         "reading": "open",
         "state": "open",
-        "rule": "R12 (D5), R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
+        "rule": "R12, R5, R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
       }
     ],
     "about": " Pending decision 10 (section 16): with a person's report standing, the claim stays open."
@@ -3283,7 +3283,8 @@
             {
               "session": 1,
               "kind": "kept",
-              "participant": "p"
+              "participant": "p",
+              "at": 1
             }
           ],
           "aggregates": [
@@ -3571,7 +3572,7 @@
         },
         "reading": "open",
         "state": "open",
-        "rule": "R4, R5, R10, R13, R17 (D1): The release cure takes precedence; compaction selects it."
+        "rule": "R4, R5, R10, R13, R17 (R4): The release cure takes precedence; compaction selects it."
       },
       {
         "event": {
@@ -3581,7 +3582,7 @@
         },
         "reading": "cure-available",
         "state": "open",
-        "rule": "R4, R5, R10, R13, R17 (D1): The release cure takes precedence; compaction selects it."
+        "rule": "R4, R5, R10, R13, R17 (R4): The release cure takes precedence; compaction selects it."
       },
       {
         "event": {
@@ -3596,7 +3597,7 @@
         },
         "reading": "cure-available",
         "state": "open",
-        "rule": "R4, R5, R10, R13, R17 (D1): The release cure takes precedence; compaction selects it."
+        "rule": "R4, R5, R10, R13, R17 (R4): The release cure takes precedence; compaction selects it."
       },
       {
         "event": {
@@ -3604,7 +3605,7 @@
         },
         "reading": "on-watch",
         "state": "cured",
-        "rule": "R4, R5, R10, R13, R17 (D1): The release cure takes precedence; compaction selects it.",
+        "rule": "R4, R5, R10, R13, R17 (R4): The release cure takes precedence; compaction selects it.",
         "stock": {
           "current": "release:1"
         }
@@ -3617,7 +3618,7 @@
         },
         "reading": "on-watch",
         "state": "cured",
-        "rule": "R4, R5, R10, R13, R17 (D1): The release cure takes precedence; compaction selects it."
+        "rule": "R4, R5, R10, R13, R17 (R4): The release cure takes precedence; compaction selects it."
       },
       {
         "event": {
@@ -3629,7 +3630,7 @@
         },
         "reading": "reopened",
         "state": "reopened",
-        "rule": "R4, R5, R10, R13, R17 (D1): The release cure takes precedence; compaction selects it."
+        "rule": "R4, R5, R10, R13, R17 (R4): The release cure takes precedence; compaction selects it."
       },
       {
         "event": {
@@ -3648,7 +3649,7 @@
         },
         "reading": "cure-available",
         "state": "open",
-        "rule": "R4, R5, R10, R13, R17 (D1): The release cure takes precedence; compaction selects it."
+        "rule": "R4, R5, R10, R13, R17 (R4): The release cure takes precedence; compaction selects it."
       },
       {
         "event": {
@@ -3656,7 +3657,7 @@
         },
         "reading": "on-watch",
         "state": "cured",
-        "rule": "R4, R5, R10, R13, R17 (D1): The release cure takes precedence; compaction selects it.",
+        "rule": "R4, R5, R10, R13, R17 (R4): The release cure takes precedence; compaction selects it.",
         "stock": {
           "current": "release:2"
         }
@@ -3718,7 +3719,7 @@
         },
         "reading": "open",
         "state": "open",
-        "rule": "R10, R13, R14, R17 (D2): The older cure was cured again and is not current."
+        "rule": "R10, R13, R14, R17 (R13, R14): The older cure was cured again and is not current."
       },
       {
         "event": {
@@ -3733,7 +3734,7 @@
         },
         "reading": "cure-available",
         "state": "open",
-        "rule": "R10, R13, R14, R17 (D2): The older cure was cured again and is not current."
+        "rule": "R10, R13, R14, R17 (R13, R14): The older cure was cured again and is not current."
       },
       {
         "event": {
@@ -3752,7 +3753,7 @@
         },
         "reading": "cure-available",
         "state": "open",
-        "rule": "R10, R13, R14, R17 (D2): The older cure was cured again and is not current."
+        "rule": "R10, R13, R14, R17 (R13, R14): The older cure was cured again and is not current."
       },
       {
         "event": {
@@ -3760,7 +3761,7 @@
         },
         "reading": "on-watch",
         "state": "cured",
-        "rule": "R10, R13, R14, R17 (D2): The older cure was cured again and is not current.",
+        "rule": "R10, R13, R14, R17 (R13, R14): The older cure was cured again and is not current.",
         "stock": {
           "current": "release:2"
         }
@@ -3775,7 +3776,7 @@
         },
         "reading": "on-watch",
         "state": "cured",
-        "rule": "R10, R13, R14, R17 (D2): The older cure was cured again and is not current."
+        "rule": "R10, R13, R14, R17 (R13, R14): The older cure was cured again and is not current."
       }
     ]
   },
@@ -3971,7 +3972,7 @@
   },
   {
     "name": "withdrawn-during-watch",
-    "about": "R18, R5 and R12 (D5): Withdrawal reopens the current cure; release 3 permits aggregate transfer and a fresh watch, ending in its own note.",
+    "about": "R18, R5 and R12, R5: Withdrawal reopens the current cure; release 3 permits aggregate transfer and a fresh watch, ending in its own note.",
     "steps": [
       {
         "event": {
@@ -4048,7 +4049,7 @@
         },
         "reading": "cure-available",
         "state": "open",
-        "rule": "R5, R12 (D5), R6, R10, R13, R14, R18: The new cure permits aggregate transfer; its watch requires a pass in a session after the selecting retire. Earlier notes remain with their own cure."
+        "rule": "R5, R12, R5, R6, R10, R13, R14, R18: The new cure permits aggregate transfer; its watch requires a pass in a session after the selecting retire. Earlier notes remain with their own cure."
       },
       {
         "event": {
@@ -4056,7 +4057,7 @@
         },
         "reading": "on-watch",
         "state": "cured",
-        "rule": "R5, R12 (D5), R6, R10, R13, R14, R18: The new cure permits aggregate transfer; its watch requires a pass in a session after the selecting retire. Earlier notes remain with their own cure."
+        "rule": "R5, R12, R5, R6, R10, R13, R14, R18: The new cure permits aggregate transfer; its watch requires a pass in a session after the selecting retire. Earlier notes remain with their own cure."
       },
       {
         "event": {
@@ -4065,7 +4066,7 @@
         },
         "reading": "on-watch",
         "state": "cured",
-        "rule": "R5, R12 (D5), R6, R10, R13, R14, R18: The new cure permits aggregate transfer; its watch requires a pass in a session after the selecting retire. Earlier notes remain with their own cure."
+        "rule": "R5, R12, R5, R6, R10, R13, R14, R18: The new cure permits aggregate transfer; its watch requires a pass in a session after the selecting retire. Earlier notes remain with their own cure."
       },
       {
         "event": {
@@ -4073,7 +4074,7 @@
         },
         "reading": "retired",
         "state": "cured",
-        "rule": "R5, R12 (D5), R6, R10, R13, R14, R18: The new cure permits aggregate transfer; its watch requires a pass in a session after the selecting retire. Earlier notes remain with their own cure."
+        "rule": "R5, R12, R5, R6, R10, R13, R14, R18: The new cure permits aggregate transfer; its watch requires a pass in a session after the selecting retire. Earlier notes remain with their own cure."
       },
       {
         "event": {
@@ -4081,7 +4082,7 @@
         },
         "reading": "retired",
         "state": "retired",
-        "rule": "R5, R12 (D5), R6, R10, R13, R14, R18: The new cure permits aggregate transfer; its watch requires a pass in a session after the selecting retire. Earlier notes remain with their own cure.",
+        "rule": "R5, R12, R5, R6, R10, R13, R14, R18: The new cure permits aggregate transfer; its watch requires a pass in a session after the selecting retire. Earlier notes remain with their own cure.",
         "stock": {
           "current": "release:3",
           "notes": [
@@ -4096,7 +4097,7 @@
   },
   {
     "name": "withdrawn-after-note",
-    "about": "R18, R5 and R12 (D5): Withdrawal reopens the current cure; release 3 permits aggregate transfer and a fresh watch, ending in its own note.",
+    "about": "R18, R5 and R12, R5: Withdrawal reopens the current cure; release 3 permits aggregate transfer and a fresh watch, ending in its own note.",
     "steps": [
       {
         "event": {
@@ -4198,7 +4199,7 @@
         },
         "reading": "cure-available",
         "state": "open",
-        "rule": "R5, R12 (D5), R6, R10, R13, R14, R18: The new cure permits aggregate transfer; its watch requires a pass in a session after the selecting retire. Earlier notes remain with their own cure."
+        "rule": "R5, R12, R5, R6, R10, R13, R14, R18: The new cure permits aggregate transfer; its watch requires a pass in a session after the selecting retire. Earlier notes remain with their own cure."
       },
       {
         "event": {
@@ -4206,7 +4207,7 @@
         },
         "reading": "on-watch",
         "state": "cured",
-        "rule": "R5, R12 (D5), R6, R10, R13, R14, R18: The new cure permits aggregate transfer; its watch requires a pass in a session after the selecting retire. Earlier notes remain with their own cure."
+        "rule": "R5, R12, R5, R6, R10, R13, R14, R18: The new cure permits aggregate transfer; its watch requires a pass in a session after the selecting retire. Earlier notes remain with their own cure."
       },
       {
         "event": {
@@ -4215,7 +4216,7 @@
         },
         "reading": "on-watch",
         "state": "cured",
-        "rule": "R5, R12 (D5), R6, R10, R13, R14, R18: The new cure permits aggregate transfer; its watch requires a pass in a session after the selecting retire. Earlier notes remain with their own cure."
+        "rule": "R5, R12, R5, R6, R10, R13, R14, R18: The new cure permits aggregate transfer; its watch requires a pass in a session after the selecting retire. Earlier notes remain with their own cure."
       },
       {
         "event": {
@@ -4223,7 +4224,7 @@
         },
         "reading": "retired",
         "state": "cured",
-        "rule": "R5, R12 (D5), R6, R10, R13, R14, R18: The new cure permits aggregate transfer; its watch requires a pass in a session after the selecting retire. Earlier notes remain with their own cure."
+        "rule": "R5, R12, R5, R6, R10, R13, R14, R18: The new cure permits aggregate transfer; its watch requires a pass in a session after the selecting retire. Earlier notes remain with their own cure."
       },
       {
         "event": {
@@ -4231,7 +4232,7 @@
         },
         "reading": "retired",
         "state": "retired",
-        "rule": "R5, R12 (D5), R6, R10, R13, R14, R18: The new cure permits aggregate transfer; its watch requires a pass in a session after the selecting retire. Earlier notes remain with their own cure.",
+        "rule": "R5, R12, R5, R6, R10, R13, R14, R18: The new cure permits aggregate transfer; its watch requires a pass in a session after the selecting retire. Earlier notes remain with their own cure.",
         "stock": {
           "current": "release:3",
           "notes": [
@@ -4453,7 +4454,7 @@
   },
   {
     "name": "condition-reopening-ended-by-a-release",
-    "about": "R10 (D4): A late observation from release 0 counts against the compacted condition; the present release cure has already cured it again.",
+    "about": "R10: A late observation from release 0 counts against the compacted condition; the present release cure has already cured it again.",
     "steps": [
       {
         "event": {
@@ -4465,7 +4466,7 @@
         },
         "reading": "open",
         "state": "open",
-        "rule": "R10 (D4), R5 and R12 (D5), R6, R7, R14: Release cures end condition reopening; aggregate transfer starts a fresh watch and preserves earlier notes."
+        "rule": "R10, R5 and R12, R5, R6, R7, R14: Release cures end condition reopening; aggregate transfer starts a fresh watch and preserves earlier notes."
       },
       {
         "event": {
@@ -4475,7 +4476,7 @@
         },
         "reading": "cure-available",
         "state": "open",
-        "rule": "R10 (D4), R5 and R12 (D5), R6, R7, R14: Release cures end condition reopening; aggregate transfer starts a fresh watch and preserves earlier notes."
+        "rule": "R10, R5 and R12, R5, R6, R7, R14: Release cures end condition reopening; aggregate transfer starts a fresh watch and preserves earlier notes."
       },
       {
         "event": {
@@ -4483,7 +4484,7 @@
         },
         "reading": "on-watch",
         "state": "cured",
-        "rule": "R10 (D4), R5 and R12 (D5), R6, R7, R14: Release cures end condition reopening; aggregate transfer starts a fresh watch and preserves earlier notes."
+        "rule": "R10, R5 and R12, R5, R6, R7, R14: Release cures end condition reopening; aggregate transfer starts a fresh watch and preserves earlier notes."
       },
       {
         "event": {
@@ -4498,7 +4499,7 @@
         },
         "reading": "on-watch",
         "state": "cured",
-        "rule": "R10 (D4), R5 and R12 (D5), R6, R7, R14: Release cures end condition reopening; aggregate transfer starts a fresh watch and preserves earlier notes."
+        "rule": "R10, R5 and R12, R5, R6, R7, R14: Release cures end condition reopening; aggregate transfer starts a fresh watch and preserves earlier notes."
       },
       {
         "event": {
@@ -4510,7 +4511,7 @@
         },
         "reading": "cure-available",
         "state": "open",
-        "rule": "R10 (D4), R5 and R12 (D5), R6, R7, R14: Release cures end condition reopening; aggregate transfer starts a fresh watch and preserves earlier notes."
+        "rule": "R10, R5 and R12, R5, R6, R7, R14: Release cures end condition reopening; aggregate transfer starts a fresh watch and preserves earlier notes."
       },
       {
         "event": {
@@ -4518,7 +4519,7 @@
         },
         "reading": "on-watch",
         "state": "cured",
-        "rule": "R10 (D4), R5 and R12 (D5), R6, R7, R14: Release cures end condition reopening; aggregate transfer starts a fresh watch and preserves earlier notes.",
+        "rule": "R10, R5 and R12, R5, R6, R7, R14: Release cures end condition reopening; aggregate transfer starts a fresh watch and preserves earlier notes.",
         "stock": {
           "current": "release:1",
           "notes": []
@@ -4532,7 +4533,7 @@
         },
         "reading": "on-watch",
         "state": "cured",
-        "rule": "R10 (D4), R5 and R12 (D5), R6, R7, R14: Release cures end condition reopening; aggregate transfer starts a fresh watch and preserves earlier notes."
+        "rule": "R10, R5 and R12, R5, R6, R7, R14: Release cures end condition reopening; aggregate transfer starts a fresh watch and preserves earlier notes."
       },
       {
         "event": {
@@ -4540,7 +4541,7 @@
         },
         "reading": "retired",
         "state": "cured",
-        "rule": "R10 (D4), R5 and R12 (D5), R6, R7, R14: Release cures end condition reopening; aggregate transfer starts a fresh watch and preserves earlier notes."
+        "rule": "R10, R5 and R12, R5, R6, R7, R14: Release cures end condition reopening; aggregate transfer starts a fresh watch and preserves earlier notes."
       },
       {
         "event": {
@@ -4548,7 +4549,7 @@
         },
         "reading": "retired",
         "state": "retired",
-        "rule": "R10 (D4), R5 and R12 (D5), R6, R7, R14: Release cures end condition reopening; aggregate transfer starts a fresh watch and preserves earlier notes.",
+        "rule": "R10, R5 and R12, R5, R6, R7, R14: Release cures end condition reopening; aggregate transfer starts a fresh watch and preserves earlier notes.",
         "stock": {
           "current": "release:1",
           "notes": [
@@ -4563,7 +4564,7 @@
   },
   {
     "name": "condition-reopening-by-ruling-then-release",
-    "about": "R10 (D4), R5 and R12 (D5): Release 1 ends the condition reopening after a ruling; its watch retains unnamed aggregates and the old condition note.",
+    "about": "R10, R5 and R12, R5: Release 1 ends the condition reopening after a ruling; its watch retains unnamed aggregates and the old condition note.",
     "steps": [
       {
         "event": {
@@ -4575,7 +4576,7 @@
         },
         "reading": "open",
         "state": "open",
-        "rule": "R10 (D4), R5 and R12 (D5), R6, R7, R14: Release cures end condition reopening; aggregate transfer starts a fresh watch and preserves earlier notes."
+        "rule": "R10, R5 and R12, R5, R6, R7, R14: Release cures end condition reopening; aggregate transfer starts a fresh watch and preserves earlier notes."
       },
       {
         "event": {
@@ -4585,7 +4586,7 @@
         },
         "reading": "cure-available",
         "state": "open",
-        "rule": "R10 (D4), R5 and R12 (D5), R6, R7, R14: Release cures end condition reopening; aggregate transfer starts a fresh watch and preserves earlier notes."
+        "rule": "R10, R5 and R12, R5, R6, R7, R14: Release cures end condition reopening; aggregate transfer starts a fresh watch and preserves earlier notes."
       },
       {
         "event": {
@@ -4593,7 +4594,7 @@
         },
         "reading": "on-watch",
         "state": "cured",
-        "rule": "R10 (D4), R5 and R12 (D5), R6, R7, R14: Release cures end condition reopening; aggregate transfer starts a fresh watch and preserves earlier notes."
+        "rule": "R10, R5 and R12, R5, R6, R7, R14: Release cures end condition reopening; aggregate transfer starts a fresh watch and preserves earlier notes."
       },
       {
         "event": {
@@ -4602,7 +4603,7 @@
         },
         "reading": "retired",
         "state": "retired",
-        "rule": "R10 (D4), R5 and R12 (D5), R6, R7, R14: Release cures end condition reopening; aggregate transfer starts a fresh watch and preserves earlier notes."
+        "rule": "R10, R5 and R12, R5, R6, R7, R14: Release cures end condition reopening; aggregate transfer starts a fresh watch and preserves earlier notes."
       },
       {
         "event": {
@@ -4612,7 +4613,7 @@
         },
         "reading": "retired",
         "state": "retired",
-        "rule": "R10 (D4), R5 and R12 (D5), R6, R7, R14: Release cures end condition reopening; aggregate transfer starts a fresh watch and preserves earlier notes."
+        "rule": "R10, R5 and R12, R5, R6, R7, R14: Release cures end condition reopening; aggregate transfer starts a fresh watch and preserves earlier notes."
       },
       {
         "event": {
@@ -4624,7 +4625,7 @@
         },
         "reading": "reopened",
         "state": "reopened",
-        "rule": "R10 (D4), R5 and R12 (D5), R6, R7, R14: Release cures end condition reopening; aggregate transfer starts a fresh watch and preserves earlier notes."
+        "rule": "R10, R5 and R12, R5, R6, R7, R14: Release cures end condition reopening; aggregate transfer starts a fresh watch and preserves earlier notes."
       },
       {
         "event": {
@@ -4639,7 +4640,7 @@
         },
         "reading": "cure-available",
         "state": "open",
-        "rule": "R10 (D4), R5 and R12 (D5), R6, R7, R14: Release cures end condition reopening; aggregate transfer starts a fresh watch and preserves earlier notes."
+        "rule": "R10, R5 and R12, R5, R6, R7, R14: Release cures end condition reopening; aggregate transfer starts a fresh watch and preserves earlier notes."
       },
       {
         "event": {
@@ -4647,7 +4648,7 @@
         },
         "reading": "on-watch",
         "state": "cured",
-        "rule": "R10 (D4), R5 and R12 (D5), R6, R7, R14: Release cures end condition reopening; aggregate transfer starts a fresh watch and preserves earlier notes.",
+        "rule": "R10, R5 and R12, R5, R6, R7, R14: Release cures end condition reopening; aggregate transfer starts a fresh watch and preserves earlier notes.",
         "stock": {
           "current": "release:1",
           "notes": [
@@ -4662,7 +4663,7 @@
   },
   {
     "name": "c-false-retired-if-decision-10-lets-the-machine-close",
-    "about": "Pending decision 10 (section 16): alternative posture permits D5 to move aggregates despite the standing report; earlier notes keep their own cure.",
+    "about": "Pending decision 10 (section 16): alternative posture permits the R12, R5 transfer to move aggregates despite the standing report; earlier notes keep their own cure.",
     "steps": [
       {
         "event": {
@@ -4754,7 +4755,7 @@
         },
         "reading": "cure-available",
         "state": "open",
-        "rule": "R5, R12 (D5), R6, R10, R13, R14, R18: The new cure permits aggregate transfer; its watch requires a pass in a session after the selecting retire. Earlier notes remain with their own cure."
+        "rule": "R5, R12, R5, R6, R10, R13, R14, R18: The new cure permits aggregate transfer; its watch requires a pass in a session after the selecting retire. Earlier notes remain with their own cure."
       },
       {
         "event": {
@@ -4762,7 +4763,7 @@
         },
         "reading": "on-watch",
         "state": "cured",
-        "rule": "R5, R12 (D5), R6, R10, R13, R14, R18: The new cure permits aggregate transfer; its watch requires a pass in a session after the selecting retire. Earlier notes remain with their own cure."
+        "rule": "R5, R12, R5, R6, R10, R13, R14, R18: The new cure permits aggregate transfer; its watch requires a pass in a session after the selecting retire. Earlier notes remain with their own cure."
       },
       {
         "event": {
@@ -4772,7 +4773,7 @@
         },
         "reading": "on-watch",
         "state": "cured",
-        "rule": "R5, R6, R12 (D5), R14: Watch and note under the later cure."
+        "rule": "R5, R6, R12, R5, R14: Watch and note under the later cure."
       },
       {
         "event": {
@@ -4780,7 +4781,7 @@
         },
         "reading": "retired",
         "state": "cured",
-        "rule": "R5, R6, R12 (D5), R14: Watch and note under the later cure."
+        "rule": "R5, R6, R12, R5, R14: Watch and note under the later cure."
       },
       {
         "event": {
@@ -4788,7 +4789,7 @@
         },
         "reading": "retired",
         "state": "retired",
-        "rule": "R5, R6, R12 (D5), R14: Watch and note under the later cure.",
+        "rule": "R5, R6, R12, R5, R14: Watch and note under the later cure.",
         "stock": {
           "current": "release:2",
           "notes": [
@@ -4883,7 +4884,7 @@
         },
         "reading": "cure-available",
         "state": "open",
-        "rule": "R5, R12 (D5), R6, R10, R13, R14, R18: The new cure permits aggregate transfer; its watch requires a pass in a session after the selecting retire. Earlier notes remain with their own cure."
+        "rule": "R5, R12, R5, R6, R10, R13, R14, R18: The new cure permits aggregate transfer; its watch requires a pass in a session after the selecting retire. Earlier notes remain with their own cure."
       },
       {
         "event": {
@@ -4891,7 +4892,7 @@
         },
         "reading": "on-watch",
         "state": "cured",
-        "rule": "R5, R12 (D5), R6, R10, R13, R14, R18: The new cure permits aggregate transfer; its watch requires a pass in a session after the selecting retire. Earlier notes remain with their own cure."
+        "rule": "R5, R12, R5, R6, R10, R13, R14, R18: The new cure permits aggregate transfer; its watch requires a pass in a session after the selecting retire. Earlier notes remain with their own cure."
       },
       {
         "event": {
@@ -4901,7 +4902,7 @@
         },
         "reading": "on-watch",
         "state": "cured",
-        "rule": "R5, R6, R12 (D5), R14: Watch and note under the later cure."
+        "rule": "R5, R6, R12, R5, R14: Watch and note under the later cure."
       },
       {
         "event": {
@@ -4909,7 +4910,7 @@
         },
         "reading": "retired",
         "state": "cured",
-        "rule": "R5, R6, R12 (D5), R14: Watch and note under the later cure."
+        "rule": "R5, R6, R12, R5, R14: Watch and note under the later cure."
       },
       {
         "event": {
@@ -4917,7 +4918,7 @@
         },
         "reading": "retired",
         "state": "retired",
-        "rule": "R5, R6, R12 (D5), R14: Watch and note under the later cure.",
+        "rule": "R5, R6, R12, R5, R14: Watch and note under the later cure.",
         "stock": {
           "current": "release:2",
           "notes": [
@@ -4930,7 +4931,7 @@
       }
     ],
     "decision10": "machine-may-close",
-    "about": "Pending decision 10 (section 16): alternative posture permits D5 to move aggregates despite the standing report; earlier notes keep their own cure."
+    "about": "Pending decision 10 (section 16): alternative posture permits the R12, R5 transfer to move aggregates despite the standing report; earlier notes keep their own cure."
   },
   {
     "name": "reviewer-C1-kept-reopen-during-watch-then-watch-met-if-decision-10-lets-the-machine-close",
@@ -5009,7 +5010,7 @@
         },
         "reading": "cure-available",
         "state": "open",
-        "rule": "R5, R12 (D5), R6, R10, R13, R14, R18: The new cure permits aggregate transfer; its watch requires a pass in a session after the selecting retire. Earlier notes remain with their own cure."
+        "rule": "R5, R12, R5, R6, R10, R13, R14, R18: The new cure permits aggregate transfer; its watch requires a pass in a session after the selecting retire. Earlier notes remain with their own cure."
       },
       {
         "event": {
@@ -5019,7 +5020,7 @@
         },
         "reading": "cure-available",
         "state": "open",
-        "rule": "R5, R12 (D5), R6, R10, R13, R14, R18: The new cure permits aggregate transfer; its watch requires a pass in a session after the selecting retire. Earlier notes remain with their own cure."
+        "rule": "R5, R12, R5, R6, R10, R13, R14, R18: The new cure permits aggregate transfer; its watch requires a pass in a session after the selecting retire. Earlier notes remain with their own cure."
       },
       {
         "event": {
@@ -5027,7 +5028,7 @@
         },
         "reading": "cure-available",
         "state": "open",
-        "rule": "R5, R12 (D5), R6, R10, R13, R14, R18: The new cure permits aggregate transfer; its watch requires a pass in a session after the selecting retire. Earlier notes remain with their own cure."
+        "rule": "R5, R12, R5, R6, R10, R13, R14, R18: The new cure permits aggregate transfer; its watch requires a pass in a session after the selecting retire. Earlier notes remain with their own cure."
       },
       {
         "event": {
@@ -5035,7 +5036,7 @@
         },
         "reading": "on-watch",
         "state": "cured",
-        "rule": "R5, R12 (D5), R6, R10, R13, R14, R18: The new cure permits aggregate transfer; its watch requires a pass in a session after the selecting retire. Earlier notes remain with their own cure."
+        "rule": "R5, R12, R5, R6, R10, R13, R14, R18: The new cure permits aggregate transfer; its watch requires a pass in a session after the selecting retire. Earlier notes remain with their own cure."
       },
       {
         "event": {
@@ -5045,7 +5046,7 @@
         },
         "reading": "on-watch",
         "state": "cured",
-        "rule": "R5, R6, R12 (D5), R14: Watch and note under the later cure."
+        "rule": "R5, R6, R12, R5, R14: Watch and note under the later cure."
       },
       {
         "event": {
@@ -5053,7 +5054,7 @@
         },
         "reading": "retired",
         "state": "cured",
-        "rule": "R5, R6, R12 (D5), R14: Watch and note under the later cure."
+        "rule": "R5, R6, R12, R5, R14: Watch and note under the later cure."
       },
       {
         "event": {
@@ -5061,7 +5062,7 @@
         },
         "reading": "retired",
         "state": "retired",
-        "rule": "R5, R6, R12 (D5), R14: Watch and note under the later cure.",
+        "rule": "R5, R6, R12, R5, R14: Watch and note under the later cure.",
         "stock": {
           "current": "release:2",
           "notes": [
@@ -5074,7 +5075,7 @@
       }
     ],
     "decision10": "machine-may-close",
-    "about": "Pending decision 10 (section 16): alternative posture permits D5 to move aggregates despite the standing report; earlier notes keep their own cure."
+    "about": "Pending decision 10 (section 16): alternative posture permits the R12, R5 transfer to move aggregates despite the standing report; earlier notes keep their own cure."
   },
   {
     "name": "release-cure-qualifies-before-the-condition",
@@ -5089,7 +5090,7 @@
         },
         "reading": "open",
         "state": "open",
-        "rule": "R10 (D4), R13: Release evidence takes precedence over the compacted condition cure."
+        "rule": "R10, R13: Release evidence takes precedence over the compacted condition cure."
       },
       {
         "event": {
@@ -5099,7 +5100,7 @@
         },
         "reading": "cure-available",
         "state": "open",
-        "rule": "R10 (D4), R13: Release evidence takes precedence over the compacted condition cure."
+        "rule": "R10, R13: Release evidence takes precedence over the compacted condition cure."
       },
       {
         "event": {
@@ -5107,7 +5108,7 @@
         },
         "reading": "on-watch",
         "state": "cured",
-        "rule": "R10 (D4), R13: Release evidence takes precedence over the compacted condition cure."
+        "rule": "R10, R13: Release evidence takes precedence over the compacted condition cure."
       },
       {
         "event": {
@@ -5122,9 +5123,19 @@
         },
         "reading": "on-watch",
         "state": "cured",
-        "rule": "R10 (D4), R13: Release evidence takes precedence over the compacted condition cure."
+        "rule": "R10, R13: Release evidence takes precedence over the compacted condition cure."
       },
-      {"event": {"type": "fail", "release": 1, "participant": "p", "record": "kept"}, "reading": "reopened", "state": "reopened", "rule": "R10 (D4): a failure from release 1 counts against the release cure that qualifies, release 1, and not against the condition cure that is the unit's current cure; it reads `reopened` until a later release cures the claim again."},
+      {
+        "event": {
+          "type": "fail",
+          "release": 1,
+          "participant": "p",
+          "record": "kept"
+        },
+        "reading": "reopened",
+        "state": "reopened",
+        "rule": "R10: a failure from release 1 counts against the release cure that qualifies, release 1, and not against the condition cure that is the unit's current cure; it reads `reopened` until a later release cures the claim again."
+      },
       {
         "event": {
           "type": "release",
@@ -5142,7 +5153,7 @@
         },
         "reading": "on-watch",
         "state": "cured",
-        "rule": "R10 (D4), R13: Release evidence takes precedence over the compacted condition cure.",
+        "rule": "R10, R13: Release evidence takes precedence over the compacted condition cure.",
         "stock": {
           "current": "condition:2"
         }
@@ -5180,6 +5191,668 @@
         "rule": "R4: Ignore entries newer than their head.",
         "stock": {
           "declaration": []
+        }
+      }
+    ]
+  },
+  {
+    "name": "same-session-covered-then-kept",
+    "about": "R1: The kept failure adds its own record beside the covered record. A cure permits compaction of only the covered record.",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R16",
+        "stock": {
+          "records": [
+            {
+              "session": 1,
+              "kind": "covered",
+              "participant": "p"
+            }
+          ]
+        }
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "kept",
+          "newSession": false
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R16",
+        "stock": {
+          "records": [
+            {
+              "session": 1,
+              "kind": "covered",
+              "participant": "p"
+            },
+            {
+              "session": 1,
+              "kind": "kept",
+              "participant": "p",
+              "at": 2
+            }
+          ]
+        }
+      },
+      {
+        "event": {
+          "type": "condition",
+          "name": "path",
+          "holds": true
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R1, R5, R12, R13: Kept records coexist with covered records; compaction replaces only covered records.",
+        "stock": {
+          "records": [
+            {
+              "session": 1,
+              "kind": "covered",
+              "participant": "p"
+            },
+            {
+              "session": 1,
+              "kind": "kept",
+              "participant": "p",
+              "at": 2
+            }
+          ]
+        }
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1, R5, R12, R13: Kept records coexist with covered records; compaction replaces only covered records.",
+        "stock": {
+          "records": [
+            {
+              "session": 1,
+              "kind": "kept",
+              "participant": "p",
+              "at": 2
+            }
+          ],
+          "aggregates": [
+            {
+              "cure": "condition:3",
+              "participant": "p",
+              "at": 4,
+              "session": 1
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "kept-failure-in-an-already-compacted-session",
+    "about": "R1: The kept failure adds its own record even after the session’s covered record was compacted. R10 counts its observation against the condition cure and reopens the unit.",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R16",
+        "stock": {
+          "records": [
+            {
+              "session": 1,
+              "kind": "covered",
+              "participant": "p"
+            }
+          ]
+        }
+      },
+      {
+        "event": {
+          "type": "condition",
+          "name": "path",
+          "holds": true
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R4, R12"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1, R5, R13",
+        "stock": {
+          "records": []
+        }
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "kept",
+          "newSession": false
+        },
+        "reading": "reopened",
+        "state": "reopened",
+        "rule": "R1, R10",
+        "stock": {
+          "records": [
+            {
+              "session": 1,
+              "kind": "kept",
+              "participant": "p",
+              "at": 4
+            }
+          ],
+          "current": "condition:2"
+        }
+      }
+    ]
+  },
+  {
+    "name": "two-condition-cures-in-turn",
+    "about": "R10 counts each failure against every condition cure compacted before it. No step reading differs if only the latest compacted condition cure counts: step 9 counts against both instances today, but either interpretation reopens; the holding edge at step 6 cures the step 5 observation again.",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R16"
+      },
+      {
+        "event": {
+          "type": "condition",
+          "name": "path",
+          "holds": true
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R4, R12"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R5, R13"
+      },
+      {
+        "event": {
+          "type": "condition",
+          "name": "path",
+          "holds": false
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R4, R13"
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered"
+        },
+        "reading": "reopened",
+        "state": "reopened",
+        "rule": "R1, R10"
+      },
+      {
+        "event": {
+          "type": "condition",
+          "name": "path",
+          "holds": true
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R4, R10, R12"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R5, R13"
+      },
+      {
+        "event": {
+          "type": "condition",
+          "name": "path",
+          "holds": false
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R4, R13"
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered"
+        },
+        "reading": "reopened",
+        "state": "reopened",
+        "rule": "R1, R10"
+      }
+    ]
+  },
+  {
+    "name": "two-kept-reports-in-one-session",
+    "about": "R1, R10, R12: Each kept report survives separately; decision 10 controls aggregate transfer after the later cure. No second retire has been requested.",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R5, R10, R12, R13, R14: Separate kept reports; current-cure counter-evidence and the declared decision-10 posture govern the later cure.",
+        "stock": {
+          "records": [
+            {
+              "session": 1,
+              "kind": "covered",
+              "participant": "p"
+            }
+          ]
+        }
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R1, R5, R10, R12, R13, R14: Separate kept reports; current-cure counter-evidence and the declared decision-10 posture govern the later cure.",
+        "stock": {
+          "records": [
+            {
+              "session": 1,
+              "kind": "covered",
+              "participant": "p"
+            }
+          ]
+        }
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1, R5, R10, R12, R13, R14: Separate kept reports; current-cure counter-evidence and the declared decision-10 posture govern the later cure.",
+        "stock": {
+          "records": []
+        }
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 1,
+          "participant": "p",
+          "record": "kept"
+        },
+        "reading": "reopened",
+        "state": "reopened",
+        "rule": "R1, R5, R10, R12, R13, R14: Separate kept reports; current-cure counter-evidence and the declared decision-10 posture govern the later cure.",
+        "stock": {
+          "records": [
+            {
+              "session": 2,
+              "kind": "kept",
+              "participant": "p",
+              "at": 4
+            }
+          ]
+        }
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 1,
+          "participant": "p",
+          "record": "kept",
+          "newSession": false
+        },
+        "reading": "reopened",
+        "state": "reopened",
+        "rule": "R1, R5, R10, R12, R13, R14: Separate kept reports; current-cure counter-evidence and the declared decision-10 posture govern the later cure.",
+        "stock": {
+          "records": [
+            {
+              "session": 2,
+              "kind": "kept",
+              "participant": "p",
+              "at": 4
+            },
+            {
+              "session": 2,
+              "kind": "kept",
+              "participant": "p",
+              "at": 5
+            }
+          ]
+        }
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 2,
+          "entries": [
+            [
+              1,
+              "cured"
+            ],
+            [
+              2,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R5, R10, R12, R13, R14: Separate kept reports; current-cure counter-evidence and the declared decision-10 posture govern the later cure.",
+        "stock": {
+          "records": [
+            {
+              "session": 2,
+              "kind": "kept",
+              "participant": "p",
+              "at": 4
+            },
+            {
+              "session": 2,
+              "kind": "kept",
+              "participant": "p",
+              "at": 5
+            }
+          ]
+        }
+      },
+      {
+        "event": {
+          "type": "pass",
+          "release": 2,
+          "participant": "p",
+          "newSession": true
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R5, R10, R12, R13, R14: Separate kept reports; current-cure counter-evidence and the declared decision-10 posture govern the later cure.",
+        "stock": {
+          "records": [
+            {
+              "session": 2,
+              "kind": "kept",
+              "participant": "p",
+              "at": 4
+            },
+            {
+              "session": 2,
+              "kind": "kept",
+              "participant": "p",
+              "at": 5
+            }
+          ]
+        }
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R5, R10, R12, R13, R14: Separate kept reports; current-cure counter-evidence and the declared decision-10 posture govern the later cure.",
+        "stock": {
+          "records": [
+            {
+              "session": 2,
+              "kind": "kept",
+              "participant": "p",
+              "at": 4
+            },
+            {
+              "session": 2,
+              "kind": "kept",
+              "participant": "p",
+              "at": 5
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "two-kept-reports-in-one-session-if-decision-10-lets-the-machine-close",
+    "decision10": "machine-may-close",
+    "about": "R1, R10, R12: Each kept report survives separately; decision 10 controls aggregate transfer after the later cure. No second retire has been requested.",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R5, R10, R12, R13, R14: Separate kept reports; current-cure counter-evidence and the declared decision-10 posture govern the later cure.",
+        "stock": {
+          "records": [
+            {
+              "session": 1,
+              "kind": "covered",
+              "participant": "p"
+            }
+          ]
+        }
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R1, R5, R10, R12, R13, R14: Separate kept reports; current-cure counter-evidence and the declared decision-10 posture govern the later cure.",
+        "stock": {
+          "records": [
+            {
+              "session": 1,
+              "kind": "covered",
+              "participant": "p"
+            }
+          ]
+        }
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1, R5, R10, R12, R13, R14: Separate kept reports; current-cure counter-evidence and the declared decision-10 posture govern the later cure.",
+        "stock": {
+          "records": []
+        }
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 1,
+          "participant": "p",
+          "record": "kept"
+        },
+        "reading": "reopened",
+        "state": "reopened",
+        "rule": "R1, R5, R10, R12, R13, R14: Separate kept reports; current-cure counter-evidence and the declared decision-10 posture govern the later cure.",
+        "stock": {
+          "records": [
+            {
+              "session": 2,
+              "kind": "kept",
+              "participant": "p",
+              "at": 4
+            }
+          ]
+        }
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 1,
+          "participant": "p",
+          "record": "kept",
+          "newSession": false
+        },
+        "reading": "reopened",
+        "state": "reopened",
+        "rule": "R1, R5, R10, R12, R13, R14: Separate kept reports; current-cure counter-evidence and the declared decision-10 posture govern the later cure.",
+        "stock": {
+          "records": [
+            {
+              "session": 2,
+              "kind": "kept",
+              "participant": "p",
+              "at": 4
+            },
+            {
+              "session": 2,
+              "kind": "kept",
+              "participant": "p",
+              "at": 5
+            }
+          ]
+        }
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 2,
+          "entries": [
+            [
+              1,
+              "cured"
+            ],
+            [
+              2,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R1, R5, R10, R12, R13, R14: Separate kept reports; current-cure counter-evidence and the declared decision-10 posture govern the later cure.",
+        "stock": {
+          "records": [
+            {
+              "session": 2,
+              "kind": "kept",
+              "participant": "p",
+              "at": 4
+            },
+            {
+              "session": 2,
+              "kind": "kept",
+              "participant": "p",
+              "at": 5
+            }
+          ]
+        }
+      },
+      {
+        "event": {
+          "type": "pass",
+          "release": 2,
+          "participant": "p",
+          "newSession": true
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R1, R5, R10, R12, R13, R14: Separate kept reports; current-cure counter-evidence and the declared decision-10 posture govern the later cure.",
+        "stock": {
+          "records": [
+            {
+              "session": 2,
+              "kind": "kept",
+              "participant": "p",
+              "at": 4
+            },
+            {
+              "session": 2,
+              "kind": "kept",
+              "participant": "p",
+              "at": 5
+            }
+          ]
+        }
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R1, R5, R10, R12, R13, R14: Separate kept reports; current-cure counter-evidence and the declared decision-10 posture govern the later cure.",
+        "stock": {
+          "records": [
+            {
+              "session": 2,
+              "kind": "kept",
+              "participant": "p",
+              "at": 4
+            },
+            {
+              "session": 2,
+              "kind": "kept",
+              "participant": "p",
+              "at": 5
+            }
+          ]
         }
       }
     ]

@@ -113,7 +113,7 @@ export function facts(u) {
     : u.declaration.some(n => n.state === 'cured' && compareRelease(n.release, c.release) > 0); // R4, R10: condition instances count too.
   const retireMet = u.aggregates.length > 0 && u.aggregates.every(a => a.participant !== null &&
     u.observations.some(o => o.passed && o.participant === a.participant && o.session > u.currentSession &&
-      o.at > u.currentAt && u.watch > o.at && !failures.some(f => f.at > o.at))); // R6
+      u.watch > o.at && !failures.some(f => f.at > o.at))); // R6
   return {
     failed: failures.length > 0, coveredRecords: u.records.some(r => r.kind === 'covered'),
     curePresent: Boolean(present(u)), differentCure: Boolean(present(u) && present(u).id !== u.current), // R12 (D5)
@@ -122,7 +122,7 @@ export function facts(u) {
     curedAgain: recurrence.length > 0 && recurrence.every(cured),
     currentCureCountedAgainst: recurrence.some(({ c }) => c.id === u.current),
     keptReportBlocksMove: u.keptReportHoldsOpen && recurrence.some(({ o, c }) =>
-      c.id === u.current && o && u.records.some(r => r.kind === 'kept' && r.session === o.session)), // R12 (D5), pending decision 10
+      c.id === u.current && o && u.records.some(r => r.kind === 'kept' && r.at === o.at)), // R12 (D5), pending decision 10
     pinLag: Boolean(last && u.head !== null && compareRelease(last.release, u.head) < 0 && last.afterHead && last.at > u.landed),
     laterHead: Boolean(last && u.observations.some(o => o.release === u.head && o.at > last.at)),
     unknownRelease: !u.known, horizonNoCure: u.known && u.horizon && !present(u), superseded: u.superseded,
@@ -146,13 +146,15 @@ export function apply(unit, event) {
       if (e.newSession !== false) u.session++;
       if (e.clears) u.condition = e.clears;
       const o = { at: u.tick, session: u.session, release: e.release ?? u.head,
-        participant: e.participant ?? null, passed: e.type === 'pass', afterHead: e.afterHead ?? false };
+        participant: e.participant ?? null, record: e.record, passed: e.type === 'pass', afterHead: e.afterHead ?? false };
       u.observations.push(o);
       if (!o.passed) {
         u.emitter ??= o.release;
-        const record = u.records.find(r => r.session === u.session);
-        if (!record && !u.observations.slice(0, -1).some(x => !x.passed && x.session === u.session)) u.records.push({ session: u.session, kind: e.record, participant: o.participant });
-        else if (record && e.record === 'kept') record.kind = 'kept';
+        const record = u.records.find(r => r.kind === 'covered' && r.session === u.session);
+        const coveredBefore = u.observations.slice(0, -1).some(x =>
+          !x.passed && x.record === 'covered' && x.session === u.session);
+        if (e.record === 'kept') u.records.push({ session: u.session, kind: 'kept', participant: o.participant, at: o.at });
+        else if (!record && !coveredBefore) u.records.push({ session: u.session, kind: e.record, participant: o.participant });
       }
       if (u.condition === 'observed') condition(o.passed);
       break;
@@ -298,6 +300,7 @@ test('every precedence case uses declared facts and returns its expected reading
     assert.equal(Object.hasOwn(c, 'open'), false, `case ${c.name}: open field is forbidden`);
     assert.ok(!seen.has(c.name), `case ${c.name}: duplicate name`);
     seen.add(c.name);
+    assert.doesNotMatch(`${c.rule ?? ''} ${c.because ?? ''}`, /D\d/, `case ${c.name}: working name`);
     assert.ok(/\bR(?:[1-9]|1[0-8])\b/.test(c.because ?? ''), `case ${c.name}: missing citation`);
     assert.ok(c.facts && typeof c.facts === 'object' && !Array.isArray(c.facts), `case ${c.name}: malformed facts`);
     for (const [key, value] of Object.entries(c.facts)) {
@@ -359,6 +362,7 @@ for (const life of lives) test(`life: ${life.name}`, () => {
   for (const [index, step] of life.steps.entries()) {
     const label = `${life.name} step ${index + 1} (${step.event.type}): ${step.rule}`;
     assert.equal(Object.hasOwn(step, 'open'), false, `${label}: ${step.open}`);
+    assert.doesNotMatch(`${step.rule ?? ''} ${step.because ?? ''}`, /D\d/, `${label}: working name`);
     assert.match(step.rule, /\bR(?:[1-9]|1[0-8])\b/, label);
     const before = structuredClone(unit);
     const next = apply(unit, step.event);
@@ -375,6 +379,15 @@ for (const life of lives) test(`life: ${life.name}`, () => {
         prior === 'cure-available' ? before.aggregates.map(a => ({ ...a, cure: next.current })) : before.aggregates,
         `${label}: R5 (D5) preserves existing aggregates except their cure`);
       assert.deepEqual(next.notes.slice(0, before.notes.length), before.notes, `${label}: old notes changed`);
+    }
+    if (step.event.type === 'fail') {
+      const kept = next.records.filter(r => r.kind === 'kept');
+      const beforeKept = before.records.filter(r => r.kind === 'kept');
+      assert.deepEqual(kept.slice(0, beforeKept.length), beforeKept, `${label}: existing kept records changed`);
+      assert.equal(kept.length, beforeKept.length + Number(step.event.record === 'kept'),
+        `${label}: every kept failure adds exactly one record`);
+      if (step.event.record === 'kept') assert.deepEqual(next.records.filter(r => r.kind === 'covered'),
+        before.records.filter(r => r.kind === 'covered'), `${label}: kept failure changed covered records`);
     }
     unit = next;
     const f = facts(unit), reading = read(f);
@@ -420,12 +433,22 @@ test('R9–R16: facts declare exactly the predicates read uses, with rule citati
 });
 
 // Each mutant must disagree with a fixed scripted expectation, including retained stocks.
-test('nineteen rule mutations are killed by scripted lives', () => {
+test('twenty-four rule mutations are killed by scripted lives', () => {
   const source = readFileSync(import.meta.filename, 'utf8');
   const model = source.slice(source.indexOf('const KEPT_REPORT_HOLDS_A_CLAIM_OPEN'), source.indexOf('const errors ='))
     .replace(/const root =[\s\S]*?(?=export function read)/, '')
     .replaceAll('export function ', 'function ');
   const mutations = [
+    ['r1-second-failure-adds-record', '!record && !coveredBefore', 'true',
+      ['mutation-g-one-record-per-session']],
+    ['r1-kept-never-added', "if (e.record === 'kept')", "if (e.record === 'kept') return u; else if (false)",
+      ['same-session-covered-then-kept']],
+    ['r1-two-kept-collapse', "if (e.record === 'kept')", "if (e.record === 'kept' && u.records.some(r => r.kind === 'kept' && r.session === u.session)) return u; else if (e.record === 'kept')",
+      ['two-kept-reports-in-one-session']],
+    ['r1-kept-replaces-covered', "if (e.record === 'kept')", "if (e.record === 'kept' && record) u.records.splice(u.records.indexOf(record), 1); if (e.record === 'kept')",
+      ['same-session-covered-then-kept']],
+    ['r1-kept-dropped-after-compaction', "if (e.record === 'kept')", "if (e.record === 'kept' && coveredBefore && !record) return u; else if (e.record === 'kept')",
+      ['kept-failure-in-an-already-compacted-session']],
     ['decision10-machine-closes-ordinary-lives', 'const KEPT_REPORT_HOLDS_A_CLAIM_OPEN = true;',
       'const KEPT_REPORT_HOLDS_A_CLAIM_OPEN = false;',
       ['c-false-retired', 'reviewer-B5-kept-during-watch-from-head', 'reviewer-C1-kept-reopen-during-watch-then-watch-met']],
@@ -451,7 +474,7 @@ test('nineteen rule mutations are killed by scripted lives', () => {
     ['r4-any-cured', "latestEntry(u)?.state === 'cured'", "u.declaration.some(e => e.state === 'cured')"],
     ['r10-withdrawn-cures-again', "n.state === 'cured' &&", 'true &&'],
     ['j-quiet-watch', '!failures.some(f => f.at > o.at)', 'true'],
-    ['g', '!record && !u.observations.slice(0, -1).some(x => !x.passed && x.session === u.session)', 'true'],
+    ['g', '!record && !coveredBefore', 'true'],
   ];
   for (const [name, from, to, required = []] of mutations) {
     assert.ok(model.includes(from), `mutation ${name}: missing target`);
