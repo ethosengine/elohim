@@ -44,9 +44,15 @@ Feature: A device carries a sibling's gate miss unattended, under its steward's 
     there shows them until they have read it.
   - A STANDING device is one that Matthew's device roster, the list of devices he has admitted as his own,
     binds to him. The carrier checks the device that posted a miss against that roster before anything else.
-  - A carry record names an ACTOR (the person whose labour it was), a STEWARD (the person who answers for
-    it) and a RUNNER (the device that did it). Machine work names no actor, so it never counts as anyone's
-    own labour.
+  - A CARRY CLAIM is the record a carrier writes when it takes a miss, or declines one with a reason. A
+    declined carry is born expired: its claim is already past its end when it is written, so no device waits
+    on it. A carry claim, and the verdict it leads to, names an ACTOR (the person whose labour it was), a
+    STEWARD (the person who answers for it) and a RUNNER (the device that did it). Machine work names no actor,
+    so it never counts as anyone's own labour.
+  - To VOID a grant is to end it before its expiry: nothing is carried under it afterwards. A grant is voided
+    when Matthew revokes it, or when the check before its first carry fails. A BREACH OBSERVATION is a record,
+    kept on the carrying device, that a grant in Matthew's name failed that check; it names the session that
+    recorded the grant.
 
   Background:
     Given two standing devices of Matthew, "laptop" and "workstation"
@@ -115,6 +121,7 @@ Feature: A device carries a sibling's gate miss unattended, under its steward's 
     Then the carrier records a declined carry with the reason "grant"
     And it runs nothing
 
+  # No miss has arrived in this scenario, so no carry is declined: the grant is void before it is used.
   Scenario: a grant that does not match its own record is void, and traced to the session that wrote it
     Given a session on "workstation" recorded a grant whose permission covers more gates than its clause
     When the answering session checks the grant before the first carry under it
@@ -129,7 +136,15 @@ Feature: A device carries a sibling's gate miss unattended, under its steward's 
     Given the carrier on "workstation" is carrying a miss under a valid grant
     When a session on "laptop" asks "workstation" what its carrier is doing
     Then the answering session replies with the gate, the commit, the grant and its expiry, and Matthew as the steward who answers for it
-    And the reply is right even when the answering session started after the carry began, because it is built from the carry's own records
+    # The reply is built from the carry's own records, not from what the session remembers.
+    And the reply is right even when the answering session started after the carry began
+
+  Scenario: a grant Matthew revokes carries nothing after he revokes it
+    Given a valid grant for the carrier on "workstation" that covers orchestrator gates on hand-over branches
+    When Matthew revokes the grant in a session on "workstation", in his own words
+    And "laptop" then posts a miss the grant would have covered
+    Then the carrier records a declined carry with the reason "grant"
+    And it runs nothing
 
   Scenario: an expired grant carries nothing
     Given a grant for the carrier on "workstation" that expired an hour ago
