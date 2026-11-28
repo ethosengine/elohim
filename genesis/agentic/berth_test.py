@@ -2065,6 +2065,83 @@ class BerthInboxTest(unittest.TestCase):
         self.assertIn("«one»", lines[0])
         self.assertIn("«two»", lines[1])
 
+    def test_wait_with_a_reader_blocks_until_a_note_then_prints_it_and_exits(self):
+        out = io.StringIO()
+        sleeps = []
+
+        def sleep(_s):
+            sleeps.append(_s)
+            if len(sleeps) == 2:
+                self.append(self.folded("w-1", 1001, to=self.SESSION, text="one"),
+                            self.folded("w-2", 1002, to=self.SESSION, text="two"))
+            elif len(sleeps) > 2:
+                raise AssertionError("--wait slept again after printing")
+
+        self.berth.sleep = sleep
+        main = _NS["main"]
+        with mock.patch.dict(main.__globals__, {"Berth": lambda: self.berth}), \
+                contextlib.redirect_stdout(out):
+            rc = main(["berth", "inbox", "--session", self.SESSION, "--reader", "mon", "--wait"])
+        self.assertEqual(rc, 0)
+        self.assertEqual(len(sleeps), 2)
+        lines = out.getvalue().splitlines()
+        self.assertEqual(len(lines), 2)
+        self.assertIn("«one»", lines[0])
+        self.assertIn("«two»", lines[1])
+        # Both were passed: the next wait or follow of this reader starts after them.
+        self.assertEqual(self.berth.reader_inbox(self.SESSION, "mon"), [])
+        # The session's own inbox still shows them.
+        self.assertEqual([n["cid"] for n in self.berth.inbox(self.SESSION, mark=False)], ["w-1", "w-2"])
+
+    def test_wait_does_not_wake_for_a_broken_miss_watch(self):
+        out, err = io.StringIO(), io.StringIO()
+        sleeps = []
+
+        def sleep(_s):
+            sleeps.append(_s)
+            if len(sleeps) == 3:
+                self.append(self.folded("m-1", 1001, to=self.SESSION, text="note"))
+
+        self.berth.sleep = sleep
+        answer = subprocess.CompletedProcess([], 7, "", "fold unavailable")
+        main = _NS["main"]
+        with mock.patch.dict(main.__globals__, {"Berth": lambda: self.berth}), \
+                mock.patch.object(_NS["_SilenceWatch"], "_miss_lines", _real_miss_lines), \
+                mock.patch.object(self.berth, "epr_bin", return_value="/stub/epr"), \
+                mock.patch("subprocess.run", return_value=answer), \
+                contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            rc = main(["berth", "inbox", "--session", self.SESSION, "--reader", "mon", "--wait"])
+        self.assertEqual(rc, 0)
+        lines = out.getvalue().splitlines()
+        self.assertEqual(len(lines), 1)
+        self.assertIn("«note»", lines[0])
+        self.assertIn("misses not watched", err.getvalue())
+
+    def test_a_claim_that_hands_out_notes_names_its_consumer_in_the_claims_log(self):
+        self.append(self.folded("c-1", 1001, to=self.SESSION, text="one"))
+        self.assertIsNotNone(self.berth.reader_claim(self.SESSION, "main")[1])
+        self.berth.reader_claim(self.SESSION, "other-reader")  # a second reader, its own line
+        path = os.path.join(self.berth._inbox_dir(), "readers", "claims.log")
+        lines = [json.loads(l) for l in open(path)]
+        self.assertEqual([(l["reader"], l["notes"]) for l in lines], [("main", ["c-1"]), ("other-reader", ["c-1"])])
+        self.assertEqual(lines[0]["pid"], os.getpid())
+        self.assertEqual(lines[0]["session"], self.SESSION)
+        # Nothing to hand out writes nothing.
+        self.berth.reader_claim(self.SESSION, "main")
+        self.assertEqual(len(open(path).readlines()), 2)
+
+    def test_wait_is_refused_without_a_reader_or_beside_another_mode(self):
+        self.append(self.folded("guard", 1001, to=self.SESSION))
+        for args in (["--wait"], ["--reader", "main", "--wait", "--follow"],
+                     ["--reader", "main", "--wait", "--json"], ["--reader", "main", "--wait", "--peek"],
+                     ["--reader", "main", "--wait", "--limit", "2"]):
+            with self.subTest(args=args):
+                rc, out, err = self.run_main("inbox", "--session", self.SESSION, *args)
+                self.assertEqual((rc, out), (2, ""), err)
+        self.assertEqual([n["cid"] for n in self.berth.inbox(self.SESSION, mark=False)], ["guard"])
+        self.assertEqual([n["cid"] for n in self.berth.reader_inbox(self.SESSION, "main", mark=False)],
+                         ["guard"])
+
     def follow_through(self, views, *argv):
         """Follow while `views` lasts: each sleep is a minute, and each reading of the lease view
         takes the next one. Returns the lines printed and how many readings were made."""
