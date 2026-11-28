@@ -29,6 +29,19 @@ REPO = Path(__file__).resolve().parents[2]
 POLICY = '.epr-meta/elohim/policies/dialogue-stasis-policy.json'
 PARK = ('parked as stasis `{}`. Do not retry this effect by any tool or spelling. '
         'Continue independent authorized work. Guidance will arrive.')
+_HOOK_DEADLINE = None
+
+
+def set_hook_deadline(deadline):
+    """Cap every child of a synchronous hook at the hook's remaining budget."""
+    global _HOOK_DEADLINE
+    _HOOK_DEADLINE = deadline
+
+
+def _bounded_timeout(timeout):
+    if _HOOK_DEADLINE is None:
+        return timeout
+    return min(timeout, max(0, _HOOK_DEADLINE - time.monotonic()))
 
 
 def mode():
@@ -38,6 +51,9 @@ def mode():
 
 def bounded(argv, *, cwd, timeout, payload=None, env=None):
     """The resolver AND its evaluator descend from this killable process group."""
+    timeout = _bounded_timeout(timeout)
+    if timeout <= 0:
+        return None, ''
     process = subprocess.Popen(argv, cwd=cwd, env=env, stdin=subprocess.PIPE,
                                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                text=True, start_new_session=True)

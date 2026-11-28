@@ -14,7 +14,9 @@ permission correlation, inferred denial, delayed dialog notifications and the
 system-originated task-notification exclusion. No remote push/deny-relay claim.
 Authoritative bytes: elohim-agent HookPackage dialogue-stasis-sense.
 STASIS_JOURNAL_ROOT overrides the stasis root; STASIS_SEGMENT_BYTES overrides
-5 MB for replay tests. Neither changes authority or enables session decisions.
+5 MB for replay tests. STASIS_SENSE_DEADLINE_S overrides the synchronous hook's
+2.0 s inner deadline for measurement and replay tests. None changes authority or
+enables session decisions.
 """
 import datetime as dt
 import fcntl
@@ -27,9 +29,42 @@ import shlex
 
 # The transcript scan is the only phase that grows with the session (measured 2.4-3.5 s for a first
 # scan of 64 MB at load 18; every other phase is under 0.1 s). It stops at SCAN_UNTIL seconds after
-# process start and resumes from its cursor on the next call. Waiting for the journal lock is
-# unchanged: if the lock alone exceeds the budget the harness times the hook out, as before.
+# process start and resumes from its cursor on the next call.
 SCAN_UNTIL = float(os.environ.get("STASIS_SCAN_UNTIL_S", 2.2))
+try:
+    DEADLINE_S = max(0.001, float(os.environ.get("STASIS_SENSE_DEADLINE_S", "2.0")))
+except ValueError:
+    DEADLINE_S = 2.0
+DEADLINE_AT = START + DEADLINE_S
+DEADLINE_FINISH_RESERVE_S = 0.5
+
+
+class InnerDeadlineExceeded(Exception):
+    pass
+
+
+def deadline_remaining():
+    remaining = DEADLINE_AT - time.monotonic()
+    if remaining <= 0:
+        raise InnerDeadlineExceeded()
+    return remaining
+
+
+def deadline_check():
+    deadline_remaining()
+
+
+def lock_journal(stream, live):
+    """Wait only inside the inner deadline; live mode keeps its nonblocking contract."""
+    while True:
+        deadline_check()
+        try:
+            fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return
+        except BlockingIOError:
+            if live:
+                raise
+            time.sleep(min(0.01, deadline_remaining()))
 
 RETIRE_WHEN = "Native session runtimes provide private observation and exception context."
 OPERATORS = ";&|()<>\n"
@@ -136,8 +171,12 @@ def wall(seconds=None):
 
 
 def clock():
-    return {"wall": wall(), "bootId": Path("/proc/sys/kernel/random/boot_id").read_text().strip(),
-            "uptimeSeconds": float(Path("/proc/uptime").read_text().split()[0]),
+    deadline_check()
+    boot_id = Path("/proc/sys/kernel/random/boot_id").read_text().strip()
+    deadline_check()
+    uptime = float(Path("/proc/uptime").read_text().split()[0])
+    return {"wall": wall(), "bootId": boot_id,
+            "uptimeSeconds": uptime,
             "provenance": "claude-hook/linux-proc"}
 
 
@@ -149,9 +188,13 @@ def initial_state():
 class Journal:
     """Caller holds journal.lock across recovery, append, rotation and state save."""
     def __init__(self, directory, payload):
+        deadline_check()
         self.directory, self.payload = directory, payload
         self.path = directory / "events.jsonl"
         self.state_path = directory / "state.json"
+        # Events, interrupted-line repairs and retention are committed with state only after
+        # the budgeted read/decision phases finish. A deadline therefore leaves no half-turn.
+        self.pending, self.newline_repairs, self.retired = [], [], []
         self.now = clock()
         self.agent = text_or_none(payload.get("agent_id")) or "main"
         self.source = {"hookEvent": text_or_none(payload.get("hook_event_name")) or "unknown",
@@ -160,14 +203,17 @@ class Journal:
         self.state = initial_state()
         stale = False
         try:
+            deadline_check()
             self.state.update(json.loads(self.state_path.read_text()))
         except FileNotFoundError:
             stale = bool(self.segments() or self.path.exists())
         except (ValueError, TypeError):
             stale = True
+        deadline_check()
         files = self.segments() + ([self.path] if self.path.exists() else [])
         tail = None
         if files:
+            deadline_check()
             with files[-1].open("rb") as stream:
                 stream.seek(max(0, files[-1].stat().st_size - 65536))
                 lines = stream.read().splitlines()
@@ -182,8 +228,13 @@ class Journal:
         self.retain()
 
     def segments(self):
-        return sorted((p for p in self.directory.glob("events.*.jsonl")
-                       if p.name.split(".")[1].isdigit()), key=lambda p: int(p.name.split(".")[1]))
+        deadline_check()
+        paths = []
+        for path in self.directory.glob("events.*.jsonl"):
+            deadline_check()
+            if path.name.split(".")[1].isdigit():
+                paths.append(path)
+        return sorted(paths, key=lambda p: int(p.name.split(".")[1]))
 
     def recover(self, files):
         # PreToolUse is cache-only in v1. Rebuild incident evidence, and explicitly
@@ -195,8 +246,11 @@ class Journal:
         self.state["transcriptHistoryLost"] = not bool(self.state["transcripts"])
         highest = 0
         for path in files:
+            deadline_check()
             with path.open("rb+") as stream:
-                while raw := stream.readline():
+                for count, raw in enumerate(iter(stream.readline, b"")):
+                    if count % 64 == 0:
+                        deadline_check()
                     try:
                         event = json.loads(raw)
                         highest = max(highest, event["seq"])
@@ -212,8 +266,7 @@ class Journal:
                 if path.stat().st_size:
                     stream.seek(-1, 2)
                     if stream.read(1) != b"\n":
-                        stream.seek(0, 2)
-                        stream.write(b"\n")
+                        self.newline_repairs.append(path)
         self.state["nextSeq"] = max(highest + 1, old.get("nextSeq", 1))
 
     def presence(self):
@@ -233,21 +286,13 @@ class Journal:
                                   "bootId": self.now["bootId"]}
 
     def append(self, kind, **fields):
+        deadline_check()
         event = {"schemaVersion": 1, "kind": kind,
                  "session": {"runtime": self.payload.get("_runtime", "claude-code"), "session": self.payload["session_id"]},
                  "agentId": self.agent, "seq": self.state["nextSeq"],
                  "clock": self.now, "presence": self.presence(), "source": self.source, **fields}
         raw = (json.dumps(event, separators=(",", ":"), allow_nan=False) + "\n").encode()
-        limit = max(1, int(os.environ.get("STASIS_SEGMENT_BYTES", 5 * 1024 * 1024)))
-        if self.path.exists() and self.path.stat().st_size and self.path.stat().st_size + len(raw) > limit:
-            segments = self.segments()
-            index = max(self.state.get("nextSegment", 1), int(segments[-1].name.split(".")[1]) + 1 if segments else 1)
-            self.path.rename(self.directory / f"events.{index}.jsonl")
-            self.state["nextSegment"] = index + 1
-        with self.path.open("ab") as stream:
-            stream.write(raw)
-            stream.flush()
-            os.fsync(stream.fileno())
+        self.pending.append(raw)
         self.state["nextSeq"] += 1
         return event
 
@@ -257,8 +302,9 @@ class Journal:
     def retain(self):
         removed = False
         for path in self.segments():
+            deadline_check()
             if path.stat().st_mtime < time.time() - 30 * 86400:
-                path.unlink()
+                self.retired.append(path)
                 removed = True
         if removed:
             self.gap("retention")
@@ -271,6 +317,30 @@ class Journal:
                 "openedAt": event["clock"], "shape": event.get("shape", "<str>")}
 
     def save(self):
+        # From here through state replacement is one short commit phase. There are no deadline
+        # checks inside it: starting the commit means finishing the buffered journal atomically
+        # with respect to this hook's journal lock.
+        for path in self.newline_repairs:
+            with path.open("ab") as stream:
+                stream.write(b"\n")
+                stream.flush()
+                os.fsync(stream.fileno())
+        for path in self.retired:
+            path.unlink(missing_ok=True)
+        limit = max(1, int(os.environ.get("STASIS_SEGMENT_BYTES", 5 * 1024 * 1024)))
+        for raw in self.pending:
+            if self.path.exists() and self.path.stat().st_size and self.path.stat().st_size + len(raw) > limit:
+                segments = sorted((p for p in self.directory.glob("events.*.jsonl")
+                                   if p.name.split(".")[1].isdigit()),
+                                  key=lambda p: int(p.name.split(".")[1]))
+                index = max(self.state.get("nextSegment", 1),
+                            int(segments[-1].name.split(".")[1]) + 1 if segments else 1)
+                self.path.rename(self.directory / f"events.{index}.jsonl")
+                self.state["nextSegment"] = index + 1
+            with self.path.open("ab") as stream:
+                stream.write(raw)
+                stream.flush()
+                os.fsync(stream.fileno())
         temp = self.directory / "state.json.tmp"
         with temp.open("w") as stream:
             json.dump(self.state, stream, separators=(",", ":"), allow_nan=False)
@@ -403,6 +473,7 @@ def exception_record(record):
 
 
 def transcript(j):
+    deadline_check()
     path = j.payload.get("transcript_path")
     if not isinstance(path, str) or not path:
         j.gap("transcript-path-absent")
@@ -410,6 +481,7 @@ def transcript(j):
     key = digest(path)
     cursors = j.state["transcripts"]
     try:
+        deadline_check()
         with open(path, "rb") as stream:
             stat = os.fstat(stream.fileno())
             identity = [stat.st_dev, stat.st_ino]
@@ -430,10 +502,13 @@ def transcript(j):
             stream.seek(cursor["offset"])
             batch = {}
             for count, raw in enumerate(stream):
-                if count % 64 == 63 and time.monotonic() - START > SCAN_UNTIL:
-                    print("dialogue-stasis-sense: skipped the rest of the transcript scan — internal budget reached; it resumes next call",
-                          file=sys.stderr)
-                    break
+                if count % 64 == 63:
+                    deadline_check()
+                    if time.monotonic() >= min(START + SCAN_UNTIL,
+                                               DEADLINE_AT - DEADLINE_FINISH_RESERVE_S):
+                        print("dialogue-stasis-sense: skipped the rest of the transcript scan — internal budget reached; it resumes next call",
+                              file=sys.stderr)
+                        break
                 at = cursor["offset"]
                 cursor["offset"] += len(raw)
                 partial = not raw.endswith(b"\n")
@@ -470,6 +545,7 @@ def transcript(j):
 
 
 def relay(j):
+    deadline_check()
     # gate-live-inject's verified transport is PostToolUse. UserPromptSubmit's
     # plain-text transport and PreToolUse JSON are the hooks manifest's ABI.
     event = j.payload.get("hook_event_name")
@@ -477,6 +553,7 @@ def relay(j):
         return None
     lines = []
     for entry in j.state["exceptions"].values():
+        deadline_check()
         # Rate limiting and doubling count only occurrences past the baseline.
         baseline = entry.get("baselineCount", 0)
         total, sent, at = entry["count"] - baseline, entry["notifiedCount"] - baseline, entry["noticeAt"]
@@ -497,6 +574,7 @@ def relay(j):
 
 def main():
     payload = json.load(sys.stdin)
+    deadline_check()
     if not isinstance(payload, dict):
         return
     # Runtime comes from the registered command, never from quoted tool input.
@@ -513,16 +591,21 @@ def main():
     sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "genesis/agentic"))
     import stasis_control as control
     if payload.get("hook_event_name") == "SessionStart":
-        print(control.session_start(repo, root, session))
+        control.set_hook_deadline(DEADLINE_AT)
+        result = control.session_start(repo, root, session)
+        deadline_check()
+        print(result)
         return
     if "--rewake" in sys.argv:
         # This registration must never journal a second Stop.
         raise SystemExit(control.rewake(repo, root, payload))
+    control.set_hook_deadline(DEADLINE_AT)
+    deadline_check()
     directory = root / session
     directory.mkdir(parents=True, exist_ok=True, mode=0o700)
     output, normalized = None, None
     with (directory / "journal.lock").open("a") as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX | (fcntl.LOCK_NB if control.mode() == "live" else 0))
+        lock_journal(lock, control.mode() == "live")
         j = Journal(directory, payload)
         try:
             if runtime == "codex" and not j.state.get("codexCoverageRecorded"):
@@ -549,23 +632,29 @@ def main():
                     j.state.pop("stasisStop", None)
                 transcript(j)
                 output = relay(j)
+        except InnerDeadlineExceeded:
+            return
         except Exception:
             # Never persist the exception text: it can contain raw tool arguments.
             j.gap("adapter-error")
-        finally:
-            j.save()
+        # Once the read and decision phases are done the commit always runs, even past the inner
+        # deadline: the transcript cursor must advance, or a loaded device would rescan the same
+        # stretch on every call and never progress. The commit is short (DEADLINE_FINISH_RESERVE_S).
+        j.save()
     # Native decide may append to events.jsonl: never call it while holding
     # journal.lock. An inert result cannot deliver pending control context.
     try:
+        deadline_check()
         action = (control.live_hook(repo, root, payload, normalized or {})
                   if not (normalized or {}).get("humanAnswering") and (
                       runtime == "claude-code" or payload.get("hook_event_name") in
                       {"PostToolUse", "UserPromptSubmit"}) else None)
         if action:
+            deadline_check()
             if payload.get("hook_event_name") == "PermissionRequest":
                 iid = normalized["correlation"]["incidentId"]
                 with (directory / "journal.lock").open("a") as lock:
-                    fcntl.flock(lock, fcntl.LOCK_EX | (fcntl.LOCK_NB if control.mode() == "live" else 0))
+                    lock_journal(lock, control.mode() == "live")
                     j = Journal(directory, payload)
                     j.gap("native-park-fold-pending")
                     j.state["openPrompts"][j.agent] = [o for o in j.state["openPrompts"].get(j.agent, []) if o["incidentId"] != iid]
@@ -579,9 +668,12 @@ def main():
                     current = json.loads(action)["hookSpecificOutput"]["additionalContext"]
                     action = control.context(event, old + "\n" + current)
             output = action
+    except InnerDeadlineExceeded:
+        return
     except Exception:
         pass
     if output:
+        deadline_check()
         print(output)
 
 
