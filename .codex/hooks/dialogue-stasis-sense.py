@@ -681,9 +681,12 @@ def main():
                     old = json.loads(output)["hookSpecificOutput"]["additionalContext"]
                     current = json.loads(action)["hookSpecificOutput"]["additionalContext"]
                     action = control.context(event, old + "\n" + current)
-            # Set before the bookkeeping below: a busy journal lock there must not cost the decision.
             output = action
             if payload.get("hook_event_name") == "PermissionRequest":
+                # The deny reaches the harness first; the bookkeeping's lock and fsync come after,
+                # and its failure cannot cost the decision.
+                print(output, flush=True)
+                output = None
                 try:
                     iid = normalized["correlation"]["incidentId"]
                     with (directory / "journal.lock").open("a") as lock:
