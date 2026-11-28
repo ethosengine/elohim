@@ -5856,5 +5856,303 @@
         }
       }
     ]
+  },
+  {
+    "name": "a-commitment-makes-the-only-record-kept",
+    "about": "R1: A commitment keeps the newest covered session record in place, adding no observation. Both values of KEPT_REPORT_HOLDS_A_CLAIM_OPEN give identical readings; decision 10 needs no twin.",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R4, R5, R6, R12, R13, R14, R16, R17"
+      },
+      {
+        "event": {
+          "type": "commit"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R4, R5, R6, R12, R13, R14, R16, R17",
+        "stock": {
+          "records": [
+            {
+              "session": 1,
+              "kind": "kept",
+              "participant": "p"
+            }
+          ],
+          "aggregates": [],
+          "notes": []
+        }
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R4, R5, R6, R12, R13, R14, R16, R17"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R4, R5, R6, R12, R13, R14, R16, R17"
+      }
+    ]
+  },
+  {
+    "name": "a-commitment-tied-while-the-cure-waits",
+    "about": "R1: A commitment keeps the newest covered session record in place, adding no observation. Both values of KEPT_REPORT_HOLDS_A_CLAIM_OPEN give identical readings; decision 10 needs no twin.",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R4, R5, R6, R12, R13, R14, R16, R17"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R1, R4, R5, R6, R12, R13, R14, R16, R17"
+      },
+      {
+        "event": {
+          "type": "commit"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R4, R5, R6, R12, R13, R14, R16, R17",
+        "stock": {
+          "records": [
+            {
+              "session": 1,
+              "kind": "kept",
+              "participant": "p"
+            }
+          ],
+          "aggregates": [],
+          "notes": []
+        }
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R4, R5, R6, R12, R13, R14, R16, R17"
+      }
+    ]
+  },
+  {
+    "name": "a-commitment-keeps-one-of-two-records",
+    "about": "R1: A commitment keeps the newest covered session record in place, adding no observation. Both values of KEPT_REPORT_HOLDS_A_CLAIM_OPEN give identical readings; decision 10 needs no twin.",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R4, R5, R6, R12, R13, R14, R16, R17"
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R4, R5, R6, R12, R13, R14, R16, R17"
+      },
+      {
+        "event": {
+          "type": "commit"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R4, R5, R6, R12, R13, R14, R16, R17",
+        "stock": {
+          "records": [
+            {
+              "session": 1,
+              "kind": "covered",
+              "participant": "p"
+            },
+            {
+              "session": 2,
+              "kind": "kept",
+              "participant": "p"
+            }
+          ],
+          "aggregates": [],
+          "notes": []
+        }
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R1, R4, R5, R6, R12, R13, R14, R16, R17"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1, R4, R5, R6, R12, R13, R14, R16, R17"
+      },
+      {
+        "event": {
+          "type": "pass",
+          "release": 1,
+          "participant": "p",
+          "newSession": true
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1, R4, R5, R6, R12, R13, R14, R16, R17"
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "reading": "retired",
+        "state": "cured",
+        "rule": "R1, R4, R5, R6, R12, R13, R14, R16, R17"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "retired",
+        "state": "retired",
+        "rule": "R1, R4, R5, R6, R12, R13, R14, R16, R17"
+      }
+    ]
+  },
+  {
+    "name": "a-persons-report-before-the-cure-beside-a-covered-record",
+    "about": "R1, R12, R14: A unit holds a person's own report and one covered record, both made before the cure. It is compacted, watched and noted on the covered record; the person's record stays and holds nothing open. Both values of KEPT_REPORT_HOLDS_A_CLAIM_OPEN give identical readings, because that record never counts against the cure. Whether such a report should hold the claim open is part of section 16, decision 10.",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "kept"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R5, R12, R13, R14: a person's report made before the cure counts against no cure (R10), and the unit closes on its covered record."
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "q",
+          "record": "covered"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R5, R12, R13, R14: a person's report made before the cure counts against no cure (R10), and the unit closes on its covered record."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R1, R5, R12, R13, R14: a person's report made before the cure counts against no cure (R10), and the unit closes on its covered record."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1, R5, R12, R13, R14: a person's report made before the cure counts against no cure (R10), and the unit closes on its covered record."
+      },
+      {
+        "event": {
+          "type": "pass",
+          "release": 1,
+          "participant": "q",
+          "newSession": true
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1, R5, R12, R13, R14: a person's report made before the cure counts against no cure (R10), and the unit closes on its covered record."
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "reading": "retired",
+        "state": "cured",
+        "rule": "R1, R5, R12, R13, R14: a person's report made before the cure counts against no cure (R10), and the unit closes on its covered record."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "retired",
+        "state": "retired",
+        "rule": "R1, R5, R12, R13, R14: a person's report made before the cure counts against no cure (R10), and the unit closes on its covered record."
+      }
+    ]
   }
 ]

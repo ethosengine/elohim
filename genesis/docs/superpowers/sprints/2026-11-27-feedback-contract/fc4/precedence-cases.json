@@ -716,5 +716,25 @@
     },
     "expect": "cure-available",
     "because": "R12, R5: The covered-record branch remains available."
+  },
+  {
+    "name": "commit-keeps-only-record-while-cure-waits",
+    "facts": {
+      "failed": true,
+      "coveredRecords": false,
+      "curePresent": true
+    },
+    "expect": "open",
+    "because": "R1, R12, R16: Tying a commitment removes the only covered record from the covered class without adding evidence or aggregates."
+  },
+  {
+    "name": "commit-keeps-newest-but-another-record-is-covered",
+    "facts": {
+      "failed": true,
+      "coveredRecords": true,
+      "curePresent": true
+    },
+    "expect": "cure-available",
+    "because": "R1, R12: Keeping the newest covered record leaves the older covered record available for compaction."
   }
 ]

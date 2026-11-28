@@ -2,7 +2,7 @@
   "$comment": "R9–R18: exactly the boolean vocabulary consumed by read(); absent facts are false.",
   "facts": {
     "failed": "R9: At least one observation did not pass.",
-    "coveredRecords": "R1, R5, R12: At least one covered record remains, at most one per failing session. Every kept failure adds a separate record without replacing a covered record, even after compaction; compaction never touches kept records.",
+    "coveredRecords": "R1, R5, R12: At least one automatically captured record remains with no commitment tied to it, at most one per failing session. Each person-written kept failure adds its own record, replacing nothing, even after compaction. A commit changes the newest covered session record to kept in place, without an observation, cure, aggregate or note; with no covered record it is not modelled. Compaction replaces covered records only.",
     "curePresent": "R4, R12, R18: The latest entry by SemVer precedence in the head declaration is cured; its release identifies the cure even if never taken. Otherwise only a holding condition supplies a cure. Entries later than the head they arrive with are ignored.",
     "aggregates": "R2, R5 and R12, R5, R13: The device holds at least one aggregate; retire on cure-available moves existing aggregates to the present cure without moving notes.",
     "retireMet": "R6, R5, R12, R14: Aggregates exist and every named participant passed in a session later than the retire that made the present cure current, followed by a quiet watch; unnamed aggregates cannot qualify.",

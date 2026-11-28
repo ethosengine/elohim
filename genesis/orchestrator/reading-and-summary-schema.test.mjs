@@ -159,6 +159,12 @@ export function apply(unit, event) {
       if (u.condition === 'observed') condition(o.passed);
       break;
     }
+    case 'commit': { // R1: retain the same occurrence, without another observation.
+      const record = u.records.findLast(r => r.kind === 'covered');
+      if (!record) throw new Error('not modelled: commitment without a covered session record');
+      record.kind = 'kept';
+      break;
+    }
     case 'release': // R4: replace the declaration, including on downgrade.
       u.head = e.release; u.landed = u.tick;
       u.declaration = e.entries.filter(([release]) => compareRelease(release, e.release) <= 0).map(([release, state]) =>
@@ -411,6 +417,32 @@ test('f-only-kept remains open under both decision-10 postures', () => {
   }
 });
 
+test('commit without a covered record is not modelled, including after compaction', () => {
+  let compacted = apply(start(), { type: 'fail', release: 0, record: 'covered' });
+  compacted = apply(compacted, { type: 'release', release: 1, entries: [[1, 'cured']] });
+  compacted = apply(compacted, { type: 'retire' });
+  for (const unit of [start(), compacted])
+    assert.throws(() => apply(unit, { type: 'commit' }), /^Error: not modelled:/);
+});
+
+test('commitment lives agree under both decision-10 postures and change only the record kind', () => {
+  for (const life of lives.filter(l => l.name.startsWith('a-commitment-'))) for (const posture of [true, false]) {
+    let unit = start(posture);
+    for (const step of life.steps) {
+      const next = apply(unit, step.event);
+      if (step.event.type === 'commit') {
+        const expected = structuredClone(unit);
+        expected.tick++;
+        expected.records.findLast(r => r.kind === 'covered').kind = 'kept';
+        assert.deepEqual(next, expected, life.name);
+      }
+      unit = next;
+      assert.equal(read(facts(unit)), step.reading, `${life.name}: posture ${posture}`);
+      assert.equal(summaryState(read(facts(unit)), facts(unit)), step.state, life.name);
+    }
+  }
+});
+
 test('R9–R16: scripted lives reach all nine readings', () => {
   const seen = new Set();
   for (const life of lives) {
@@ -433,12 +465,16 @@ test('R9–R16: facts declare exactly the predicates read uses, with rule citati
 });
 
 // Each mutant must disagree with a fixed scripted expectation, including retained stocks.
-test('twenty-four rule mutations are killed by scripted lives', () => {
+test('twenty-six rule mutations are killed by scripted lives', () => {
   const source = readFileSync(import.meta.filename, 'utf8');
   const model = source.slice(source.indexOf('const KEPT_REPORT_HOLDS_A_CLAIM_OPEN'), source.indexOf('const errors ='))
     .replace(/const root =[\s\S]*?(?=export function read)/, '')
     .replaceAll('export function ', 'function ');
   const mutations = [
+    ['r1-commit-adds-record', "record.kind = 'kept';", "u.records.push({ ...record, kind: 'kept' });",
+      ['a-commitment-makes-the-only-record-kept']],
+    ['r1-commit-no-op', "record.kind = 'kept';", '',
+      ['a-commitment-tied-while-the-cure-waits']],
     ['r1-second-failure-adds-record', '!record && !coveredBefore', 'true',
       ['mutation-g-one-record-per-session']],
     ['r1-kept-never-added', "if (e.record === 'kept')", "if (e.record === 'kept') return u; else if (false)",
