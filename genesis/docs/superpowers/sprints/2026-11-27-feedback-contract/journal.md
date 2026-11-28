@@ -8,7 +8,7 @@ author: shem session 3d494616 (Claude Fable 5.2), designing; shem session cacccb
 serves: [private-feedback-loop, dev-system-equilibrium]
 cites:
   - "feedback-loop-contract-plan | the plan whose FC stations are this sprint | sha256:0e2d5d15bd455754 | path: genesis/docs/superpowers/plans/2026-11-27-feedback-loop-contract-plan.md"
-  - "feedback-as-a-lifecycle-item-design | the spec the sprint takes into a contract | sha256:6af9042774cc0d7a | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
+  - "feedback-as-a-lifecycle-item-design | the spec the sprint takes into a contract | sha256:fa55da38420f99c9 | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
   - "one-loop-for-every-producer-design | the companion that sketches the contract and the producers it must serve | sha256:e7361b750b95dce3 | path: genesis/docs/superpowers/specs/2026-11-27-one-loop-for-every-producer-design.md"
 ---
 
@@ -571,3 +571,51 @@ hold hides the difference; the quiet-watch clause is among those. Section 5.5's 
 numbers a summary carries is prose that nothing checks, and the spec lists that with what the
 model does not handle. Codex (astra) did the model side. 132 lives, 918 steps, 41 checked
 changes, 172 tests across three files.
+
+### 2026-11-28, a cold reader finds the seam between the judge and the store
+
+The last two changes to the design had had no blind reader, so a fresh one (a Claude Opus agent
+that was given the document and nothing else) read all of it as an engineer who would have to
+build from it. Its verdict was to revise. It found the order of the nine readings and the hold of
+decision 10 stated the same way wherever they appear. What it could not build from was the place
+where the judge meets the store: what a unit groups, how many stored records one session leaves,
+how one instance of a condition cure is told from the next, what moving an aggregate does in a
+store that only appends, and how a receiver checks an emitter.
+
+Codex (astra) checked each of its 23 findings, read-only, against the model, the 132 lives and
+the store code, and sorted them: wording the lives already settle, cases nothing decides, and
+misreadings. The designing session opened the lives and the code lines it cited before changing
+a sentence. No rule changed and no life was added. Twelve conflicts of wording were corrected
+from the lives or the code, among them: a unit holds failures from newer emitters too (the
+definition said one emitter); a person may rule on any claim on watch (section 14 said only
+where no condition is checkable); the spool's run and the zero byte in the session key; the
+archival step is left by a late record from the unit's own emitter; and a skipped release, which
+section 0 still called a gap after decision 11 settled it. Where the reader had misread, the
+sentence it missed was usually far from the one it met, so four of those got a clause where it
+stumbled: the verb that writes a commitment link, that a later pass starts a watch's quiet again,
+where the judge's terms are defined, and that a captured record has no author for decision 10 to
+ask about.
+
+The cases nothing decides went onto the page as such, and a second fresh reader read the result
+with one question: where would a builder not know to ask. It too said revise, and it too found
+the readings and decision 10 consistent. It went one layer further into the store. Once records
+are compacted the store holds aggregates where the model still remembers every observation, and
+nothing says how the rules are computed from an aggregate. A late record compacted under a cure
+that already has an aggregate would be refused by the store as different evidence under one
+source. A person's record has a run its author chose, so the rules that speak of its session
+cannot be applied to it. It also caught four of the new gap sentences stating as open what
+another section stated as settled, and those were narrowed. Seven more conflicts of wording were
+corrected, among them the aggregate's key (the stored tuple has the emitter; R2 did not), the
+clause of R10 no reader could parse (the model's rule is that the claim stays reopened until
+every cure counted against is cured again), and section 12's session key, which now gives the
+form epr's capture writes.
+
+Section 6 now closes with what is not designed on the store side, in three groups: records and
+counting, what compaction writes and how it is read back, and what crosses devices and surfaces.
+None of it is decided here. The loop is closed on the author's judgment and not on a clean read:
+two cold readers in a row agreed on the judge and each found a deeper layer of the same
+undesigned thing, which is the contract of the retire command with the store. That is a design
+station of its own and not more wording; section 7a names it as node 10, and it is put to the
+steward as such. The integrator's
+reader reads this change as it does every batch. No rule changed, no life was added and no test
+changed: 132 lives, 172 tests across three files.

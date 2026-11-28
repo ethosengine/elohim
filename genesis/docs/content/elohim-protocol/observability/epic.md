@@ -9,7 +9,7 @@ companion_to:
   - genesis/docs/content/elohim-protocol/observer-protocol.md
   - genesis/docs/content/elohim-protocol/hardware-providence-commons.md
 cites:
-  - "feedback-as-a-lifecycle-item-design | the same witness on a person's own device, for tools: self-sense recorded under declared names, with a claim's runtime life this epic's kinds lack | sha256:6af9042774cc0d7a | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
+  - "feedback-as-a-lifecycle-item-design | the same witness on a person's own device, for tools: self-sense recorded under declared names, with a claim's runtime life this epic's kinds lack | sha256:fa55da38420f99c9 | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
   - "one-loop-for-every-producer-design | the reconciliation of this epic with the Observer Protocol and the feedback loop, and the survey of what each producer emits today | sha256:e7361b750b95dce3 | path: genesis/docs/superpowers/specs/2026-11-27-one-loop-for-every-producer-design.md"
   - "observer-protocol | the witness-not-surveillance epic whose Part VIII cannot / must / humans-control this epic turns on the network's observation of itself | path: genesis/docs/content/elohim-protocol/observer-protocol.md"
   - "observation-event-layer-design | the three-layer cut (Observation / Event / Attestation), the observer's log address, the diversity threshold and the eight-stage hard cutover this epic's witness plane is built on | path: genesis/docs/content/elohim-protocol/architecture/2026-05-11-observation-event-layer-design.md"

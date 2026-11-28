@@ -10,7 +10,7 @@ author: "Claude (session 3d494616 on shem, Fable 5.2), at the steward's directio
 serves: [private-feedback-loop, workspace-device-arrival, pain-is-answered, dev-system-equilibrium]
 refines: native-dev-tooling-over-peers-plan
 cites:
-  - "feedback-as-a-lifecycle-item-design | the design whose stations FB-1 to FB-10 this plan restates as claimable | sha256:6af9042774cc0d7a | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
+  - "feedback-as-a-lifecycle-item-design | the design whose stations FB-1 to FB-10 this plan restates as claimable | sha256:fa55da38420f99c9 | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
   - "one-loop-for-every-producer-design | the companion whose contract and store rule the FC stations fix as shapes | sha256:e7361b750b95dce3 | path: genesis/docs/superpowers/specs/2026-11-27-one-loop-for-every-producer-design.md"
   - "native-dev-tooling-over-peers-plan | the epic's plan this is a child of; its peer link, channel list and bin store are what this work rides | sha256:983afa13e08fe1d3 | path: genesis/docs/superpowers/plans/2026-10-29-native-dev-tooling-over-peers-plan.md"
   - "observer-protocol | source of the safeguards station FC-9 answers line by line | sha256:78afb76e1fb58772 | path: genesis/docs/content/elohim-protocol/observer-protocol.md"

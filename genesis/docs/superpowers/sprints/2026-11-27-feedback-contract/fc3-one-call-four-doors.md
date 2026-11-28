@@ -8,7 +8,7 @@ author: shem session 3d494616 (Claude Fable 5.2), orchestrating; fields read fro
 serves: [private-feedback-loop]
 cites:
   - "feedback-loop-contract-plan | the plan whose station FC-3 this table delivers, and whose condition it finds unmet | sha256:0e2d5d15bd455754 | path: genesis/docs/superpowers/plans/2026-11-27-feedback-loop-contract-plan.md"
-  - "feedback-as-a-lifecycle-item-design | the design that names the fields of an observation on a device, cited in rows as L | sha256:6af9042774cc0d7a | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
+  - "feedback-as-a-lifecycle-item-design | the design that names the fields of an observation on a device, cited in rows as L | sha256:fa55da38420f99c9 | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
   - "one-loop-for-every-producer-design | the companion whose section 6 says the contract has one call, cited as O | sha256:e7361b750b95dce3 | path: genesis/docs/superpowers/specs/2026-11-27-one-loop-for-every-producer-design.md"
   - "feedback-contract-fc1-primitives-inventory | the inventory whose rows first found time, subject and the observation record defined differently on the two planes | sha256:334e42fd83e95af4 | path: genesis/docs/superpowers/sprints/2026-11-27-feedback-contract/fc1-primitives-inventory.md"
 ---
