@@ -7,8 +7,8 @@ steward: human:matthew
 author: shem session 3d494616 (Claude Fable 5.2), designing; shem session cacccb55 integrating
 serves: [private-feedback-loop, dev-system-equilibrium]
 cites:
-  - "feedback-loop-contract-plan | the plan whose FC stations are this sprint | sha256:6a2ac59f7325a637 | path: genesis/docs/superpowers/plans/2026-11-27-feedback-loop-contract-plan.md"
-  - "feedback-as-a-lifecycle-item-design | the spec the sprint takes into a contract | sha256:cf3dd75b4c907dc7 | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
+  - "feedback-loop-contract-plan | the plan whose FC stations are this sprint | sha256:9f368d170f451ae3 | path: genesis/docs/superpowers/plans/2026-11-27-feedback-loop-contract-plan.md"
+  - "feedback-as-a-lifecycle-item-design | the spec the sprint takes into a contract | sha256:13ae49af0eded2ca | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
   - "one-loop-for-every-producer-design | the companion that sketches the contract and the producers it must serve | sha256:e7361b750b95dce3 | path: genesis/docs/superpowers/specs/2026-11-27-one-loop-for-every-producer-design.md"
 ---
 
@@ -516,3 +516,26 @@ all 54 of its citations (50 supported, 4 in part); a Claude scribe wrote the not
 taken. The ledger case already had an advisory rule in `.claude/data/.epr-meta`, and one point
 was added to it, in a commit of its own. The failure-list case cannot be written as a rule
 today. The station stays open, with five missing nodes named and none proposed as work.
+
+### 2026-11-28, the hold is the question as first asked
+
+The integrator's reader copied the model and ran 27 lives under both values of the constant that
+holds decision 10, and 16 changes to the model. Two findings, both where the model and the
+spec's own words disagreed. With the constant true, a person's report that a fix had failed
+stopped holding the claim once any covered record was also held, or when it was written before
+the device compacted, so the claim closed under the default. And a record kept because a
+commitment was tied to it never held, because the hold matched a record to its observation by a
+field the new event did not carry. The reader said plainly that section 16 gave the steward a
+wrong description of the default to decide on, and told him so.
+
+The designing session did not repair the boundary. It had been drawn around which cure a record
+counted against, and three corrections had each moved it. The constant now means the question
+as section 16 first asked it: can a claim close while a kept record of it stands, without that
+record's author. True, the default: a unit that holds any kept record is not compacted, watched
+or closed. False: kept records hold nothing. The matching of records to observations is gone
+from the model. Codex (astra) made the change, ported twelve of the reader's lives, and added
+eight checked changes that each die by a reading. Eight earlier lives changed and keep their old
+readings as twins, the life this session wrote by hand among them: what the last entry said it
+showed is now true only of its twin. Section 16 puts three things to the steward: which
+outcome; whether he wants the narrower rule, which is not modelled; and what releases a held
+claim. 107 lives, 784 steps, 73 cases, 34 checked changes, 147 tests across three files.
