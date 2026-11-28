@@ -59,6 +59,16 @@ rules:
       anywhere; memkit-retention.py's HEAD/TAIL/CORE comet keeps a permanent spine but releases it
       automatically; .epr-meta `retire-when:` is a decision-gated pin for RULES; habits.yaml
       `best_observed:` is one for a high-water mark. Nothing pins a result or a ledger row.
+      (5) ASK WHETHER THE FEEDBACK LOOP ALREADY CARRIES IT. If a row is a tool saying what went
+      wrong for whoever ran it (a refusal, an error, a finding about one run), the device has a
+      store for that: `epr feedback`, where a producer declares its closed list of terms and a
+      session leaves one record per term. Its design also gives each claim a reading and a
+      retirement by rule; that part is designed and not built. Before the first row, read the
+      producer checklist,
+      genesis/docs/superpowers/sprints/2026-11-27-feedback-contract/fc7-producer-checklist.md, and
+      the design it comes from,
+      genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md. A ledger of
+      failures beside that store is a second store with its own limits to keep.
     retire-when: >
       when a ledger under .claude/data cannot be opened except through findings_ledger.py, so mode,
       reader, forgetting rule and pin are structural rather than remembered
