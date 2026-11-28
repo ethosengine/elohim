@@ -148,12 +148,19 @@ Its CID is the grant's address. The record binds his words **by hash only** (`wo
 itself stays on the device (his ruling "Both, quote stays home").
 
 - **Where it may be recorded.** Only in the main conversation of a session on the device the grant names as its
-  runner: the covenant's own route (asked through the main conversation; the subagent-stamp guard refuses a
-  subagent), and the recording device's did must equal `runner:<did>`. A grant for another device, from a Codex
-  session, or from a bare terminal command is refused in this stage, saying why: none of them is the main
-  conversation of a session on the runner. The subagent-stamp guard is a string match (its own docstring: it
-  stops honest drift, not a determined forger), so any main-conversation session on the runner, and anything
-  on the device that can write that stamp, can record the clause; that is the accepted residual below. What of
+  runner, and the recording device's did must equal `runner:<did>`. What enforces that today, and what does not:
+  `epr covenant record` names the recording session in the clause and, through `live_guard`
+  (session_envelope.rs:409-444), requires that session's envelope on this device to be live and bound to this
+  checkout; the `covenant-subagent-stamp` hook refuses `covenant record` or `covenant put` from a tool call that
+  carries an `agent_id`, so a subagent cannot record one. The hook records nothing (nothing in the clause says
+  "main conversation"), and it is a string match (its own docstring: it guards against honest drift, not a
+  determined forger). Nothing tells a Codex session or a terminal command from a main conversation: each can
+  name a live session. Slice 1 adds the one check the device holds: a `grantsCarry` clause is refused unless its
+  session is moored on this device with the runtime `claude-code`, saying why. That runtime is a declaration:
+  the Claude Code start hook moors each session with it (ram-guard.py:502), and any process can declare it, so
+  the check stops an honest Codex session or terminal and not one that lies. A shell that names a borrowed
+  live session still passes, and so does any main-conversation session on the runner: that is the accepted
+  residual below. What of
   the trace survives a workspace restart: the clause (a brit note at `refs/notes/brit/covenant/<session>/<cid>`
   in the repository's git store), the Commitment (the flow sidecar `.eprfs/status/flows.jsonl`) and the
   recording session's own transcript (under the harness's config directory) all live on the persistent
@@ -207,7 +214,8 @@ F4-portal-consent removes it.
 **Who audits the grant, and when.** The verifier is one read, `epr flow carry verify-grant <cid>`, run (1) by the
 answering session before the first claim under a grant and (2) by the lander before it reuses a carried verdict.
 On the recording device it checks that the clause exists in the covenant notes, is signed, names the steward,
-carries the main-conversation stamp of a session on this device, and matches the Commitment (runner, coverage, expiry); a
+names a session that has an envelope on this device and was moored here as `claude-code` (the most the
+device records, and a declaration; nothing records "main conversation"), and matches the Commitment (runner, coverage, expiry); a
 lander elsewhere checks the `Cite` event's signature, the recording device's standing for the steward, the expiry
 and the coverage. A grant that fails is carried under by nobody: the verifier emits `carry-grant-unverified@1`
 naming the session that recorded it, captures feedback naming the steward, and voids the grant with a revocation.
