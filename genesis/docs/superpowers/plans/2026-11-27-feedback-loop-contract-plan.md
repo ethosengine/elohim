@@ -10,7 +10,7 @@ author: "Claude (session 3d494616 on shem, Fable 5.2), at the steward's directio
 serves: [private-feedback-loop, workspace-device-arrival, pain-is-answered, dev-system-equilibrium]
 refines: native-dev-tooling-over-peers-plan
 cites:
-  - "feedback-as-a-lifecycle-item-design | the design whose stations FB-1 to FB-10 this plan restates as claimable | sha256:bb8216eb2f736464 | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
+  - "feedback-as-a-lifecycle-item-design | the design whose stations FB-1 to FB-10 this plan restates as claimable | sha256:0190422f60b73c07 | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
   - "one-loop-for-every-producer-design | the companion whose contract and store rule the FC stations fix as shapes | sha256:e7361b750b95dce3 | path: genesis/docs/superpowers/specs/2026-11-27-one-loop-for-every-producer-design.md"
   - "native-dev-tooling-over-peers-plan | the epic's plan this is a child of; its peer link, channel list and bin store are what this work rides | sha256:983afa13e08fe1d3 | path: genesis/docs/superpowers/plans/2026-10-29-native-dev-tooling-over-peers-plan.md"
   - "observer-protocol | source of the safeguards station FC-9 answers line by line | sha256:78afb76e1fb58772 | path: genesis/docs/content/elohim-protocol/observer-protocol.md"
@@ -56,7 +56,7 @@ Verify: one table in the sprint directory in which each primitive has exactly on
 
 - [ ] **FC-2 — the declaration a producer ships has one schema in the SDK, and brit's shipped table validates against it unchanged** (serves private-feedback-loop)
 
-State: drafted, on its branch; the place its schema lives waits on the steward's ruling (companion section 12, decision 2: SDK schema now, or after a second producer has used the call). The draft and its fixtures are in the sprint directory (`../sprints/2026-11-27-feedback-contract/fc2-declaration-draft.md` and `fc2/`). It accepts, unchanged, the `claims --json` output of a brit 0.3.10 built on shem from brit's branch at `a99143327` (72 claims, no cures), and refuses twenty-four fixtures, each wrong in one way. Those checks are a test in the orchestrator's suite, `genesis/orchestrator/producer-declaration-schema.test.mjs`, so a gate runs them at every landing that touches the test or the fixtures; the test moves with the schema when its home is ruled. Not yet true of the first check below: no brit release archive carries the file, so "the release that carries it" was a local build. brit ships `{"claims": [...], "cures": [...]}` with twelve fields per claim (lifecycle spec section 5.4 and the seam of section 12). The SDK has two neighbouring shapes: `ClaimDeclaration` and `ObservationDeclaration` in `app-manifest.schema.json`, and `observation-kind.schema.json`. No schema describes brit's file. The P2P design gate for the declaration is recorded in the lifecycle spec's section 13: content-derived, part of the producer's own release, no DHT entry.
+State: drafted, on its branch; the place its schema lives waits on the steward's ruling (companion section 12, decision 2: SDK schema now, or after a second producer has used the call). The draft and its fixtures are in the sprint directory (`../sprints/2026-11-27-feedback-contract/fc2-declaration-draft.md` and `fc2/`). It accepts, unchanged, the `claims --json` output of a brit 0.3.10 built on shem from brit's branch at `a99143327` (72 claims, no cures), and refuses thirty-two fixtures, each wrong in one way. Its `cures` entry follows the cumulative five-field shape brit fixed for 0.3.12 (`claim`, `release`, `state`, `cite`, `summary`), which no brit release writes yet. Those checks are a test in the orchestrator's suite, `genesis/orchestrator/producer-declaration-schema.test.mjs`, so a gate runs them at every landing that touches the test or the fixtures; the test moves with the schema when its home is ruled. Not yet true of the first check below: no brit release archive carries the file, so "the release that carries it" was a local build. brit ships `{"claims": [...], "cures": [...]}` with twelve fields per claim (lifecycle spec section 5.4 and the seam of section 12). The SDK has two neighbouring shapes: `ClaimDeclaration` and `ObservationDeclaration` in `app-manifest.schema.json`, and `observation-kind.schema.json`. No schema describes brit's file. The P2P design gate for the declaration is recorded in the lifecycle spec's section 13: content-derived, part of the producer's own release, no DHT entry.
 
 Verify: a draft schema file in the sprint directory accepts the `claims.json` of the brit release that carries it, byte for byte, and refuses a row with an unknown field, a severity or polarity outside its list, or a `validityHorizon` that is not an ISO 8601 duration. After the ruling, the same file under `elohim/sdk/schemas/v1/manifest/` with its test in the SDK's schema test step.
 
@@ -68,7 +68,7 @@ Verify: one fixture expresses the same observation for each door; a test on each
 
 - [ ] **FC-4 — the reading of a term and the summary that may leave a device are each one closed shape, shared by every consumer** (serves private-feedback-loop)
 
-State: not built; like FC-2, where its schema lives waits on the steward's ruling (companion section 12, decision 2), and until then the deliverable is a draft in the sprint directory. The lifecycle spec gives nine readings with an order of precedence (section 6) and the summary's fields with their sources by state (section 5.5), in prose and tables. The SDK names the missing piece `ClaimInstance`.
+State: drafted, on its branch, as `../sprints/2026-11-27-feedback-contract/fc4-reading-and-summary-draft.md` and `fc4/`: two draft schemas, the mapping from reading to summary state and to the words a person is shown, sixteen facts, 63 cases, 61 scripted lives of one claim (twenty-one of them written by the integrator's reader to break the model) and forty-eight fixtures, checked by `genesis/orchestrator/reading-and-summary-schema.test.mjs`, which runs every combination of the facts and requires each to give exactly one reading, and runs each life through a small model, checking the reading after every event. Getting there corrected the design five times over, the last time by rewriting the spec's section 6 from numbered rules, now seventeen, that the model runs; the reader's attack on the model then found four more faults in one pass, which changed four rules and added one. The first draft could not run the order of readings in the lifecycle spec's section 6 as written, because a cure still present after compaction read `cure-available` ahead of `on-watch` and `retired`; sections 5.5, 6 and 7 were amended. The integrator's reader then found that a claim retired by a person's ruling still read `on-watch`, and that `reopened` had no meaning where the cure was a condition and not a release; both are corrected and have cases. The same reader then found a state with no reading at all, a cure present and nothing left for compaction to replace; `open` is now what remains when no other reading holds. The gap those lives first pinned, a device that skips the release that carried a fix, went to the brit lane, which chose a cumulative `cures` list for brit 0.3.12; the model reads it, and a fix can now be withdrawn. One behaviour is held behind a named switch because it is the steward's to decide (the lifecycle spec's section 16, decision 10): whether a machine-checked recovery may close a claim while a person's own report of its return still stands. No judge and no summary exists in code. Like FC-2, where its schema lives waits on the steward's ruling (companion section 12, decision 2), and until then the deliverable is a draft in the sprint directory. The lifecycle spec gives nine readings with an order of precedence (section 6) and the summary's fields with their sources by state (section 5.5), in prose and tables. The SDK names the missing piece `ClaimInstance`.
 
 Verify: the readings and the summary are a draft schema in the sprint directory, with the precedence as a table-driven test that any implementation can run, and the story `genesis/a2o/features/devflow/feedback-drains-when-cured.feature` uses only readings the schema lists.
 
@@ -86,7 +86,7 @@ Verify: the shape is schema; the feedback store's existing rule validates agains
 
 - [ ] **FC-7 — what a producer must declare and call to be on the loop is one checklist, with brit as its worked example** (serves private-feedback-loop)
 
-State: not built. The companion's section 4 gives each producer's first move in one line.
+State: the checklist is written, on its branch, as `../sprints/2026-11-27-feedback-contract/fc7-producer-checklist.md`, and the condition below is not met. It has 22 lines: four things a producer cannot do, sixteen it must do, two it leaves to the person. Walked through it at its branch tip `a99143327`, brit passes fourteen, four do not apply, one cannot be settled because no release carrying the declaration has been published, and three differ: its repeat marker leaves the outcome out of its key for some claims (latent: no call site triggers it today), a full spool is silent, and its marker directory has no bound. A fourth line first read as brit's failure was this design's mistake, a wrong directory name in the lifecycle spec, now corrected. The agent hook `.claude/hooks/brit-first.py`, which is not on the loop, cannot meet three lines because the contract has no place for a producer that is a script: who admits it, what its emitter is, and a gap-note path that names only brit. Ten things the checklist asks are checked by nothing. The companion's section 4 gives each producer's first move in one line.
 
 Verify: brit passes every line of the checklist against its landed release, and one other producer, an agent hook, is walked through it with no line that needs an interface the contract lacks.
 
@@ -98,7 +98,7 @@ Verify: an edit that adds a new append-only ledger under `.claude/data/`, or a n
 
 - [ ] **FC-9 — the contract answers each line of the Observer Protocol's safeguards, or says why a line does not apply to tools** (serves private-feedback-loop)
 
-State: not built. The Observer Protocol's Part VIII has three lists: what an observer cannot do, what it must do, and what the person controls. The companion's section 1b maps the feedback loop onto the Observer Protocol's shape and names three places the likeness stops. The lifecycle spec was written without reading that epic.
+State: the table is written, on its branch, as `../sprints/2026-11-27-feedback-contract/fc9-observer-safeguards.md`, and it finds the condition below unmet. Part VIII has eighteen lines. Four are answered by the designs and partly built; six are answered on paper and not built; one, physical privacy switches, does not apply to a tool; and seven have no answer in either design: enabling stalking or harassment, preserving evidence only with consent or emergency, cryptographic proof of operation, when observation happens, how patterns get used, access to one's own data, and deletion on request. On the last, the lifecycle spec says the opposite of silence: a record a person wrote, a record tied to a commitment and protected evidence are kept. The table records the seven and answers none. Answering them is design work not yet done, and where an answer decides what a person is owed it is the steward's. The Observer Protocol's Part VIII has three lists: what an observer cannot do, what it must do, and what the person controls. The companion's section 1b maps the feedback loop onto the Observer Protocol's shape and names three places the likeness stops. The lifecycle spec was written without reading that epic.
 
 Verify: one table with a row for each line of Part VIII, in which the feedback loop's answer cites the section of the lifecycle spec that holds it, or the row says the line does not apply and why. The checklist of FC-7 has the same three columns.
 
@@ -120,7 +120,7 @@ Verify: twenty captures of one term in one session leave one record per producer
 
 State: not built; the shapes are FC-2 and FC-4.
 
-Verify: an occurrence from a release behind the device's head reads `stale-emitter`, and `cure-available` once the head's declaration lists it in `cures`.
+Verify: an occurrence from a release behind the device's head reads `stale-emitter`; once the store holds a later observation from the head release it reads `cure-available`, if the head's declaration lists the claim in `cures`.
 
 - [ ] **FB-3 — a term whose burden crosses its declared bound is told to the device's steward at session start** (serves private-feedback-loop)
 
@@ -162,7 +162,7 @@ Verify: a brit older than the hook's table reads as pin lag with its cure, a new
 
 State: not built. The suite already calls the recorder when a sprint report is built; shem's store holds no record from it.
 
-Verify: a concern failed in one report and passed in two later ones reads `on-watch`, then `retired` after its watch, and a report built on a device leaves records in that device's store.
+Verify: a concern failed in one report and passed in two later ones reads `cure-available`, then `on-watch` once a session has retired it, then `retired` after its watch, and a report built on a device leaves records in that device's store.
 
 - [ ] **FB-9 — a red or green CI stage is recorded under the stage its pipeline declares** (serves pain-is-answered)
 
@@ -174,7 +174,7 @@ Verify: a stage red on three builds and green on the next two reads as one term 
 
 State: not built; designed in one line.
 
-Verify: a gate red on two pushes and green after a landing reads `on-watch` and names the landing.
+Verify: a gate red on two pushes and green after a landing reads `cure-available` and names the landing, and `on-watch` once a session has retired it.
 
 ## Carried elsewhere
 

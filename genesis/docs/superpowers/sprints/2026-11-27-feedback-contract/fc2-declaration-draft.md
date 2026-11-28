@@ -7,8 +7,8 @@ steward: human:matthew
 author: shem session 3d494616 (Claude Fable 5.2), called the designing session below, orchestrating and checking; schema, script and hand-written fixtures by Codex (astra), the schema then changed in two places by the designing session
 serves: [private-feedback-loop]
 cites:
-  - "feedback-loop-contract-plan | the plan whose station FC-2 this draft answers | sha256:c797ac99ca07cf87 | path: genesis/docs/superpowers/plans/2026-11-27-feedback-loop-contract-plan.md"
-  - "feedback-as-a-lifecycle-item-design | the design whose section 5.4 lists the declaration fields the schema closes | sha256:bb8216eb2f736464 | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
+  - "feedback-loop-contract-plan | the plan whose station FC-2 this draft answers | sha256:abae7be43a4c8fcf | path: genesis/docs/superpowers/plans/2026-11-27-feedback-loop-contract-plan.md"
+  - "feedback-as-a-lifecycle-item-design | the design whose section 5.4 lists the declaration fields the schema closes | sha256:0190422f60b73c07 | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
   - "one-loop-for-every-producer-design | the companion whose section 12 holds the open decision on where this schema lives | sha256:e7361b750b95dce3 | path: genesis/docs/superpowers/specs/2026-11-27-one-loop-for-every-producer-design.md"
   - "feedback-contract-fc1-primitives-inventory | the inventory that found reach and polarity mean something else in the SDK, which is why this draft does not reference them | sha256:334e42fd83e95af4 | path: genesis/docs/superpowers/sprints/2026-11-27-feedback-contract/fc1-primitives-inventory.md"
 ---
@@ -30,7 +30,7 @@ call), and he has not ruled. Nothing reads this schema yet.
 |---|---|
 | `fc2/producer-declaration.draft.schema.json` | The schema: a file is `{"claims": [...], "cures": [...]}`, with no other key at any level |
 | `fc2/fixtures/accepted/` | Three small valid files written by hand, and `brit-0.3.10-a99143327.claims.json`, brit's own output |
-| `fc2/fixtures/refused/` | Twenty-four files, each wrong in exactly one way, named for it |
+| `fc2/fixtures/refused/` | Thirty-two files, each wrong in exactly one way, named for it |
 
 The checks are a test, `genesis/orchestrator/producer-declaration-schema.test.mjs`, which the
 orchestrator's gate runs at every landing that touches the test or this `fc2/` directory. It is
@@ -43,9 +43,10 @@ must be what refuses it, and a fixture with no entry in that table fails. The te
 schema when the schema's home is ruled.
 
 To check the schema without the test: any validator for JSON Schema 2020-12 accepts the four
-files in `fc2/fixtures/accepted/` and refuses twenty-one of the twenty-four in
-`fc2/fixtures/refused/`. The other three (`duplicate-id.json`, `supersedes-undeclared-id.json`,
-`cure-undeclared-id.json`) pass the schema and are refused only by the three rules named below,
+files in `fc2/fixtures/accepted/` and refuses twenty-eight of the thirty-two in
+`fc2/fixtures/refused/`. The other four (`duplicate-id.json`, `supersedes-undeclared-id.json`,
+`cure-undeclared-id.json`, `cure-duplicate-claim-release.json`) pass the schema and are refused
+only by the four rules named below,
 which the test carries.
 
 The first version of these checks was a script run by hand, before the test existed. The Evidence
@@ -81,9 +82,22 @@ steward's.
   problem counts as cured on a device, such as running a release at least as new as a named one.
   `retireWhen` is `null` or `quiet:<duration>`: how long the problem must stay gone before it is
   called gone.
-- **Three rules a JSON Schema cannot state are in the test, each under its own name**: ids are
-  unique (`uniqueClaimIds`), every superseded id is declared (`declaredSupersedes`), and every
-  cure names a declared id (`declaredCureClaims`).
+- **Four rules a JSON Schema cannot state are in the test, each under its own name**: ids are
+  unique (`uniqueClaimIds`), every superseded id is declared (`declaredSupersedes`), every
+  cure entry names a declared id (`declaredCureClaims`), and a claim has at most one cure entry
+  per release (`uniqueCureEntries`).
+- **A `cures` entry has five required fields**: `claim`, `release`, `state`, `cite` and
+  `summary`. `release` is the producer's version for the release that made the entry, in
+  semantic-versioning form without build metadata, since two versions that differ only in build
+  metadata cannot be ordered. `state` is `cured` or `withdrawn`. `cite` and `summary` may not be
+  empty. The list is cumulative: a release's file carries every earlier release's entries and its
+  own. This is the shape brit fixed for its release 0.3.12, in place of a list of what one
+  release handled, so that a device which skips a release still sees the fix it carried. A
+  schema for one file cannot check that a later release kept an earlier one's entries; brit pins
+  its own list with a test, as it does its claim ids.
+- **`reopened` is not a state a producer writes.** It is what a device reads from what it
+  observes. A producer that takes back its own claim to have fixed something writes
+  `withdrawn`. A file with `"state": "reopened"` is refused.
 
 ## Evidence
 
@@ -106,6 +120,18 @@ workspace).
   `$` the SDK's schemas use, and the wording of one comment. The checks above were run after
   those changes.
 
+## The change of 2026-11-27 to `cures`
+
+The first version of this draft took a `cures` entry as brit 0.3.10's code defines it: `claim`,
+`cite`, `summary`. The scripted lives of station FC-4 then showed that a device which skips the
+release that listed a fix never sees it. The question went to the brit lane through the shem
+integrator, with two ways to close it. Brit chose a cumulative list and fixed the five-field
+shape above for 0.3.12, took this design's request to name the second state `withdrawn`, and
+will state in its documentation that releases are ordered by semantic-version precedence and that
+a claim's state is that of its latest entry in the head release's declaration. The schema, eight
+new refused fixtures and one new rule in the test follow that shape. brit 0.3.10's own file is
+unchanged and still accepted, because its list is empty.
+
 ## Where the sources disagree
 
 The schema follows what brit's code serialises. These differences are recorded and not resolved.
@@ -121,6 +147,8 @@ The schema follows what brit's code serialises. These differences are recorded a
 
 ## Not proven
 
+- That brit 0.3.12 writes entries this schema accepts. 0.3.12 does not exist yet; every fixture
+  that holds a cure entry was written by hand to the shape brit described.
 - That a published brit release archive carries the same bytes. No release with this file has
   been cut; the output checked here came from a local build of the branch.
 - That the schema's patterns behave the same in a Rust validator. Only Ajv 8.18.0, a JavaScript

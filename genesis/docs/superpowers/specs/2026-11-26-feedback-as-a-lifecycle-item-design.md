@@ -95,6 +95,30 @@ The rest is the design of an agent seat (Claude, Fable 5.2: first draft by sessi
 shem integrator; this revision by session 3d494616 on the steward's tenth statement) and is a
 proposal until the steward accepts it. The brit lane on the laptop reviewed the seam of section 12.
 
+Sections 5.5, 6 and 7 were amended later on 2026-11-27 by session 3d494616, after a first draft
+of a schema for the readings (station FC-4 of the plan) showed that the order of readings could
+not be run as written. What changed: a reading is of one claim and failing emitter, and is told
+by what the device holds; three ids are shown to a person in plain words; a summary reports
+what the device has done; and the retire command has one path for a person's ruling. Three fresh
+readers checked those sections in turn against one question, whether the judge and the summary
+could be written from the page without a guess. The last reader's two findings were corrected
+and not read again. The integrator's reader then found two faults those three had missed: a
+claim retired by a person's ruling still read `on-watch`, and `reopened` was not defined where
+the cure was a condition and not a release. Both are corrected, with cases in the sprint
+directory's `fc4/`. The same reader then found a third, a state with no reading at all, and
+proposed that the test try every combination of facts; it now does, and `open` is what remains
+when no other reading holds. The reader then found two more states that read wrongly, at which point patching the
+prose was stopped. Section 6 was rewritten from sixteen numbered rules, R1 to R16, which a small
+model in the orchestrator's tests runs through fifteen scripted lives; the rules, the lives and
+the section now say one thing, and a rule is changed in the lives first. A scribe agent wrote
+the section from the rules and the designing session checked it. The integrator's reader then
+ran the model against twenty-one lives of its own and found four more faults in one pass, where
+prose had taken six; rules R4, R10, R13 and R14 were changed, R17 was added, and its lives are
+kept beside the others. A further pass of fourteen lives and thirty-five changes to the model
+closed those four and found two more things: which cure is acted on when two are present, now
+stated in R4, and a device that skips a release, which is stated as a gap and not designed
+(section 7a, node 9). None of this is a ruling of the steward's.
+
 ## 1. What this document says and does not restate
 
 A warning, a refusal or a failure is one observation of a **claim** that its emitter declared in
@@ -308,14 +332,10 @@ One row per claim, shipped in the emitter. The fields, and the existing vocabula
 | `weight` | What one occurrence costs the one who felt it. Zero means a refusal that is working as designed | New; `duration_ms` is the measured cost where known |
 | `ceiling` | The highest rung a summary of this claim may graduate to: `device`, `steward`, `collective`, `commons` | The governed-space rungs |
 | `cure` | A named action the device can already take (migrate, follow head, restart), where one exists | `Check.cure` |
-| `clears` | The condition under which a cure is present on a device, from a closed list: `release-current:<tool>`, `release-at-least:<tool>@<version>`, `path:<p>`, `bound:<measure@v>`, `observed` (a later `passed` observation of the claim). A list; any one holding is enough | New |
+| `clears` | The condition under which a cure is present on a device, from a closed list: `release-current:<tool>`, `release-at-least:<tool>@<version>`, `path:<p>`, `bound:<measure@v>`, `observed` (the newest observation of the claim on the device `passed`; a newer one that did not pass ends it). A list; any one holding is enough | New |
 | `retireWhen` | How long the problem must stay gone before it is called gone (section 7). One form for now: `quiet:<ISO 8601 duration>`, such as `quiet:P45D`. Null means the retention policy's watch, and a shorter value than the policy's is read as the policy's | The habit register's `retire-when`; the policy's `resolvedDays` |
 
-A release also carries one list of its own, `cures`. Each entry has three fields: `claim` (the
-claim id), `cite` (the commit, landing or flow note that holds the root-cause analysis) and
-`summary` (the cure's sentence: one line of plain text, reviewed with the release). This is the
-release saying what it handled, in statement 11's sense. The whole file is
-`{"claims": [<row>, …], "cures": [{claim, cite, summary}, …]}`.
+A release also carries one list of its own, `cures`. Each entry has five fields: `claim` (the claim id), `release` (the producer's version for the release that made the entry), `state` (`cured` or `withdrawn`), `cite` (the commit, landing or flow note that holds the root-cause analysis) and `summary` (the cure's sentence: one line of plain text, reviewed with the release). The list is cumulative: a release's declaration carries every entry of every earlier release and its own. There is at most one entry per claim and release. A claim may go cured, withdrawn and cured again across releases, each step a new entry. Releases are ordered by semantic-version precedence. The device reads the declaration of the head release it has taken; an entry whose release is later than that head is ignored. Brit fixed this shape for its release 0.3.12, at this design's request, in place of a list of what one release had handled, so that a device which skips a release still sees the cure it carried. `withdrawn` is the producer taking back its own claim and is a different thing from `reopened`, which is what a device reads from what it observes. The whole file is `{"claims": [<row>, …], "cures": [{claim, release, state, cite, summary}, …]}`.
 
 For this repository's own producers the same file shape lives at `.epr-meta/feedback-claims.json`.
 It is a new file beside the existing `.epr-meta/feedback-policy.json`, which keeps its present
@@ -341,8 +361,11 @@ The only payload that may leave a device. Every field is closed or measured.
 | `severity` | Closed: one of the three handled levels of section 10. A receiver folds the declaration's name through the same table and compares |
 | `state`: `open`, `cured`, `retired`, `reopened` | Closed |
 | `class`: `fixture` or `real` | Closed |
-| `cure`: the address of the curing release, when the state has one | Closed |
+| `cure`: the curing release as the producer's declaration names it, the producer and the version in the entry's `release`; an address is not used because a device that skipped that release holds none | Closed. Present in a `cured`, `retired` or `reopened` summary, where it is the cure the device acted on or the cure the reopening counts against, and only when that cure is a release. An `open` summary has none, even when a cure is available and not yet acted on. A claim that cleared by a condition naming no release (section 7) has no `cure` in its summary, because such a condition can hold a path |
 | `sessions`, `first-day`, `last-day`, `dropped`, `bytes` | Measured: numbers, and days in place of times |
+
+Always present: `claim`, `emitter`, `polarity`, `severity`, `state` and `class`. The measured
+fields are present according to the state, as set out below.
 
 Not in a summary: `about`, `judged`, `message`, any path or argument, the participant, and the
 session key. The sending device builds a summary by looking each closed value up in the emitter's
@@ -354,8 +377,14 @@ from, by state: for `open`, `sessions` and the two days are read from the view o
 `dropped` and `bytes` are left out; for `cured`, the numbers are combined across the claim's
 aggregates: `sessions`, `bytes` and `dropped` (their `count`) are summed, `first-day` is the
 earliest and `last-day` the latest; for `retired`, all five are the archival note's, with
-`dropped` its `count`; for `reopened`, they are the note's when one exists, and the aggregates'
-as for `cured` when the claim reopened during its watch. A summary is written as
+`dropped` its `count`; for `reopened`, they are the note's when one exists, the aggregates'
+as for `cured` when the claim reopened during its watch, and the view's as for `open` when it
+reopened before compaction, while the device still held per-session records. Where a unit that was cured twice holds two notes, "the note" is the later one. A `reopened` summary
+keeps the unit's own emitter, so that a receiver can match it to the summaries that came before
+it; the release in which the claim was observed again is at or after the `cure` it names. A
+summary reports what the device has done and not what the judge proposes. That is why three
+readings send `open`, and why a claim whose watch is met still sends `cured`, with the
+aggregates' numbers, until the note is written. A summary is written as
 labelled slots on one flow event, which is why its field names are hyphenated while a
 declaration, which is JSON, uses camel case. One summary fits well inside the channel's 64 KiB
 record limit.
@@ -365,53 +394,117 @@ made.
 
 ## 6. The judge
 
-Native, in `epr feedback triage`, at read time. It writes nothing. For each claim and emitter on
-the device it gives one reading:
+Native, in `epr feedback triage`, at read time. It writes nothing. For each unit on the device it
+gives one reading. A unit is one claim as reported by one failing emitter on this device. "The
+claim" in this section and in sections 5.5 and 7 means that unit.
+
+**What the device holds for a unit:**
+
+- Session records: one per session in which the claim did not pass; a second failure in the same session adds none. Each is either covered (captured automatically and not tied to a commitment) or kept (written by a person, or tied to a commitment). Compaction replaces covered records only. `[R1]`
+- Aggregates: what compaction leaves in place of covered records, one for each participant among the records it replaces and one that names none for records with no participant. Each aggregate belongs to the cure the compaction acted on. `[R2]`
+- Notes: an archival note belongs to one cure. The unit's current cure is the cure its latest compaction, move or ruling acted on; before any, it has none. `[R3]`
+
+**When a cure is present.** A release cure is present when the claim's latest entry in the head's cumulative `cures` declaration is `cured`. It is identified by that entry's `release`, whether or not the device ever took that release. Going back to an earlier head means reading that head's shorter list. `[R4]` The declaration is the cumulative list that section 5.4 describes: each release carries every entry of every earlier release and its own, so a device that skipped the curing release still sees the cure it carried, provided a later release carried the entry forward. Entries whose release is later than the head are ignored. A condition cure is present while the claim's clearing condition holds. For the condition `observed`, it holds exactly while the newest observation of the claim on the device passed. Each time a condition comes to hold after not holding is a new cure instance. Where a release cure and a condition cure are both present, the present cure is the release cure. `[R4]`
+
+A `withdrawn` latest entry means no release cure is present. It also counts against the cure it withdraws, the latest `cured` entry before it, exactly as an observation would, for a unit whose current cure that is. `[R18]`
+
+The first row in the following table whose condition holds is the reading `[R9-R16]`. A unit with
+no observation that did not pass has no reading `[R9]`. `open` is what remains, so every unit that
+has an observation that did not pass has exactly one reading `[R16]`.
 
 | Reading | Meaning | What it proposes | Summary state |
 |---|---|---|---|
-| `open` | Observed, with no cure present | Nothing | `open` |
-| `stale-emitter` | The newest failing observation came from a release behind this device's head for that tool, made after the head landed: pin lag | The local cure: restart the session, or `epr device arrive` | None: the lag is the device's own |
-| `unrecorded` | The emitter is no known release: a local build or a registry-built binary | Nothing | None: no declaration to check it against |
-| `cure-available` | A release the device runs lists the claim in `cures`, or the claim's `clears` holds | Compaction (section 7) | `open` |
-| `on-watch` | Compacted, and `retireWhen` not yet met | Nothing | `cured` |
-| `retired` | `retireWhen` met | The archival note | `retired` |
-| `reopened` | Observed again from an emitter at or after its cure | Counter-evidence to the cure | `reopened` |
-| `review-due` | `validityHorizon` passed with no cure | An Intent, through the existing `epr feedback propose` | `open` |
-| `superseded` | A declared claim names it in `supersedes` | Nothing | None: the superseding claim carries it |
+| `reopened` | Something counts against a cure and the claim has not been cured again with respect to that cure. An observation that did not pass, from emitter release *e*, counts against the latest `cured` entry in the head's declaration whose release is at or before *e*, whether or not the device has compacted, and whatever the unit's current cure is. Only if no such entry qualifies, and the observation was recorded after the device compacted under a condition cure, does it count against that condition cure. A withdrawal counts as `[R18]` says. Cured again: for a release cure, the head's declaration holds a later `cured` entry; for a condition cure, the condition has come to hold again after the observation, or a release cure is present. A release cure ends a reopening of either kind `[R10]` | Counter-evidence to the cure | `reopened` |
+| `stale-emitter` | The newest observation that did not pass came from a release behind the device's head for that tool and was made after the head landed, and the device holds no later observation from the head release `[R11]` | The local cure: restart the session, or `epr device arrive` | None: the lag is the device's own |
+| `cure-available` | A cure is present, and either the unit holds at least one covered session record, or the unit holds aggregates, its current cure has been counted against, and the present cure is a different cure from its current cure. The second branch is subject to the open decision of section 16, decision 10 `[R12]` | Compaction (section 7) | `open` |
+| `on-watch` | The unit holds aggregates, `retireWhen` is not met, it holds no note for its current cure, and nothing has counted against its current cure `[R13]` | Nothing | `cured` |
+| `retired` | `retireWhen` is met, or the unit holds a note for its current cure; and in either case nothing has counted against its current cure `[R14]` | The archival note, until it is written; then nothing | `cured` until the note is written; then `retired` |
+| `superseded` | A declared claim names it in `supersedes` `[R15]` | Nothing | None: the superseding claim carries it |
+| `review-due` | The validity horizon has passed with no cure present. Cannot hold together with `unrecorded` `[R15]` | An Intent, through the existing `epr feedback propose` | `open` |
+| `unrecorded` | The emitter is no known release `[R15]` | Nothing | None: no declaration to check it against |
+| `open` | Whatever remains `[R16]` | Nothing | `open` |
 
-A claim has one reading at a time. Where more than one could hold, the first in this order does:
-`reopened`; `stale-emitter`; `cure-available`; `on-watch`; `retired`; `superseded`; `review-due`;
-`unrecorded`; `open`. `stale-emitter` gives way to the readings after it as soon as the store
-holds any later observation from the head release of that tool, since the device has then run the
-newer release. `reopened` holds until a release later than the cure it counts against cures the
-claim again; the claim then reads `cure-available` and the steps of section 7 repeat, with any
-earlier note kept. An observation read `stale-emitter` is not counted toward the claim's burden
-(section 8).
+A reading has an id, used in records and schemas, and where the id is not plain words a person is
+shown plain words instead: `stale-emitter` is shown as "behind", `cure-available` as "cure
+available" and `on-watch` as "on watch". The other ids are shown as written.
 
-Acting on a reading is a separate, deliberate act, `epr feedback retire --claim <id>`, made by an
-attributed session. It is one command: it takes the judge's current reading for that claim and
-performs the transition that reading proposes, compaction on `cure-available` and the archival note
-on `retired`. On any other reading it changes nothing and says why. The store already requires that: "interpretation and linking require
-deliberate authorship" (`feedback_store.rs:90-92`). Where the condition is machine-checkable the
-act needs no person, only an actor to attribute it to. Where no such condition exists, a person
-rules with `--as`, as sense rulings do (`flow/sense.rs`).
+The summary state in the table's last column is what a unit sends, with one exception: a unit
+whose emitter is no known release sends no summary at all, whatever its reading, because a
+summary's emitter must be one a declaration lists (section 5.5). `[R17]`
 
-What connects a reading to the act: at session start, where the `sense:` line is already printed,
-the device lists the claims read `cure-available` and those whose watch has ended. The session at
-the device, a person or their agent, then runs the retire command. Nothing runs it unattended.
+**Acting on a reading.** Acting on a reading is a separate, deliberate act, `epr feedback retire
+--claim <id>`, made by an attributed session. The store already requires that: "interpretation and
+linking require deliberate authorship" (`feedback_store.rs:90-92`). At session start, where the
+`sense:` line is already printed, the device lists the claims read `cure-available` and those whose
+watch has ended. The session at the device, a person or their agent, then runs the retire command.
+Nothing runs it unattended. An occurrence with no participant cannot meet a machine-checked
+condition, because the store matches recovery on a named participant and an absent one matches
+nothing.
 
-An occurrence with no participant cannot meet a machine-checked condition, because the store
-matches recovery on a named participant and an absent one matches nothing. Such records, which
-are nearly all of today's, are closed only by a person's ruling.
+On `cure-available` the command compacts every covered session record the unit holds, if any, into
+aggregates under the present cure, moves the aggregates the unit already holds to the present
+cure, and makes the present cure the current cure. The watch then runs under that cure. Kept
+records stay. Notes are not moved: an earlier note stays a note for its own cure. `[R5]` On
+`retired` with no note for
+the current cure, it writes the note for the current cure. With a note already held for the
+current cure it is refused and changes nothing. `[R7]` When `retireWhen` is met is stated in full in section 7. `[R6]` On `on-watch`, the command with a person's
+ruling (`--as`) writes the note for the current cure and leaves the aggregates as they are. Without
+a ruling it changes nothing on `on-watch`. A person may rule on any `on-watch` reading, not only one whose watch cannot be met. On every other reading a ruling adds nothing: the command does what it does without one. `[R8]`
+The aggregates a ruling leaves carry no recovery link, so today's retention keeps them; the rule
+that lets them go belongs to the new version of the retention policy, which is the steward's to
+establish (section 16, decision 1).
+
+**A decision this section does not make.** Section 16, decision 10, asks whether a record a person wrote can close without its author. `[R12]` makes a sharper case of it. A person's own kept report reopens a claim that the device had already compacted; a later release then cures it; the same participant passes in a later session and a quiet watch elapses. May the machine close that claim while the person's report stands? The model holds this behind one named constant, `KEPT_REPORT_HOLDS_A_CLAIM_OPEN`, which is `true` until the steward rules. With it true, a kept record that has counted against the unit's current cure blocks the second branch of `[R12]`, and the claim reads `open` until its author acts. A withdrawal or a covered record counting against the cure does not block. With it false, the claim is moved to the later cure, watched and noted under it, and the person's record is still kept. Both outcomes are scripted. With the constant true: the lives `c-false-retired`, `reviewer-B5-kept-during-watch-from-head` and `reviewer-C1-kept-reopen-during-watch-then-watch-met`. With it false: the same three with the suffix `-if-decision-10-lets-the-machine-close`. The life `f-only-kept`, a claim reported only by kept records, reads `open` under both: the decision does not reach it, which is the inconsistency a reviewer pointed out. Under "the machine may close", whether a person's word holds a claim open would depend on whether automatic records happened to exist beside it. See section 16, decision 10.
+
+**What follows from the rules:**
+
+- A device that skips the release that made a cure entry still sees the cure (life `skipped-release-still-sees-the-cure`). `[R4]`
+- A withdrawal before the device acted removes the cure, and the claim reads `open` until a later entry cures it again (life `withdrawn-before-compaction`). A withdrawal during the watch or after the note reads `reopened`; when a later release cures the claim again it reads `cure-available`, the retire command moves its aggregates to that cure, and it is watched and noted under it, the earlier note being kept (lives `withdrawn-during-watch`, `withdrawn-after-note`). `[R18, R12]`
+- A release cure ends a reopening against a condition cure (lives `condition-reopening-ended-by-a-release`, `condition-reopening-by-ruling-then-release`). `[R10]`
+- A failure from the release that made the cure reopens the claim even when the unit's current cure is a condition (life `release-cure-qualifies-before-the-condition`). `[R10]`
+- A claim cured by a condition can be reopened and cured again any number of times: red, green, red, green under `observed` ends `retired` (life `b-observed-red-green-red-green`). `[R4, R10]`
+- A failure under `observed` before any retire returns the claim to `open` (life `i-observed-fails-before-retire`). `[R10]`
+- A ruling closes a watch that cannot be met, and a second ruling for the same cure is refused (life `d-ruling`). A unit once closed by a ruling keeps those aggregates, so if it is later reopened and cured again its watch cannot be met by machine and it closes by a ruling again (life `j-ruling-twice`). `[R6, R7, R8]`
+- A late failing record from the unit's own emitter that arrives after its note reads `cure-available` until a session compacts it, and then `retired` again; a record from a different, older emitter is another unit (life `g-late-own-emitter`). `[R12, R14]`
+- A failure from an older release, arriving after the head's declaration holds a later `cured` entry, is not a reopening: it counts against the older cure, which the later one has cured again. A failure from the release of the latest `cured` entry is one, and stays one until a later entry cures the claim (lives `reviewer-C3-two-cures-then-fail-on-r1-no-pinlag`, `reviewer-A3-reopen-on-current-head`). `[R10]`
+- A failure that counts against an earlier cure does not disturb the reading of a watch under the current cure (life `guard-is-for-the-current-cure-only`). `[R13]`
+- `stale-emitter` gives way as soon as the device holds a later observation from the head release, and an observation read `stale-emitter` is not counted toward the claim's burden (section 8) (life `h-pin-lag`). `[R11]`
+- A release cure takes precedence over a condition cure (life `precedence-release-over-condition`). `[R4]`
+- Going back to an earlier head reads the shorter list (lives `downgrade-reads-the-shorter-list`, `downgrade-below-the-cure`). `[R4]`
+- Entries later than the head are ignored (life `entries-newer-than-the-head-are-ignored`). `[R4]`
+- An unknown emitter's unit sends no summary (life `reviewer-B3-unrecorded-then-cure`). `[R17]`
+- A watch must elapse with no failure after the pass, even a failure that counts against an earlier cure (life `watch-needs-quiet-after-the-pass`). `[R6]`
+
+**Also true of a unit**, and carried by the model and the lives:
+
+- A failing observation that reopens a unit belongs to that unit and starts no unit of its own. The unit keeps the name of its first failing emitter. When it is cured again, compaction takes every covered record the unit then holds and moves the aggregates it already holds to the present cure, writing each new aggregate under the emitter its records came from; its second retirement writes a second note, for the second cure, and the first note is kept (life `a-release-life`).
+- The passing occurrences that prove a recovery come from a later emitter. They are matched on the claim and the participant, whatever emitter they came from.
+- A person rules with `--as`, as sense rulings do (`flow/sense.rs`). A ruling writes no recovery link for the aggregates it closes over, and the note it writes names that person as its participant (life `d-ruling`).
+- Records that name no participant, which are nearly all of today's, can be closed only by a person's ruling.
+
+The model does not handle seven things:
+
+- Two entries for one claim and release: the model takes the later in input order; the draft schema's test refuses such a declaration.
+- Build metadata in a version: `1.0.0` and `1.0.0+build` have equal precedence; the draft schema forbids build metadata in an entry's `release`.
+- A failure from a release whose cure was withdrawn before the device compacted reads `reopened`; `open` is arguable.
+- The model takes the order of events as time, where a store dates a record by when it was observed: a pass dated before the failure it would answer, or a record dated before a note it arrives after, is not designed.
+- The model holds one unit: a failure from a different, older emitter is another unit, and how two units of one claim stand beside each other for a person is not designed.
+- An unknown emitter is ordered as the earliest release, where a real unknown build has no place in the order of releases.
+- After a device goes back to a head whose list no longer holds the cure of a claim it has already compacted, a new failure counts against nothing, and the claim can retire with that record never compacted.
+
+The rules are run. `genesis/orchestrator/reading-and-summary-schema.test.mjs` carries a small
+model of one unit's life and checks every step of the lives in
+`genesis/docs/superpowers/sprints/2026-11-27-feedback-contract/fc4/lives.json`, and it tries every
+combination of the facts the readings depend on to confirm that each unit gives exactly one
+reading. A change to a rule here is made in the lives first.
 
 ## 7. Decay: three steps, and what is kept
 
-| Step | What the device holds for the claim | What moves it on |
+| Step | What the device holds for the claim (one claim and failing emitter: the unit of section 6) | What moves it on |
 |---|---|---|
 | Open | One occurrence per session | The judge reads `cure-available` |
-| Cured, on watch | One aggregate occurrence carrying the count, sessions and days; one `Interpretation` whose summary is the release's own sentence; one `AvailableRelease` link whose evidence is the release's address | The claim's `retireWhen` is met |
-| Archival | One protected occurrence: the claim, the cure's address, what was dropped and over how long | Nothing. A recurrence reads `reopened` |
+| Cured, on watch | One aggregate occurrence carrying the count, sessions and days; one `Interpretation` whose summary is the release's own sentence; one `AvailableRelease` link whose evidence is the release, named by producer and version as the declaration's entry names it | The claim's `retireWhen` is met, or a person's ruling (section 6, R8) |
+| Archival | One protected occurrence: the claim, the cure as the declaration names it (the producer's release by version, or the condition as written), what was dropped and over how long | Nothing. A recurrence reads `reopened` |
 
 - **The citation and the plain text are existing kinds.** The link is the citation; `Interpretation.summary` holds the cure's sentence. That sentence was written by whoever fixed the problem and reviewed with the release, so no text from the device's own records survives the first step.
 - **The two records this section writes.** Both are ordinary occurrences. "Address of" means the store's existing content address (`atom_cid` in `elohim/epr-rea`), which the Genesis adapter already uses for the same purpose.
@@ -433,8 +526,8 @@ are nearly all of today's, are closed only by a person's ruling.
 
 - **What "the cure" is when no release cites the claim.** `cure-available` can hold through the claim's own `clears` with no entry in any `cures` list. Compaction still runs. Where the condition that held names a release (`release-current`, `release-at-least`), the cure is the device's head release of that tool, and the link is written to it; there is no sentence, so no interpretation is written. Where it names none (`path`, `bound`, `observed`), the cure is the condition as written, and neither link nor interpretation is written. In both cases that value is what the tuple and `detail.cure` hold.
 - **From cured to archival.** When the judge reads `retired`, the retire command writes, for each aggregate, the store's existing recovery link to the earliest `passed` occurrence of the claim by that aggregate's participant in a session after the cure landed, dated at that occurrence's time. Then it appends the note. The aggregates, the interpretation and the links are not kept on purpose: until a recovery link exists retention cannot select them, and once it does they are a resolved group past its 30 days, which ordinary retention reclaims. The cure's sentence and citation are not copied into the note, because the release's own `cures` list keeps them and the note names the release. An aggregate whose participant has not seen the claim pass keeps the claim on watch; a person may rule on it.
-- **`retireWhen`** is met when, for every aggregate, a later `passed` occurrence of the same claim, by the same participant, in another session, has stood for the watch period with no failing occurrence. That is the store's existing rule for experienced recovery and the policy's `resolvedDays`, whose floor is 30 days. A claim may ask for longer.
-- **The archival note is "owed to the release"** in that it names the release's address, so the history of a release is the set of notes that name it.
+- **`retireWhen`** is met when every aggregate the unit holds names a participant, each such participant has a passing observation of the claim in a later session than the compaction that made the aggregate, and the watch period has since elapsed with no observation of the claim that did not pass. An aggregate that names no participant cannot meet it `[R6]` A pass that names no participant counts for no aggregate.. That is the store's existing rule for experienced recovery and the policy's `resolvedDays`, whose floor is 30 days. A claim may ask for longer.
+- **The archival note is "owed to the release"** in that it names the release, by producer and version as the declaration's entry does, so the history of a release is the set of notes that name it.
 - **A reopen is counter-evidence.** It counts against the cure, reverses the positive signal of section 9, and is owed to the cure's author wherever the `retired` summary went. The canon holds that floor: "Corrections always reach the participant they concern."
 - **The first step changes policy.** Retention today permits deletion only for routine successes and for groups 30 days past experienced recovery. Compacting on a cited release drops per-session records earlier, while keeping their count. That needs a new version of the policy, which is the steward's to establish (section 16, decision 1).
 - **What may not be dropped:** a flow-log or channel record, including one that carried a summary, and protected evidence. Sending a summary does not hold back the device's own records, which never crossed.
@@ -455,6 +548,8 @@ Each is a step between two things that already have names.
 5. Chain: the surface cleans itself. Between "a claim is cured on this device" and "the surface's own log lines for it are dropped". Missing node: an adapter call by which a surface drops what a cure covers. Probe: after a retirement, the runtime's stored lines for that claim count zero. Present state: nothing. The acceptance suite is the nearest case to hand: 1.4 GB of raw results, traces and screenshots on this device, whose findings the store would hold in a few kilobytes.
 6. Chain: a claim on the application plane. Between "a claim declaration" and "an observation kind". Missing node: a closed-vocabulary field type in the observation-kind schema, whose types today are `Cid`, `String` and numbers. Probe: a kind whose param is an enumerated list refuses a value outside it. Present state: a `String` field is open.
 7. Chain: a development device. Between "a roster row admits a device" and "its records may be released in full". Missing node: a declaration, by the steward, that a device is a development device. Probe: `berth status` shows it, and an export from a device without it carries no open field. Present state: the roster row has no such field.
+8. Chain: a person's own report is closed. Between "a person wrote a record, or a record is tied to a commitment" and "the claim it reports is retired". Missing node: a way for a unit whose records compaction may not replace to close. Compaction leaves such records as they are (section 7), so the unit has nothing to put on watch, and by rule R16 of section 6 it reads `open` even after a cure is present. Node 2 above is the half of this for records tied to a commitment; nothing covers a record a person wrote by hand. Probe: a claim reported only by `epr feedback record`, cured by a release, reads something other than `open` after a session acts on it. Present state: no reading, no command and no retention rule reaches it; the model's life `f-only-kept` shows it.
+9. Chain: a fix is seen by a device that skipped the release that carried it. Between "a release lists a claim in its `cures`" and "a device that runs a later release reads the claim as cured". Cause: a device that goes from release 0 to release 2 runs the fix release 1 carried but would not see the cure unless the declaration says so. Brit chose the cumulative `cures` list and ships it in release 0.3.12 (relayed by the shem integrator from the brit lane on thinkpad, 2026-11-27). The judge reads the head's declaration (section 6, `[R4]`): because the list is cumulative, every earlier entry is present in a later release's declaration, and a device that skipped a release still reads the cure it carried. Probe: a device that takes release 2 without release 1 reads a claim release 1 cured as `cure-available`. Present state: agreed and modelled (life `skipped-release-still-sees-the-cure`), not shipped: brit 0.3.10, the release on this device, has an empty `cures` list, and no judge exists in code.
 
 ## 8. Leaving the device
 
@@ -517,8 +612,8 @@ an ordinary exception with no declared bound remains feedback, not an invented b
 Statement 13 is the order of things: the device's own cleanliness comes first.
 
 1. **On the device.** A drain returns bytes, and the capacity bound that was approaching recovers. That recovery is already a signal (`algedonic-recovered`, by the latch). The capacity report gains one line per cure: what it dropped and how much it returned. This needs no one else.
-2. **At a rung.** A summary whose state is `retired` is the positive signal: it carries the cure's address and the numbers `sessions`, `dropped` and `bytes`. Summed per cure by those at that rung, it is what a release removed from its peers: noise and disk. Statement 12 calls this a value shape, and it is readable without any further design.
-3. **As value.** Whether that sum settles into anything, and what it would mean, is not decided here. Statement 15 places it with mishpat; statement 14 asks only that it stay possible. So the summary carries what a later settlement would need: the cure's address, measured sizes, the class, and counts taken in principals. Two carriers exist if the network wants them: the observation kind `shefa:appreciation-emitted`, which names a recipient, a magnitude and a context, and the REA `satisfies` and `fulfills` relations.
+2. **At a rung.** A summary whose state is `retired` is the positive signal: it carries the cure, named as the declaration names it, and the numbers `sessions`, `dropped` and `bytes`. Summed per cure by those at that rung, it is what a release removed from its peers: noise and disk. Statement 12 calls this a value shape, and it is readable without any further design.
+3. **As value.** Whether that sum settles into anything, and what it would mean, is not decided here. Statement 15 places it with mishpat; statement 14 asks only that it stay possible. So the summary carries what a later settlement would need: the cure as the declaration names it, measured sizes, the class, and counts taken in principals. Two carriers exist if the network wants them: the observation kind `shefa:appreciation-emitted`, which names a recipient, a magnitude and a context, and the REA `satisfies` and `fulfills` relations.
 
 Limits that existing rulings already set on any such settlement: a pleasure signal is "a promotion
 *candidate*" and "never auto-promotes"; "no aggregate-triggered path may mutate a rule"; one
@@ -614,13 +709,14 @@ Agreed with the brit lane on 2026-11-27, and built on brit branch `run-ci/feedba
 
 - **Claim and emitter reach capture as environment**, `EPR_FEEDBACK_CLAIM` and `EPR_FEEDBACK_EMITTER`. An older epr ignores them and records as before, so brit needs no version gate. The arguments are unchanged, and the `--operation` word is drawn only from the list every installed recorder accepts, with `other` for any command outside it; a test in brit pins that list. This is the cure for finding 9 of section 3 on the brit side.
 - **The emitter** is the release record's address, which the launcher passes as `EPR_BIN_RECORD`, because a binary cannot contain its own record's address. A registry-built brit falls back to `unrecorded:<version>+exe.<sha12>` over the executable's bytes.
-- **A marker, checked before any process is started**, keyed on claim, emitter and session key, skips repeats. This removes the start and the 2-second wait that every brit command pays today. The marker is brit's alone: a file brit creates under `$XDG_CACHE_HOME/brit/feedback-notices/`, named by the key. epr neither reads nor writes it; epr's own guard against repeats is the store's same-source rule (section 5.2).
+- **A marker, checked before any process is started**, keyed on claim, emitter and session key, skips repeats. This removes the start and the 2-second wait that every brit command pays today. The marker is brit's alone: a file brit creates under `$XDG_CACHE_HOME/brit/feedback-markers/`, named by the key; for a command claim, and for any `passed` observation, the key also takes in the outcome. (A different directory beside it, `feedback-notices/`, holds brit's once-a-session notice that the recorder left a gap. An earlier version of this line named that directory for the marker, which was this design's mistake and not brit's.) Brit bounds that directory and `feedback-notices/` from 0.3.12: at 4,096 entries it removes files older than 7 days and skips lock files, and when still full it skips writing, which costs a repeated spawn or a repeated gap line and not a record. epr neither reads nor writes it; epr's own guard against repeats is the store's same-source rule (section 5.2).
 - **The session key** is brit's existing `gap_notice_key()` (brit 0.3.9; the brit lane reports commits `67f4068d8` and `c84b34665`, which this checkout's older brit does not hold): the SHA-256 of the first non-empty of `ELOHIM_SESSION_ID`, `CLAUDE_SESSION_ID`, `CLAUDE_CODE_SESSION_ID`, `CODEX_THREAD_ID`, `CODEX_SESSION_ID`; with `EPR_FEEDBACK_INVOCATION` set, that value is hashed in as well; with no session, the UTC day. The agent-side hook derives the same key, so the two producers' records share one run; each leaves its own record (section 5.2).
 - **The recorder cannot record its own absence**, so brit writes the claim, cause and time to a spool: `$XDG_STATE_HOME/brit/feedback-spool/<32 hex>.json`, one file per session and recorder identity, at most 1,024 bytes, written by rename, at most 256 files. A recorder that is missing, times out or cannot be started is skipped for the rest of that session. A recorder that refuses one record is not unavailable, so its file is keyed on the session, the recorder and the refused claim: only that claim is not retried, and one session can leave several `refused` files. The file does not say which claim was refused. Its keys are `v`, `claim`, `cause`, `at`, `emitter`, `session` (hashed), `recorder` (`path`, `size`, `mtime`) and `stderr` (the recorder's first error line). brit does not delete; epr drains. `stderr` and `recorder.path` are open fields. `epr feedback drain-spool` reads at most 256 notes a run, without following a link, turns each valid one into an occurrence (producer `brit`, run `spool-<session>`, item `<claim> failed <emitter>`, the note's own time, no participant) and removes the note it read and no other file; `stderr` and `recorder.path` are not stored. A note it cannot read as one is left where it is, and device status then says so.
 - **`claims.json` lists every legal id in full**, and `brit feedback claims --json` prints it.
 - **A refusal by design** (`brit/refused:<verb>.<form>`: a push deletion, a force push) declares weight 0 and no `clears`. Anything a later release could remove is `brit/capability-absent`.
 - **`brit/command:<verb>`** is today's per-command capture: weight 0, ceiling `device`. It is the denominator, and it is what retention already treats as a routine success.
 - **The human line** gains one suffix, ` [fb brit/capability-absent:grep.rev]`.
+- **From 0.3.12 the declaration's `cures` list is cumulative**, as section 5.4 describes.
 
 The brit diff (branch `run-ci/feedback-f1`, commits `e33aa20d2` and `9e14426e0`) was read against this section on 2026-11-27 and agrees with it. It was read, not built or run, by this document's author.
 
@@ -721,6 +817,8 @@ A posture is what the stations build to unless the steward corrects it. None is 
 7. **Severity.** Posture: declared in the standard's six names, handled as the existing three. If he wants `error` and `fatal` kept apart, that is one more level on the algedonic type.
 8. **Whether a drain settles into value.** Posture: not decided here; left possible (section 9). Statement 15 places it with mishpat.
 9. **A habit for the drain.** Posture: proposed in section 15.
+10. **A person's own report has no way to close.** Posture: not designed; such a claim reads `open` (section 6, rule R16; section 7a, node 8). `[R12]` raises a sharper case: a person's own kept report reopens a claim the device had already compacted; a later release cures it; the same participant passes and the watch elapses. With the constant `KEPT_REPORT_HOLDS_A_CLAIM_OPEN` true (the default), the claim reads `open` until its author acts. With it false, the machine moves the claim to the later cure and closes it, while the person's record is still kept. Both outcomes are scripted; the six lives are `c-false-retired`, `reviewer-B5-kept-during-watch-from-head`, `reviewer-C1-kept-reopen-during-watch-then-watch-met`, and the same three with the suffix `-if-decision-10-lets-the-machine-close`. The life `f-only-kept` reads `open` under both outcomes: the decision does not reach a claim reported only by kept records, which is the inconsistency a reviewer pointed out. Needs from him: which of the two outcomes, and whether a claim reported only by a person's records should also have a way to close.
+11. **A device that skips a release does not see the fix that release carried.** Posture: settled with brit as a cumulative `cures` list (section 5.4; section 7a, node 9). Needs from him: nothing, unless he wants the seam otherwise; the entry's second state is named `withdrawn` at this design's request.
 
 The first draft carried a "Resolved" list. Its answers were the integrator's, not the steward's:
 the first draft's author records that the steward typed "resolve those answers and get back with

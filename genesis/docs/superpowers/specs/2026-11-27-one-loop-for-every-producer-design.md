@@ -24,7 +24,7 @@ graduation-trigger: >-
   a second producer besides brit records under a declared name through the same call, and one
   store that had no declared limit gains one with a probe that reads it
 cites:
-  - "feedback-as-a-lifecycle-item-design | the device-plane design this pass generalises: a declared name per problem, a judge, a drain on cure, and a summary that leaves by consent | sha256:bb8216eb2f736464 | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
+  - "feedback-as-a-lifecycle-item-design | the device-plane design this pass generalises: a declared name per problem, a judge, a drain on cure, and a summary that leaves by consent | sha256:0190422f60b73c07 | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
   - "observability-epic | the governing vision for a running network: self-sense, witness and fruit kept apart, one cybernetic loop, and fruit and a count as the only things that cross a rung | sha256:b193d1cff3a60988 | path: genesis/docs/content/elohim-protocol/observability/epic.md"
   - "private-thought-governed-fruit | source of the rule that the aggregator is the dragnet and that no boundary rests on a count | sha256:2945eb608257be1e | path: genesis/docs/architecture/private-thought-governed-fruit.md"
   - "algedonic-feedback-signal | the typed pain signal a breach rides, and the rule that pain is not filtered or priced down | sha256:cf902beac8dd4aec | path: genesis/docs/superpowers/specs/2026-08-10-algedonic-feedback-signal-design.md"

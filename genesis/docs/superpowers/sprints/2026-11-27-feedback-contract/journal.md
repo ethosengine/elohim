@@ -7,8 +7,8 @@ steward: human:matthew
 author: shem session 3d494616 (Claude Fable 5.2), designing; shem session cacccb55 integrating
 serves: [private-feedback-loop, dev-system-equilibrium]
 cites:
-  - "feedback-loop-contract-plan | the plan whose FC stations are this sprint | sha256:c797ac99ca07cf87 | path: genesis/docs/superpowers/plans/2026-11-27-feedback-loop-contract-plan.md"
-  - "feedback-as-a-lifecycle-item-design | the spec the sprint takes into a contract | sha256:bb8216eb2f736464 | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
+  - "feedback-loop-contract-plan | the plan whose FC stations are this sprint | sha256:abae7be43a4c8fcf | path: genesis/docs/superpowers/plans/2026-11-27-feedback-loop-contract-plan.md"
+  - "feedback-as-a-lifecycle-item-design | the spec the sprint takes into a contract | sha256:0190422f60b73c07 | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
   - "one-loop-for-every-producer-design | the companion that sketches the contract and the producers it must serve | sha256:e7361b750b95dce3 | path: genesis/docs/superpowers/specs/2026-11-27-one-loop-for-every-producer-design.md"
 ---
 
@@ -184,3 +184,263 @@ named, and a count of days otherwise.
 The integrator's first push of the founding slice was refused by a different test of the tree
 suite, one that fails when two gate runs overlap on the device, and not by the slice. Dev did not
 move. The integrator pushes again when the device is quiet.
+
+### 2026-11-27, the safeguards table (FC-9), and the design's judge corrected by its own schema draft
+
+FC-9. `fc9-observer-safeguards.md` sets every line of the Observer Protocol's Part VIII beside
+what the feedback designs answer and what is built. Codex (astra) made the mapping; a Claude
+Haiku agent opened about 95 citations and searched again for every line marked unanswered,
+finding one answer the mapping had missed, in the companion; a Claude scribe agent wrote the
+prose; one blind reader found nothing to correct. Of eighteen lines, four are answered and partly
+built, six are answered on paper and not built, one does not apply to a tool, and seven have no
+answer: enabling stalking or harassment, preserving evidence only with consent or emergency,
+cryptographic proof of operation, when observation happens, how patterns get used, access to
+one's own data, and deletion on request. The table answers none of them. Where an answer decides
+what a person is owed, it is the steward's.
+
+FC-4, and what it found in the design. The designing session asked Codex (astra) for draft
+schemas of the reading and the summary, with the order of the nine readings as cases any
+implementation can run. Astra reported its draft incomplete and listed why: as the lifecycle
+spec's section 6 was written, a cure that is still present reads `cure-available` again after
+compaction, and that reading comes before `on-watch` and `retired` in the order, so neither could
+ever be read. The fault was in the design, written by the designing session, and not in the
+draft.
+
+The designing session amended sections 5.5, 6 and 7 of the lifecycle spec and put them to three
+fresh blind readers in turn, each asked whether the judge and the summary could be written from
+the page without a guess. The first found the order repaired and four seams between the
+sections; the second found four more; the third found two, which were corrected and not read
+again. What the spec now says that it did not: one reading is of one claim and failing emitter;
+which of the three cure readings holds follows from what records the device still has; a
+reopening belongs to the unit it reopens; a summary reports what the device has done, so a claim
+whose watch is met sends `cured` until its note is written; a summary carries a cure only when
+the cure is a release; and where a watch cannot be met, a person's ruling with `--as` writes the
+note. These are the designing session's corrections to its own proposal. No decision of
+section 16 is touched.
+
+FC-4 itself is not delivered. The draft is re-briefed against the amended sections.
+
+### 2026-11-27, the integrator's reader finds two more faults in the judge, and FC-4 is drafted
+
+The integrator's reader read the amended lifecycle spec and returned it: fix first. It found two
+faults that three blind readers and Codex had missed.
+
+- A claim retired by a person's ruling kept its aggregates, since no recovery link is written for
+  them, and so still met the words for `on-watch`, which comes before `retired` in the order. It
+  would have read `on-watch` for good, and a second ruling would have written a second note.
+  The spec itself says this is how nearly all of today's records close.
+- `reopened` was defined as observed again "from an emitter at or after its cure". Where the cure
+  is a condition and not a release, that has no meaning, so such a claim failing again could not
+  read `reopened`.
+
+Both are corrected in the spec: a note for a claim's current cure ends its watch whether or not
+the aggregates are still held, and a second note for the same cure is refused; and where the cure
+names no release, a failing observation after compaction reopens the claim. "Nothing observed
+since" now reads "no failing observation since". Three lines of the plan that described readings
+in the old way are corrected (FB-2, FB-8, FB-10). This correction has been read by nobody but its
+author.
+
+The lesson the designing session takes: each of five readers found faults the one before had
+not, and the one who found the deepest was the one asked whether the change was safe to land,
+not whether the page read well. A design of a state machine wants its cases written down and run
+before it is called read.
+
+FC-4 is drafted. `fc4-reading-and-summary-draft.md` and `fc4/` hold the two draft schemas, the
+mapping, fifteen facts, forty-one cases and forty-eight fixtures. Codex (astra) wrote them in two
+rounds and wrote the test, `genesis/orchestrator/reading-and-summary-schema.test.mjs`; the
+designing session added four cases for the reader's two findings, ran the test (8 passed), and
+made it fail three ways and restored it, one of those being the reader's first finding put back.
+One blind reader read the note; its findings are applied. The orchestrator gate has not been run
+on the test: the integrator has asked for no gate runs until its landing is through.
+
+To spare a Storybook build in CI for one fingerprint line, the seam map's cite of the lifecycle
+spec is put back as it was and left stale. The corpus's stale count is 372 for that reason, one
+more than before.
+
+### 2026-11-27, a third fault of the same kind, and a test that tries every combination
+
+The integrator's reader closed its two findings and returned the revision once more. A unit
+whose only remaining records are ones compaction may not replace, a person's own or one tied to
+a commitment, had no reading once a cure was present: the reference function in the test ended
+by returning nothing. The reader had found it by trying all the combinations of the facts by
+hand, and proposed that the test do the same.
+
+The designing session did that. `open` is now what remains when no other reading holds, so the
+rule is total; `retired` holds on the note for the current cure alone, which made one fact
+unnecessary; and three consequences are written out in the spec, one of them stated as not
+designed (how a unit of kept records closes). The test now runs every one of the 16,384
+combinations of the fourteen facts and requires one reading for each where something failed, none
+where nothing did, and all nine reachable. With the old rule put back, that test fails. Four
+cases were added, making forty-five, and every line citation in the cases and facts was
+remapped to the spec as it now stands and checked against the quoted words.
+
+What the designing session did wrong, said plainly: it amended a state machine in prose four
+times and asked readers to find what was missing, when the complete check was an afternoon's
+loop over fourteen booleans. The integrator's reader found three faults that way before the
+session wrote the loop.
+
+Still open, by the reader's notes and now stated in the spec: a unit once closed by a ruling and
+later cured again closes by a ruling again; and how a unit of kept records closes is not
+designed.
+
+### 2026-11-27, the producer checklist (FC-7), and a mistake of the design's that brit's code exposed
+
+`fc7-producer-checklist.md` is the checklist: 22 lines a producer must meet to be on the loop as
+the contract stands, with brit walked through each at its branch tip `a99143327` and one agent
+hook walked through each to find where a script has no place. Codex (astra) derived it and made
+both walk-throughs. It marked four of brit's lines as failing. A Claude Haiku agent then opened
+about 170 of the cited places and read brit's marker and spool functions in full, and none of
+the four stood as written: one is latent, one differs from a principle and not from the seam,
+one is a real difference, and one was the design's own error. The lifecycle spec had said brit's
+repeat marker lives under `feedback-notices/`; brit keeps it under `feedback-markers/` and uses
+the other directory for a different thing, and brit's own documentation says so. The spec is
+corrected. A Claude scribe agent wrote the prose.
+
+The three differences are written in the document for the brit lane as observations to
+reconcile and were passed to the integrator the same hour. Nothing in them says what brit should
+do.
+
+For the contract, the finding is the hook's: nothing says who admits a script as a producer,
+what a script's emitter is, or how a script leaves a gap note. Those are three things FB-7 needs
+before the hook can report on the loop.
+
+The same hour the integrator reported that its four-hour landing of other work had failed in the
+eprfs gate on two tests that refuse a key file "inside the git repository at /tmp". The cause was
+this session's Codex legs: launched with a write sandbox that includes `/tmp`, they make `/tmp`
+look like a git repository for moments at a time. The cure was already written down on this
+device and the designing session had used half of it. Every write leg since is launched with
+`/tmp` excluded, and the banner is checked.
+
+### 2026-11-27, the judge is rebuilt from rules that are run
+
+The integrator's reader closed its third finding and found two more, of a kind no check of
+single states can catch: after its first recurrence a claim fixed by a condition read `reopened`
+for good, and a claim could read `retired` on a note for a fix it had since reopened against.
+The first is the ordinary life of a test that goes red and green.
+
+The designing session stopped amending the prose and withdrew the five commits that carried it
+from the integrator's queue. It wrote the judge down once as sixteen numbered rules. Codex
+(astra) built a small model of one claim's life in the orchestrator's test and fifteen scripted
+lives, 105 steps, with the reading and the summary state stated after every step. The designing
+session ran them, read the main lives step by step, and put each of the two faults back: six
+lives fail with one, one with the other. A Claude scribe agent rewrote the spec's section 6 from
+the sixteen rules; the designing session checked that nothing outside that section and one
+bullet of section 7 had changed, defined one term the rewrite had dropped, and put back seven
+true statements it had removed.
+
+What a person's own report cannot do is now said where the steward will see it: a claim reported
+only by records a person wrote, or records tied to a commitment, reads `open` even after a fix,
+because compaction may not replace such records and nothing else closes them. It is missing node
+8 of the spec's section 7a and a tenth decision in its section 16.
+
+Not done: nobody but the designing session has read the rewritten section; the integrator's
+reader is asked to attack the lives. No gate has run on any of it.
+
+### 2026-11-27, the model is attacked, and four more faults fall out in one pass
+
+The integrator put a reader on the lives, as asked. It copied the model, wrote twenty-one lives
+of its own, and changed the model twenty-four ways to see which changes any life would notice.
+The five earlier faults each held. It found four new ones and seven changes that nothing
+noticed.
+
+- A reopening whose record a person wrote, arriving during the watch, was later retired under
+  the very cure it counted against. `on-watch` and both ways of reading `retired` now require
+  that nothing has counted against the current cure since it became current.
+- The text and the model disagreed about when a reopening against a release ends, and neither
+  was exact. A failure now counts against the latest taken release, at or before its emitter,
+  that lists the claim, and the reopening ends when a later listing release has been taken.
+- The text said a cure is present only while the running release lists the claim, which would
+  drop every cure at the next release. The model was right and the text is corrected.
+- A claim from an unknown release was sending summaries, which section 5.5 forbids. It sends
+  none.
+
+The rules are now seventeen. The reviewer's lives are kept under their own names beside the
+others: forty-three lives, 295 steps, forty-nine cases, 55 tests. With the first of the four
+faults put back, three lives fail.
+
+What this showed: six rounds of readers on prose found five faults one at a time. One pass with
+the model found four, and told the designing session which of its own lives were too weak to
+notice a change. Two things the model cannot express are now said in the spec as not designed:
+records dated out of the order they arrive in, and two units of one claim side by side.
+
+The integrator also stopped the designing session's gate run 35 seconds in, because its own next
+landing had just entered the same suite; only the address lint had run. No gate has run on any
+of this since.
+
+### 2026-11-27, the reader closes its four findings and names two more
+
+The integrator's reader ran fourteen more lives and thirty-five changes against the revised
+model. Its four findings are closed, and it judged every rule consistent with the model except
+R4. Two things remained.
+
+- When a release cure and a condition cure are both present, nothing said which one compaction
+  acts on, and the model preferred the condition, after which a later release could not cure
+  the claim again. The release cure now takes precedence, as rule R4 states.
+- A device that skips the release that listed a claim never sees the cure, though it runs the
+  fix. shem itself took brit 0.3.5, 0.3.9 and 0.3.10 in a day, and none of brit's 72 rows has a
+  clearing condition, so for brit this is the ordinary case. The designing session did not
+  design a cure for it: the answer is either a cumulative list on brit's side of the seam or a
+  read of the releases in between on the device's side, and neither is its to choose alone. It
+  is section 7a's node 9 and section 16's decision 11, and a life named for the gap pins what
+  happens today.
+
+The model now runs forty-eight lives, 325 steps, and 60 tests, and one guard the reader showed
+to be redundant is removed. The reader's view is that a draft with a model that says what it
+does not model can go on improving on dev.
+
+### 2026-11-27, one more gap stated, and brit's answer on skipped releases
+
+The integrator's reader made a last pass: the precedence finding is closed, the skipped-release
+gap is stated adequately, every change to the model it had found unnoticed is now noticed. One
+sequence remained. A claim compacted under a condition cure and then reopened stays `reopened`
+after the device takes a release that lists the claim, and neither the retire command nor a
+ruling moves it. The text and the model agree with each other and the outcome is still wrong. It
+is stated in the spec as a second known gap and pinned by a life, to be settled with the first.
+
+The brit lane answered the first the same hour, through the integrator. It prefers a cumulative
+`cures` list and will ship it in brit 0.3.12: each entry `{claim, release, state, cite, summary}`,
+append-only and pinned by a test, with a claim's state read from its latest entry in the
+declaration of the head release. The designing session accepted, as a design position and not a
+ruling, and asked for one change that brit took: the second state is `withdrawn`, not
+`reopened`, because `reopened` is what a device reads from what it observes and a withdrawal is
+the producer taking back its own claim. Brit has fixed that shape. The batch that followed changed the lives
+first, then the rules, then the draft schema, and it replaced this statement of the gap and its
+life before either reached dev: the two were handed over, accepted, and then folded into one
+range with the batch the next entry describes.
+
+### 2026-11-27, brit makes the list of cures cumulative, and one question goes to the steward
+
+The gap a scripted life had pinned, a device that skips the release that carried a fix, went to
+the brit lane through the shem integrator with two ways to close it. Brit chose a cumulative
+`cures` list for its release 0.3.12 and fixed the shape: `{claim, release, state, cite,
+summary}`, append-only and pinned by a test, a claim's state read from its latest entry in the
+head release's declaration, releases ordered by semantic-version precedence. It took the
+designing session's one request: the second state is `withdrawn`, since `reopened` is what a
+device reads from what it observes. It also took a bound on its two marker directories (4,096
+entries, seven days, lock files kept) and will write its limits into its own documentation. These
+are design positions agreed between two lanes, not rulings.
+
+The model was changed before any sentence of the spec. Codex (astra) did it in three rounds, each
+launched with `/tmp` excluded from its sandbox. The first stopped honestly at two steps the rules
+did not decide: after a fix is withdrawn and a later release fixes the claim again, the device
+holds nothing new to compact, so the claim could not be watched or closed under the new fix. Two
+rules were added for that: a release cure ends a reopening of either kind, which also closes the
+second known gap; and a claim whose cure has been counted against moves to a later cure when the
+retire command is next run, and its watch starts again. The third round stopped at one step
+where the designing session's own brief had expected the wrong reading; the rule was right.
+
+The integrator's reader judged the model sound against thirteen more lives. It also said that
+one thing the new rule does is not the designing session's to decide, and the designing session
+agrees. When a person's own report reopens a claim and a later release then fixes it, the new
+rule would let a machine-checked recovery close the claim while that report stands; yet the same
+report standing alone keeps a claim open for good. That is a sharper form of decision 10 of the
+lifecycle spec's section 16. The model holds it behind one named switch, set so that the
+person's report holds the claim open, and scripts both outcomes as paired lives. It is put to the
+steward and not settled here.
+
+The spec's sections 5.4, 5.5, 6, 7a, 12 and 16 were then written from one statement of the rules,
+by a scribe agent, and checked by the designing session against the six places it was allowed to
+change. The draft declaration schema follows brit's five fields and refuses build metadata in a
+version; brit 0.3.10's own file is byte-identical and still accepted.
+
+Counts: 61 lives, 432 steps, 63 cases, 16 facts, 80 tests across the two test files.
