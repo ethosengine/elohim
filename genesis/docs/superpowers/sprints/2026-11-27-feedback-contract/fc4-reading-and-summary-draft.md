@@ -8,7 +8,7 @@ author: shem session 3d494616 (Claude Fable 5.2), called the designing session b
 serves: [private-feedback-loop]
 cites:
   - "feedback-loop-contract-plan | the plan whose station FC-4 this draft answers | sha256:0e2d5d15bd455754 | path: genesis/docs/superpowers/plans/2026-11-27-feedback-loop-contract-plan.md"
-  - "feedback-as-a-lifecycle-item-design | the design whose sections 5.5 and 6 these schemas and cases put into a form that can be run | sha256:fa55da38420f99c9 | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
+  - "feedback-as-a-lifecycle-item-design | the design whose sections 5.5 and 6 these schemas and cases put into a form that can be run | sha256:627dc0523743df7a | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
   - "feedback-contract-fc2-declaration-draft | the sibling draft whose claim-id pattern and test conventions this one reuses | sha256:4f0f5246e0b18034 | path: genesis/docs/superpowers/sprints/2026-11-27-feedback-contract/fc2-declaration-draft.md"
 ---
 
@@ -41,7 +41,7 @@ they would be built to.
 | `fc4/reading-to-state.json` | For each reading: the summary state it sends, and the words a person is shown |
 | `fc4/facts.json` | Sixteen yes-or-no facts about what a device holds for one claim, each with the rule of the design that defines it |
 | `fc4/precedence-cases.json` | 73 cases: a set of facts, the reading the design gives, and the rule that decides it |
-| `fc4/lives.json` | 132 lives of one claim, 918 steps in all: each step is an event, and the reading and summary state that must follow it |
+| `fc4/lives.json` | 137 lives of one claim, 946 steps in all: each step is an event, and the reading and summary state that must follow it |
 | `fc4/fixtures/` | Sixteen files the schemas accept and thirty-two they refuse, each refused file wrong in one way and named for it |
 
 The checks are a test, `genesis/orchestrator/reading-and-summary-schema.test.mjs`, which the
@@ -209,6 +209,20 @@ workspace).
   default, one was removed with the rule it changed, and seven cannot have one, because under
   the default the hold itself hides the difference. 132 lives, 918 steps,
   73 cases, 41 checked changes, 147 tests.
+- The last sentence of that count was wrong, and the integrator's reader showed it with a
+  four-step life. Replayed at the earlier commit, twelve changes had died only by a twin or a
+  stock check, not eleven. As the test now records them: four die by a reading under the
+  default (`r1-two-kept-collapse`, `d4-condition-also-counted-against`,
+  `r1-kept-dropped-after-compaction`, `e`), the last two by lives the reader found; one was
+  removed with the rule it changed (`decision10-h-commit-default-oldest`); two die under the
+  default by a stock check and by a reading only in a twin (`r1-commit-adds-record`,
+  `r1-kept-replaces-covered`); and five die only in a twin (`decision10-m-commit-first-kind`,
+  `decision10-f-kept-suppresses-covered`, `decision10-g-commit-ignores-session`, `d`,
+  `j-quiet-watch`). That the hold hides the difference for those seven is reasoned from the
+  model and has not been searched, except `j-quiet-watch`, for which the reader searched every
+  continuation of four events. Three lives were added for how a reopening ends (W1, W2, W3 of
+  the reader), with no change to the model. 137 lives, 946 steps, 73 cases, 41 checked changes,
+  152 tests.
 - One thing the model does behind a named switch, because it is not the designing session's to
   decide: whether a claim can close while a kept record of it stands, without that record's
   author. The switch is `KEPT_REPORT_HOLDS_A_CLAIM_OPEN`, true until the steward rules. With it

@@ -8,7 +8,7 @@ author: shem session 3d494616 (Claude Fable 5.2), orchestrating; mechanism read 
 serves: [dev-system-equilibrium]
 cites:
   - "feedback-loop-contract-plan | the plan whose station FC-8 this note answers, and whose condition it finds cannot be met with the rule vocabulary as it stands | sha256:0e2d5d15bd455754 | path: genesis/docs/superpowers/plans/2026-11-27-feedback-loop-contract-plan.md"
-  - "feedback-as-a-lifecycle-item-design | the design the added pointer sends a session to, and whose declared term list is where a list of failure names is found | sha256:fa55da38420f99c9 | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
+  - "feedback-as-a-lifecycle-item-design | the design the added pointer sends a session to, and whose declared term list is where a list of failure names is found | sha256:627dc0523743df7a | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
   - "feedback-contract-fc7-producer-checklist | the checklist the added point in the ledger rule names as what to read before a new ledger's first row | sha256:acee0872ee71078a | path: genesis/docs/superpowers/sprints/2026-11-27-feedback-contract/fc7-producer-checklist.md"
   - "epr-meta-compose-gate | the design of the edit-time resolver whose matcher, classes and cascade this note reads to say what a rule can and cannot see | sha256:6052ce071bfec509 | path: genesis/docs/superpowers/specs/2026-06-25-epr-meta-compose-gate-design.md"
 ---

@@ -8,7 +8,7 @@ author: shem session 3d494616 (Claude Fable 5.2), designing; shem session cacccb
 serves: [private-feedback-loop, dev-system-equilibrium]
 cites:
   - "feedback-loop-contract-plan | the plan whose FC stations are this sprint | sha256:0e2d5d15bd455754 | path: genesis/docs/superpowers/plans/2026-11-27-feedback-loop-contract-plan.md"
-  - "feedback-as-a-lifecycle-item-design | the spec the sprint takes into a contract | sha256:fa55da38420f99c9 | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
+  - "feedback-as-a-lifecycle-item-design | the spec the sprint takes into a contract | sha256:627dc0523743df7a | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
   - "one-loop-for-every-producer-design | the companion that sketches the contract and the producers it must serve | sha256:e7361b750b95dce3 | path: genesis/docs/superpowers/specs/2026-11-27-one-loop-for-every-producer-design.md"
 ---
 
@@ -619,3 +619,32 @@ station of its own and not more wording; section 7a names it as node 10, and it 
 steward as such. The integrator's
 reader reads this change as it does every batch. No rule changed, no life was added and no test
 changed: 132 lives, 172 tests across three files.
+
+### 2026-11-28, a reopening is not a latch, and a count that was wrong
+
+The integrator's reader passed the last batch and attacked the two sentences of section 6 this
+session had changed without changing a life. R2 it could not part from the model. R10 it could.
+The new sentence said a claim reads `reopened` until every cure counted against has been cured
+again, which reads as a latch: once cured again, done. The model has no latch. A reopening
+against a condition cure is ended by a release cure only while that release cure is present, and
+when the producer withdraws it the claim reads `reopened` again with no new observation. The
+same story told against a release cure reads `open` at the end, because the entry that cured the
+claim again still stands in the cumulative list. Three lives of the reader's pin this as the
+model has it (W1, W2, W3); the sentence and the cell of R10 now say "for as long as"; and the
+difference between the two endings is listed with what the model does not handle, as undecided.
+The model did not change.
+
+The reader also showed that a count in the last entry but one was wrong. That entry said seven
+of the model's deliberate changes cannot be caught under the default, because the hold hides the
+difference. One of the seven is caught by a four-step life under the default, and another
+change, `e`, by a two-step one. Replayed at the earlier commit there were twelve such changes
+and not eleven. The note for station FC-4 now gives all twelve by name: four die by a reading
+under the default, one was removed with its rule, two die under the default by a stock check
+only, and five die only in a twin. For those seven the reason is reasoned from the model and
+not searched, apart from the quiet-watch clause. The earlier entry is left as written.
+
+Three wordings followed the reader as well: section 6 says it is the model that compacts beside
+a kept record under the other outcome; node 10 of section 7a says what is missing is what the
+command does when an address is already held, since section 7 does give each address; and the
+table of section 7 says "at each compaction". Codex (astra) did the model side. 137 lives, 946
+steps, 41 checked changes, 177 tests across three files.
