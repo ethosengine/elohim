@@ -19,7 +19,8 @@
 set -euo pipefail
 
 WORKSPACE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-STORAGE_BUILD_MANIFEST="${WORKSPACE_ROOT}/elohim/holochain/build-manifest.json"
+# STORAGE_BUILD_MANIFEST is overridable only so the refusal paths can be tested.
+STORAGE_BUILD_MANIFEST="${STORAGE_BUILD_MANIFEST:-${WORKSPACE_ROOT}/elohim/holochain/build-manifest.json}"
 
 # Keep the Edge check target on the same resource contract as the local gate.
 # Node is already part of the CI builder; the manifest remains the one source

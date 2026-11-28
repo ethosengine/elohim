@@ -460,12 +460,6 @@ RUN rm -rf src benches target/release/elohim-storage target/release/libelohim* \
 # uses buildkitd; local one-off builds need DOCKER_BUILDKIT=1.
 # ═══════════════════════════════════════════════════════════════════════════
 FROM dep-sources AS check-deps
-# scripts/ci/storage-quality-gate.sh reads this value from this crate's gate
-# project in elohim/holochain/build-manifest.json and passes it to BuildKit.
-# Scope it to the check branch so release-image cargo behaviour is unchanged.
-ARG CARGO_BUILD_JOBS
-RUN case "$CARGO_BUILD_JOBS" in ''|*[!0-9]*|0) echo "check target requires a positive CARGO_BUILD_JOBS build arg" >&2; exit 1;; esac
-ENV CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS}
 # Placeholder targets: dep-sources already wrote these; rewriting them is
 # idempotent and keeps this stage correct if that step ever moves.
 RUN mkdir -p src benches && \
@@ -501,6 +495,14 @@ RUN rm -rf src benches target/debug/elohim-storage target/debug/libelohim* \
 # unchanged tree is a full cache hit and a changed tree re-runs exactly once.
 # ═══════════════════════════════════════════════════════════════════════════
 FROM check-deps AS check
+# scripts/ci/storage-quality-gate.sh reads this value from this crate's gate
+# project in elohim/holochain/build-manifest.json and passes it to BuildKit.
+# Only this stage is capped: it holds the library test compile that the cap
+# exists for (Edge 1937 killed it at 429.9 s), while the check-deps warm above
+# passed uncapped and keeps its cache. Release images never descend from here.
+ARG CARGO_BUILD_JOBS
+RUN case "$CARGO_BUILD_JOBS" in ''|*[!0-9]*|0) echo "check target requires a positive CARGO_BUILD_JOBS build arg" >&2; exit 1;; esac
+ENV CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS}
 # blob_store's chunker test include_str!s the kernel's shared tree vectors
 # (src/../../eprfs/fixtures from /app/src resolves to /eprfs/fixtures).
 COPY elohim/eprfs/fixtures/tree-vectors.json /eprfs/fixtures/tree-vectors.json
