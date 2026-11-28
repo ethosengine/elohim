@@ -8,7 +8,7 @@ author: shem session 3d494616 (Claude Fable 5.2), orchestrating; inventory read 
 serves: [private-feedback-loop, dev-system-equilibrium]
 cites:
   - "feedback-loop-contract-plan | the plan whose station FC-1 this table delivers | sha256:d29a95ac372adc78 | path: genesis/docs/superpowers/plans/2026-11-27-feedback-loop-contract-plan.md"
-  - "feedback-as-a-lifecycle-item-design | the design whose primitives the table looks up, cited in rows as L | sha256:a9cc251c6e355063 | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
+  - "feedback-as-a-lifecycle-item-design | the design whose primitives the table looks up, cited in rows as L | sha256:20f22882feea7ab4 | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
   - "one-loop-for-every-producer-design | the companion whose section 6 lists the contract pieces, cited in rows as O | sha256:e7361b750b95dce3 | path: genesis/docs/superpowers/specs/2026-11-27-one-loop-for-every-producer-design.md"
 ---
 
