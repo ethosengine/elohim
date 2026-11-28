@@ -58,6 +58,7 @@ Commands:
   berth inbox   --session S [--peek] [--all] [--follow] [--json]  read notes said to this session
   berth inbox   --session S --reader R [--limit N] [--peek] [--json]
   berth inbox   --session S --reader R --follow
+  berth inbox   --session S --reader R --wait
   berth inbox   --session S --reader R --ack OFFSET --claim TOKEN
                                                                    one reader's unread notes ADDRESSED to S
                                                                    (no household broadcasts, no well-formed
@@ -74,7 +75,11 @@ Commands:
                                                                    is SILENT: ...` when a device with a moored
                                                                    session stops exchanging, and `... is
                                                                    exchanging again` when it resumes; open gate
-                                                                   misses arriving in the device fold print once
+                                                                   misses arriving in the device fold print once.
+                                                                   --wait prints what --follow would print next,
+                                                                   then exits: an idle agent's wake that no
+                                                                   watch cap ends (run it in the background and
+                                                                   re-arm it after each wake)
   berth who     RESOURCE                                           json of the holder (or null)
   berth room    cargo [--json] [--want N]                          read-only: may N more builds start here now?
                                                                    seats (io.max_concurrent_heavy), the builds
@@ -1111,6 +1116,7 @@ class Berth:
                     write_json_atomic(path, {"offset": max(offset, end)})
                 return [], None, max(offset, end), False, False
             token = secrets.token_hex(12)
+            self._log_reader_claim(session, reader, token, entries)
             if lease_s is None:
                 try:
                     lease_s = float(os.environ.get("BERTH_READER_LEASE_S") or self.READER_LEASE_S)
@@ -1120,6 +1126,33 @@ class Berth:
             write_json_atomic(path, {"offset": offset,
                                      "pending": {"token": token, "end": end, "expires": now + lease}})
             return entries, token, end, more, False
+
+    READER_LOG_MAX = 1 << 20
+
+    def _log_reader_claim(self, session, reader, token, entries):
+        """One line per claim that hands out notes: who claimed (pid and the parent's command line),
+        for which reader, and which notes. Two sessions lost notes that sat on time in the stream
+        behind their reader's cursor while neither the hook nor the follow showed them (2026-11-27,
+        backlog steward-device-arrival-open-items row 132); this names the consumer the next time.
+        Bounded (one rotation at READER_LOG_MAX), and a failure here never stops a claim."""
+        try:
+            path = os.path.join(self._inbox_dir(), "readers", "claims.log")
+            if os.path.exists(path) and os.path.getsize(path) > self.READER_LOG_MAX:
+                os.replace(path, path + ".1")
+            try:
+                with open(f"/proc/{os.getppid()}/cmdline", "rb") as f:
+                    parent = f.read().replace(b"\0", b" ").decode("utf-8", "replace").strip()[:300]
+            except OSError:
+                parent = ""
+            line = {"at": self.now(), "session": session, "reader": reader, "token": token,
+                    "pid": os.getpid(), "ppid": os.getppid(), "parent": parent,
+                    "argv": " ".join(sys.argv[1:])[:300],
+                    "notes": [n.get("cid") for n, _ in entries],
+                    "dseqs": [n.get("dseq") for n, _ in entries]}
+            with open(path, "a", encoding="utf-8") as f:
+                f.write(json.dumps(line, sort_keys=True) + "\n")
+        except Exception:  # noqa: BLE001 — a diagnostic must never cost a delivery
+            pass
 
     def reader_ack(self, session, reader, token, offset):
         """The consumer holding `token` has delivered every note before `offset`: the cursor moves
@@ -4100,6 +4133,7 @@ def _main(argv):
         peek = "--peek" in argv
         include_seen = "--all" in argv
         follow = "--follow" in argv
+        wait = "--wait" in argv
         as_json = "--json" in argv
         valued = {}
         for flag in ("--reader", "--limit", "--ack", "--claim"):
@@ -4112,6 +4146,7 @@ def _main(argv):
         reader, limit, ack, claim = (valued.get(f) for f in ("--reader", "--limit", "--ack", "--claim"))
         reader_usage = ("usage: berth inbox --session S --reader R [--limit N] [--peek] [--json]\n"
                         "       berth inbox --session S --reader R --follow\n"
+                        "       berth inbox --session S --reader R --wait\n"
                         "       berth inbox --session S --reader R --ack OFFSET --claim TOKEN")
 
         def refuse(why):
@@ -4125,6 +4160,8 @@ def _main(argv):
             return refuse(f"{', '.join(missing)} needs a value")
         if reader is None and valued:
             return refuse(f"{', '.join(valued)} needs --reader")
+        if wait and reader is None:
+            return refuse("--wait needs --reader")
         if reader is not None:
             if not NOTE_ID.fullmatch(reader):
                 return refuse("a reader is an id: letters, digits and . _ : -")
@@ -4136,6 +4173,8 @@ def _main(argv):
                 limit = int(limit)
             if follow and (peek or as_json or limit is not None or ack is not None or claim is not None):
                 return refuse("--follow prints every note as text and takes no --peek, --json, --limit or --ack")
+            if wait and (follow or peek or as_json or limit is not None or ack is not None or claim is not None):
+                return refuse("--wait prints the first notes as text and takes no --follow, --peek, --json, --limit or --ack")
             if (ack is None) != (claim is None):
                 return refuse("--ack and --claim come together")
             if ack is not None:
@@ -4165,6 +4204,41 @@ def _main(argv):
                         print(line, flush=True)
                     watch.save()
                 except (BrokenPipeError, OSError):
+                    return 0
+                b.sleep(2)
+        if reader is not None and wait:
+            # The wake form: block until this reader has a note (or the follow's device notice),
+            # print it as --follow does, acknowledge it, and EXIT. A harness's background command
+            # that ends on its first output wakes an idle agent and has no watch lifetime to outlive;
+            # a Monitor of --follow is killed at its cap (30 minutes), and a session that does not
+            # re-arm it hears nothing after (2026-11-27, backlog steward-device-arrival-open-items).
+            watch = _SilenceWatch(b, session, reader)
+            while True:
+                entries, token, end, _, _ = b.reader_claim(session, reader, lease_s=30.0)
+                printed = False
+                for note, offset in entries:
+                    try:
+                        print(b._note_line(note, session, b.now()), flush=True)
+                    except (BrokenPipeError, OSError):
+                        b.reader_release(session, reader, token)
+                        return 0
+                    b.reader_ack(session, reader, token, offset)
+                    printed = True
+                if token:
+                    b.reader_ack(session, reader, token, end)
+                try:
+                    for line in watch.lines():
+                        if line.startswith("[berth] misses not watched"):
+                            # A broken miss watch is said once per start; for a wake that restarts
+                            # after every note it would wake at every start, so it goes to stderr.
+                            print(line, file=sys.stderr, flush=True)
+                            continue
+                        print(line, flush=True)
+                        printed = True
+                    watch.save()
+                except (BrokenPipeError, OSError):
+                    return 0
+                if printed:
                     return 0
                 b.sleep(2)
         if reader is not None and peek:
