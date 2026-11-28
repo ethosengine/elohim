@@ -3,13 +3,10 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import test from 'node:test';
 import Ajv2020 from 'ajv/dist/2020.js';
-
 // Decision 10 of the lifecycle design's section 16, not yet ruled.
-// true: a kept record that counted against the current cure blocks D5's move to a later cure,
-// so the claim stays open until its author acts.
-// false: D5 applies whatever kind of record counted against the cure.
+// true: any kept record holds the unit against compaction, watch and closure.
+// false: kept records remain, but hold nothing. No modelled event releases the hold.
 const KEPT_REPORT_HOLDS_A_CLAIM_OPEN = true;
-
 const root = resolve(import.meta.dirname, '../..');
 const sprint = join(root, 'genesis/docs/superpowers/sprints/2026-11-27-feedback-contract/fc4');
 const load = path => JSON.parse(readFileSync(path, 'utf8'));
@@ -39,22 +36,20 @@ function declaredRequired(node, path) {
   }
   for (const [key, value] of Object.entries(node)) declaredRequired(value, `${path}/${key}`);
 }
-
 // False/absent facts do not establish a predicate. No lifecycle transition is inferred.
 export function read(f) {
   if (!f.failed) return null;
   if (f.recurred && !f.curedAgain) return 'reopened';
   if (f.pinLag && !f.laterHead) return 'stale-emitter';
-  if (f.curePresent && (f.coveredRecords ||
-      (f.aggregates && f.currentCureCountedAgainst && f.differentCure && !f.keptReportBlocksMove))) return 'cure-available';
-  if (f.aggregates && !f.retireMet && !f.note && !f.currentCureCountedAgainst) return 'on-watch';
-  if ((f.retireMet || f.note) && !f.currentCureCountedAgainst) return 'retired';
+  if (!f.keptRecordHolds && f.curePresent && (f.coveredRecords ||
+      (f.aggregates && f.currentCureCountedAgainst && f.differentCure))) return 'cure-available';
+  if (!f.keptRecordHolds && f.aggregates && !f.retireMet && !f.note && !f.currentCureCountedAgainst) return 'on-watch';
+  if (!f.keptRecordHolds && (f.retireMet || f.note) && !f.currentCureCountedAgainst) return 'retired';
   if (f.superseded) return 'superseded';
   if (f.horizonNoCure) return 'review-due';
   if (f.unknownRelease) return 'unrecorded';
   return 'open';
 }
-
 // R1–R4: event order is time; numeric releases abbreviate MAJOR.0.0 in lives.
 export function start(keptReportHoldsOpen = KEPT_REPORT_HOLDS_A_CLAIM_OPEN) {
   return { keptReportHoldsOpen, tick: 0, session: 0, emitter: null, head: null, landed: 0, known: true,
@@ -121,8 +116,7 @@ export function facts(u) {
     note: Boolean(note), recurred: recurrence.length > 0,
     curedAgain: recurrence.length > 0 && recurrence.every(cured),
     currentCureCountedAgainst: recurrence.some(({ c }) => c.id === u.current),
-    keptReportBlocksMove: u.keptReportHoldsOpen && recurrence.some(({ o, c }) =>
-      c.id === u.current && o && u.records.some(r => r.kind === 'kept' && r.at === o.at)), // R12 (D5), pending decision 10
+    keptRecordHolds: u.keptReportHoldsOpen && u.records.some(r => r.kind === 'kept'), // R1, R12–R14
     pinLag: Boolean(last && u.head !== null && compareRelease(last.release, u.head) < 0 && last.afterHead && last.at > u.landed),
     laterHead: Boolean(last && u.observations.some(o => o.release === u.head && o.at > last.at)),
     unknownRelease: !u.known, horizonNoCure: u.known && u.horizon && !present(u), superseded: u.superseded,
@@ -150,17 +144,18 @@ export function apply(unit, event) {
       u.observations.push(o);
       if (!o.passed) {
         u.emitter ??= o.release;
-        const record = u.records.find(r => r.kind === 'covered' && r.session === u.session);
         const coveredBefore = u.observations.slice(0, -1).some(x =>
           !x.passed && x.record === 'covered' && x.session === u.session);
         if (e.record === 'kept') u.records.push({ session: u.session, kind: 'kept', participant: o.participant, at: o.at });
-        else if (!record && !coveredBefore) u.records.push({ session: u.session, kind: e.record, participant: o.participant });
+        else if (!coveredBefore) u.records.push({ session: u.session, kind: e.record, participant: o.participant });
       }
       if (u.condition === 'observed') condition(o.passed);
       break;
     }
     case 'commit': { // R1: retain the same occurrence, without another observation.
-      const record = u.records.findLast(r => r.kind === 'covered');
+      const record = e.session === undefined ? u.records.findLast(r => r.kind === 'covered') :
+        u.records.find(r => r.session === e.session && r.kind === 'covered') ?? u.records.find(r => r.session === e.session);
+      if (record?.kind === 'kept') return unit;
       if (!record) throw new Error('not modelled: commitment without a covered session record');
       record.kind = 'kept';
       break;
@@ -196,7 +191,6 @@ const summaryState = (reading, f) => {
   const state = reading === null || f.unknownRelease ? null : mapping()[reading].state;
   return state && typeof state === 'object' ? (f.note ? state.then : state.untilNoteWritten) : state;
 }; // R17: unknown emitters send nothing; retired sends cured until the current cure's note exists.
-
 const errors = {
   reading: {
     'reading-outside-nine': ['enum', '/reading'],
@@ -235,12 +229,10 @@ const errors = {
     'missing-state': ['required', '', 'state'],
   },
 };
-
 test('both schemas compile in strict mode', () => {
   for (const [kind, schema] of Object.entries(schemas())) declaredRequired(schema, kind);
   assert.doesNotThrow(compile, `schemas must exist and compile at ${sprint}`);
 });
-
 test('every accepted reading and summary fixture passes its schema', () => {
   for (const [kind, validate] of Object.entries(compile())) {
     const files = names('accepted', kind);
@@ -251,7 +243,6 @@ test('every accepted reading and summary fixture passes its schema', () => {
     }
   }
 });
-
 test('every refused fixture fails exactly once for its named reason', () => {
   for (const [kind, validate] of Object.entries(compile())) {
     for (const name of names('refused', kind)) {
@@ -268,14 +259,12 @@ test('every refused fixture fails exactly once for its named reason', () => {
     }
   }
 });
-
 test('each refused directory and the refusal table name exactly the same files', () => {
   for (const kind of Object.keys(errors)) {
     assert.deepEqual(names('refused', kind), Object.keys(errors[kind]).map(name => `${name}.json`).sort(),
       fixturePath('refused', kind));
   }
 });
-
 test('the nine readings agree with the mapping and its states and display words', () => {
   const tableStates = {open:'open', 'stale-emitter':null, unrecorded:null,
     'cure-available':'open', 'on-watch':'cured', retired:{untilNoteWritten:'cured',then:'retired'},
@@ -295,7 +284,6 @@ test('the nine readings agree with the mapping and its states and display words'
     assert.equal(entry.unknownEmitterState, null, `${reading}: R17 unknown emitter`);
   }
 });
-
 test('every precedence case uses declared facts and returns its expected reading', () => {
   const vocabulary = new Set(Object.keys(load(join(sprint, 'facts.json')).facts));
   const readings = schemas().reading.properties.reading.enum;
@@ -316,7 +304,6 @@ test('every precedence case uses declared facts and returns its expected reading
     assert.equal(read(c.facts), c.expect, `case ${c.name}`);
   }
 });
-
 test('every combination of the declared facts gives exactly one reading, or none only when nothing failed', () => {
   const names = Object.keys(load(join(sprint, 'facts.json')).facts);
   const readings = new Set(schemas().reading.properties.reading.enum);
@@ -331,12 +318,10 @@ test('every combination of the declared facts gives exactly one reading, or none
   }
   assert.deepEqual([...reached].sort(), [...readings].sort(), 'every one of the nine readings must be reachable');
 });
-
 test('the cases include every step of one unit in order', () => {
   assert.deepEqual(cases().filter(c => c.sequence === 'one-unit').map(c => c.step),
     [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 'one-unit must contain all ten steps in order');
 });
-
 test('the story uses only declared reading and state words', () => {
   const storyPath = join(root, 'genesis/a2o/features/devflow/feedback-drains-when-cured.feature');
   const story = readFileSync(storyPath, 'utf8');
@@ -360,7 +345,6 @@ test('the story uses only declared reading and state words', () => {
   for (const word of words) assert.ok(shown.includes(word), `${storyPath}: unknown reading ${word}`);
   for (const word of stateWords) assert.ok(states.includes(word), `${storyPath}: unknown state ${word}`);
 });
-
 // R1–R16: each life asserts both projections after every event, independently of static cases.
 const lives = load(join(sprint, 'lives.json'));
 for (const life of lives) test(`life: ${life.name}`, () => {
@@ -404,7 +388,6 @@ for (const life of lives) test(`life: ${life.name}`, () => {
     assert.equal(summaryState(reading, f), step.state, label);
   }
 });
-
 test('f-only-kept remains open under both decision-10 postures', () => {
   const life = lives.find(l => l.name === 'f-only-kept');
   for (const posture of [true, false]) {
@@ -416,19 +399,21 @@ test('f-only-kept remains open under both decision-10 postures', () => {
     }
   }
 });
-
 test('commit without a covered record is not modelled, including after compaction', () => {
   let compacted = apply(start(), { type: 'fail', release: 0, record: 'covered' });
   compacted = apply(compacted, { type: 'release', release: 1, entries: [[1, 'cured']] });
   compacted = apply(compacted, { type: 'retire' });
   for (const unit of [start(), compacted])
-    assert.throws(() => apply(unit, { type: 'commit' }), /^Error: not modelled:/);
+    for (const event of [{ type: 'commit' }, { type: 'commit', session: 1 }, { type: 'commit', session: 99 }])
+      assert.throws(() => apply(unit, event), /^Error: not modelled:/);
+  const kept = apply(apply(start(), { type: 'fail', release: 0, record: 'covered' }), { type: 'commit', session: 1 });
+  assert.deepEqual(apply(kept, { type: 'commit', session: 1 }), kept);
 });
-
-test('commitment lives agree under both decision-10 postures and change only the record kind', () => {
+test('commitment lives follow each decision-10 posture and change only the record kind', () => {
   for (const life of lives.filter(l => l.name.startsWith('a-commitment-'))) for (const posture of [true, false]) {
     let unit = start(posture);
-    for (const step of life.steps) {
+    const expectedLife = lives.find(l => l.name === life.name.replace(/-if-decision-10-lets-the-machine-close$/, '') + (posture ? '' : '-if-decision-10-lets-the-machine-close')) ?? life;
+    for (const step of expectedLife.steps) {
       const next = apply(unit, step.event);
       if (step.event.type === 'commit') {
         const expected = structuredClone(unit);
@@ -442,7 +427,6 @@ test('commitment lives agree under both decision-10 postures and change only the
     }
   }
 });
-
 test('R9–R16: scripted lives reach all nine readings', () => {
   const seen = new Set();
   for (const life of lives) {
@@ -456,44 +440,50 @@ test('R9–R16: scripted lives reach all nine readings', () => {
   }
   assert.deepEqual([...seen].sort(), [...schemas().reading.properties.reading.enum].sort());
 });
-
 test('R9–R16: facts declare exactly the predicates read uses, with rule citations', () => {
   const declared = load(join(sprint, 'facts.json')).facts;
   const used = [...new Set([...read.toString().matchAll(/f\.(\w+)/g)].map(m => m[1]))];
   assert.deepEqual(Object.keys(declared).sort(), used.sort());
   for (const text of Object.values(declared)) assert.match(text, /\bR(?:[1-9]|1[0-8])\b/);
 });
-
 // Each mutant must disagree with a fixed scripted expectation, including retained stocks.
-test('twenty-six rule mutations are killed by scripted lives', () => {
+test('thirty-four rule mutations are killed by scripted lives', () => {
   const source = readFileSync(import.meta.filename, 'utf8');
   const model = source.slice(source.indexOf('const KEPT_REPORT_HOLDS_A_CLAIM_OPEN'), source.indexOf('const errors ='))
     .replace(/const root =[\s\S]*?(?=export function read)/, '')
     .replaceAll('export function ', 'function ');
   const mutations = [
+    ['decision10-a-second-branch-only', 'if (!f.keptRecordHolds && f.curePresent && (f.coveredRecords ||\n      (f.aggregates && f.currentCureCountedAgainst && f.differentCure)))', 'if (f.curePresent && (f.coveredRecords || (f.aggregates && f.currentCureCountedAgainst && f.differentCure && !f.keptRecordHolds)))', ['same-session-covered-then-kept']],
+    ['decision10-b-watch-unguarded', '!f.keptRecordHolds && f.aggregates', 'f.aggregates', ['a-persons-report-arrives-during-the-watch']],
+    ['decision10-c-retired-unguarded', '!f.keptRecordHolds && (f.retireMet', '(f.retireMet', ['a-persons-report-arrives-during-the-watch']],
+    ['decision10-d-commitment-ignored', "u.records.some(r => r.kind === 'kept')", "u.records.some(r => r.kind === 'kept' && r.at !== undefined)", ['a-commitment-keeps-one-of-two-records']],
+    ['decision10-e-counted-against-only', "u.records.some(r => r.kind === 'kept')", "recurrence.some(({ o }) => o && u.records.some(r => r.kind === 'kept' && r.session === o.session))", ['a-persons-report-before-the-cure-beside-a-covered-record']],
+    ['decision10-f-kept-suppresses-covered', "!x.passed && x.record === 'covered' && x.session", '!x.passed && x.session', ['reviewer3-X2-kept-then-covered-same-session-if-decision-10-lets-the-machine-close']],
+    ['decision10-g-commit-ignores-session', 'e.session === undefined ?', 'true ?', ['named-commit-keeps-older-participant-if-decision-10-lets-the-machine-close']],
+    ['decision10-h-commit-default-oldest', "u.records.findLast(r => r.kind === 'covered')", "u.records.find(r => r.kind === 'covered')", ['unnamed-commit-keeps-newest-participant-if-decision-10-lets-the-machine-close']],
     ['r1-commit-adds-record', "record.kind = 'kept';", "u.records.push({ ...record, kind: 'kept' });",
       ['a-commitment-makes-the-only-record-kept']],
     ['r1-commit-no-op', "record.kind = 'kept';", '',
       ['a-commitment-tied-while-the-cure-waits']],
-    ['r1-second-failure-adds-record', '!record && !coveredBefore', 'true',
+    ['r1-second-failure-adds-record', '!coveredBefore', 'true',
       ['mutation-g-one-record-per-session']],
     ['r1-kept-never-added', "if (e.record === 'kept')", "if (e.record === 'kept') return u; else if (false)",
       ['same-session-covered-then-kept']],
     ['r1-two-kept-collapse', "if (e.record === 'kept')", "if (e.record === 'kept' && u.records.some(r => r.kind === 'kept' && r.session === u.session)) return u; else if (e.record === 'kept')",
       ['two-kept-reports-in-one-session']],
-    ['r1-kept-replaces-covered', "if (e.record === 'kept')", "if (e.record === 'kept' && record) u.records.splice(u.records.indexOf(record), 1); if (e.record === 'kept')",
+    ['r1-kept-replaces-covered', "if (e.record === 'kept')", "if (e.record === 'kept' && u.records.some(r => r.kind === 'covered' && r.session === u.session)) u.records.splice(u.records.findIndex(r => r.kind === 'covered' && r.session === u.session), 1); if (e.record === 'kept')",
       ['same-session-covered-then-kept']],
-    ['r1-kept-dropped-after-compaction', "if (e.record === 'kept')", "if (e.record === 'kept' && coveredBefore && !record) return u; else if (e.record === 'kept')",
+    ['r1-kept-dropped-after-compaction', "if (e.record === 'kept')", "if (e.record === 'kept' && coveredBefore && !u.records.some(r => r.kind === 'covered' && r.session === u.session)) return u; else if (e.record === 'kept')",
       ['kept-failure-in-an-already-compacted-session']],
     ['decision10-machine-closes-ordinary-lives', 'const KEPT_REPORT_HOLDS_A_CLAIM_OPEN = true;',
       'const KEPT_REPORT_HOLDS_A_CLAIM_OPEN = false;',
       ['c-false-retired', 'reviewer-B5-kept-during-watch-from-head', 'reviewer-C1-kept-reopen-during-watch-then-watch-met']],
     ['d4-condition-also-counted-against', '(release ? [release] : conditions)',
-      '(release ? [release, ...conditions] : conditions)', ['release-cure-qualifies-before-the-condition']],
+      '(release ? [release, ...conditions] : conditions)', ['release-cure-qualifies-before-the-condition-if-decision-10-lets-the-machine-close']],
     ['future-entries-read', '.filter(([release]) => compareRelease(release, e.release) <= 0)', '',
       ['entries-newer-than-the-head-are-ignored']],
     ['d4-release-does-not-end-condition-reopening', 'Boolean(releasePresent(u)) || ', ''],
-    ['d5-no-aggregate-branch', '(f.aggregates && f.currentCureCountedAgainst && f.differentCure && !f.keptReportBlocksMove)', 'false'],
+    ['d5-no-aggregate-branch', '(f.aggregates && f.currentCureCountedAgainst && f.differentCure)', 'false'],
     ['d5-moves-notes', 'for (const aggregate of u.aggregates) aggregate.cure = u.current;',
       'for (const aggregate of [...u.aggregates, ...u.notes]) aggregate.cure = u.current;'],
     ['a', 'a.participant !== null &&', 'true &&'],
@@ -510,7 +500,7 @@ test('twenty-six rule mutations are killed by scripted lives', () => {
     ['r4-any-cured', "latestEntry(u)?.state === 'cured'", "u.declaration.some(e => e.state === 'cured')"],
     ['r10-withdrawn-cures-again', "n.state === 'cured' &&", 'true &&'],
     ['j-quiet-watch', '!failures.some(f => f.at > o.at)', 'true'],
-    ['g', '!record && !coveredBefore', 'true'],
+    ['g', '!coveredBefore', 'true'],
   ];
   for (const [name, from, to, required = []] of mutations) {
     assert.ok(model.includes(from), `mutation ${name}: missing target`);
@@ -521,11 +511,12 @@ test('twenty-six rule mutations are killed by scripted lives', () => {
       return life.steps.some(step => {
         u = m.apply(u, step.event);
         const f = m.facts(u), r = m.read(f);
-        return !Object.hasOwn(step, 'open') && (r !== step.reading || m.summaryState(r, f) !== step.state ||
-          Object.entries(step.stock ?? {}).some(([k, v]) => JSON.stringify(u[k]) !== JSON.stringify(v)));
+        return !Object.hasOwn(step, 'open') && (r !== step.reading || (!name.startsWith('decision10-') &&
+          (m.summaryState(r, f) !== step.state || Object.entries(step.stock ?? {}).some(([k, v]) => JSON.stringify(u[k]) !== JSON.stringify(v)))));
       });
     });
     assert.ok(killed.length, `mutation ${name} survived`);
+    if (/^decision10-[a-h]-/.test(name)) console.log(`${name}: READING killed by ${required.join(', ')}`);
     for (const life of required) assert.ok(killed.some(l => l.name === life),
       `mutation ${name} must be killed by ${life}`);
   }

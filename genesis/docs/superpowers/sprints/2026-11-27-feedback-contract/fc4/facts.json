@@ -2,7 +2,7 @@
   "$comment": "R9–R18: exactly the boolean vocabulary consumed by read(); absent facts are false.",
   "facts": {
     "failed": "R9: At least one observation did not pass.",
-    "coveredRecords": "R1, R5, R12: At least one automatically captured record remains with no commitment tied to it, at most one per failing session. Each person-written kept failure adds its own record, replacing nothing, even after compaction. A commit changes the newest covered session record to kept in place, without an observation, cure, aggregate or note; with no covered record it is not modelled. Compaction replaces covered records only.",
+    "coveredRecords": "R1, R5, R12: At least one covered session record remains. A commit names its session, or defaults to the newest covered record; an already-kept named record is unchanged. A missing or compacted session record throws not modelled:. Each person-written failure adds a kept record; covered failures add at most one per session. Compaction replaces covered records only.",
     "curePresent": "R4, R12, R18: The latest entry by SemVer precedence in the head declaration is cured; its release identifies the cure even if never taken. Otherwise only a holding condition supplies a cure. Entries later than the head they arrive with are ignored.",
     "aggregates": "R2, R5 and R12, R5, R13: The device holds at least one aggregate; retire on cure-available moves existing aggregates to the present cure without moving notes.",
     "retireMet": "R6, R5, R12, R14: Aggregates exist and every named participant passed in a session later than the retire that made the present cure current, followed by a quiet watch; unnamed aggregates cannot qualify.",
@@ -16,6 +16,6 @@
     "superseded": "R15: A declared claim names this claim in supersedes.",
     "currentCureCountedAgainst": "R10, R13, R14, R18: Observation or declared withdrawal counter-evidence counts against the current cure, even if a later entry cures again.",
     "differentCure": "R12, R5: A cure is present and its identity differs from the current cure.",
-    "keptReportBlocksMove": "R12, R5, pending decision 10: The posture holds claims open and a kept record’s own observation counted against the current cure; sharing a session with counter-evidence is insufficient. This blocks only the aggregate-transfer branch."
+    "keptRecordHolds": "R1, R12, R13, R14: The constant is true and the unit holds at least one kept record, person-written or commitment-tied. It blocks both cure-available branches, on-watch and retired, after reopened and stale-emitter. No event releases it; false holds nothing."
   }
 }

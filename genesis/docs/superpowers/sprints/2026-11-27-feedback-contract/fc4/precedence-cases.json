@@ -442,10 +442,11 @@
     "name": "only-kept-records-cure-present",
     "facts": {
       "failed": true,
-      "curePresent": true
+      "curePresent": true,
+      "keptRecordHolds": true
     },
     "expect": "open",
-    "because": "R16: First matching reading in R9–R16 for these facts."
+    "because": "R1, R12, R13, R14: A kept record holds the unit against compaction, watch and closure, after reopening and stale-emitter."
   },
   {
     "name": "late-old-release-failure-after-note",
@@ -474,10 +475,11 @@
     "facts": {
       "failed": true,
       "curePresent": true,
-      "aggregates": true
+      "aggregates": true,
+      "keptRecordHolds": true
     },
-    "expect": "on-watch",
-    "because": "R13: First matching reading in R9–R16 for these facts."
+    "expect": "open",
+    "because": "R1, R12, R13, R14: A kept record holds the unit against compaction, watch and closure, after reopening and stale-emitter."
   },
   {
     "name": "old-note-invalidated-even-after-new-cure",
@@ -681,10 +683,10 @@
       "differentCure": true,
       "recurred": true,
       "curedAgain": true,
-      "keptReportBlocksMove": true
+      "keptRecordHolds": true
     },
     "expect": "open",
-    "because": "R12, R5: Pending decision 10 blocks the R12, R5 transfer while the report stands."
+    "because": "R1, R12, R13, R14: A kept record holds the unit against compaction, watch and closure, after reopening and stale-emitter."
   },
   {
     "name": "machine-may-close-aggregate-transfer",
@@ -696,13 +698,13 @@
       "differentCure": true,
       "recurred": true,
       "curedAgain": true,
-      "keptReportBlocksMove": false
+      "keptRecordHolds": false
     },
     "expect": "cure-available",
     "because": "R12, R5: The alternative posture permits the R12, R5 transfer."
   },
   {
-    "name": "kept-report-does-not-block-covered-branch",
+    "name": "kept-report-blocks-covered-branch",
     "facts": {
       "failed": true,
       "aggregates": true,
@@ -711,30 +713,112 @@
       "differentCure": true,
       "recurred": true,
       "curedAgain": true,
-      "keptReportBlocksMove": true,
-      "coveredRecords": true
+      "coveredRecords": true,
+      "keptRecordHolds": true
     },
-    "expect": "cure-available",
-    "because": "R12, R5: The covered-record branch remains available."
+    "expect": "open",
+    "because": "R1, R12, R13, R14: A kept record holds the unit against compaction, watch and closure, after reopening and stale-emitter."
   },
   {
     "name": "commit-keeps-only-record-while-cure-waits",
     "facts": {
       "failed": true,
       "coveredRecords": false,
-      "curePresent": true
+      "curePresent": true,
+      "keptRecordHolds": true
     },
     "expect": "open",
-    "because": "R1, R12, R16: Tying a commitment removes the only covered record from the covered class without adding evidence or aggregates."
+    "because": "R1, R12, R13, R14: A kept record holds the unit against compaction, watch and closure, after reopening and stale-emitter."
   },
   {
     "name": "commit-keeps-newest-but-another-record-is-covered",
     "facts": {
       "failed": true,
       "coveredRecords": true,
-      "curePresent": true
+      "curePresent": true,
+      "keptRecordHolds": true
     },
-    "expect": "cure-available",
-    "because": "R1, R12: Keeping the newest covered record leaves the older covered record available for compaction."
+    "expect": "open",
+    "because": "R1, R12, R13, R14: A kept record holds the unit against compaction, watch and closure, after reopening and stale-emitter."
+  },
+  {
+    "name": "kept-hold-watch",
+    "facts": {
+      "failed": true,
+      "keptRecordHolds": true,
+      "aggregates": true
+    },
+    "expect": "open",
+    "because": "R1, R10, R11, R12, R13, R14, R15, R16: Hold preserves the remaining precedence."
+  },
+  {
+    "name": "kept-hold-retired",
+    "facts": {
+      "failed": true,
+      "keptRecordHolds": true,
+      "retireMet": true
+    },
+    "expect": "open",
+    "because": "R1, R10, R11, R12, R13, R14, R15, R16: Hold preserves the remaining precedence."
+  },
+  {
+    "name": "kept-hold-note",
+    "facts": {
+      "failed": true,
+      "keptRecordHolds": true,
+      "note": true
+    },
+    "expect": "open",
+    "because": "R1, R10, R11, R12, R13, R14, R15, R16: Hold preserves the remaining precedence."
+  },
+  {
+    "name": "kept-hold-superseded",
+    "facts": {
+      "failed": true,
+      "keptRecordHolds": true,
+      "superseded": true
+    },
+    "expect": "superseded",
+    "because": "R1, R10, R11, R12, R13, R14, R15, R16: Hold preserves the remaining precedence."
+  },
+  {
+    "name": "kept-hold-horizon",
+    "facts": {
+      "failed": true,
+      "keptRecordHolds": true,
+      "horizonNoCure": true
+    },
+    "expect": "review-due",
+    "because": "R1, R10, R11, R12, R13, R14, R15, R16: Hold preserves the remaining precedence."
+  },
+  {
+    "name": "kept-hold-unknown",
+    "facts": {
+      "failed": true,
+      "keptRecordHolds": true,
+      "unknownRelease": true
+    },
+    "expect": "unrecorded",
+    "because": "R1, R10, R11, R12, R13, R14, R15, R16: Hold preserves the remaining precedence."
+  },
+  {
+    "name": "kept-hold-reopened",
+    "facts": {
+      "failed": true,
+      "keptRecordHolds": true,
+      "recurred": true
+    },
+    "expect": "reopened",
+    "because": "R1, R10, R11, R12, R13, R14, R15, R16: Hold preserves the remaining precedence."
+  },
+  {
+    "name": "kept-hold-stale",
+    "facts": {
+      "failed": true,
+      "keptRecordHolds": true,
+      "pinLag": true
+    },
+    "expect": "stale-emitter",
+    "because": "R1, R10, R11, R12, R13, R14, R15, R16: Hold preserves the remaining precedence."
   }
 ]

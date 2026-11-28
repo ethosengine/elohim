@@ -2091,7 +2091,7 @@
     ]
   },
   {
-    "name": "reviewer-B4-kept-at-each-point",
+    "name": "reviewer-B4-kept-at-each-point-if-decision-10-lets-the-machine-close",
     "steps": [
       {
         "event": {
@@ -2190,7 +2190,111 @@
         "state": "retired",
         "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
       }
-    ]
+    ],
+    "decision10": "machine-may-close"
+  },
+  {
+    "name": "reviewer-B4-kept-at-each-point",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R4–R18: Reading under the declared kept-record posture; reopening and stale emitter take precedence."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R1, R4–R18: Reading under the declared kept-record posture; reopening and stale emitter take precedence."
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "kept",
+          "afterHead": false
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R4–R18: Reading under the declared kept-record posture; reopening and stale emitter take precedence."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R4–R18: Reading under the declared kept-record posture; reopening and stale emitter take precedence."
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "kept",
+          "afterHead": false
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R4–R18: Reading under the declared kept-record posture; reopening and stale emitter take precedence."
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "newSession": true
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R4–R18: Reading under the declared kept-record posture; reopening and stale emitter take precedence."
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R4–R18: Reading under the declared kept-record posture; reopening and stale emitter take precedence."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R4–R18: Reading under the declared kept-record posture; reopening and stale emitter take precedence."
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "kept",
+          "afterHead": false
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R4–R18: Reading under the declared kept-record posture; reopening and stale emitter take precedence."
+      }
+    ],
+    "about": "R1, R12–R14: Any kept record holds the unit under the default; machine-may-close permits compaction, watch and closure on covered evidence."
   },
   {
     "name": "reviewer-B5-kept-during-watch-from-head",
@@ -3232,7 +3336,7 @@
     ]
   },
   {
-    "name": "mutation-d-compaction-beside-kept",
+    "name": "mutation-d-compaction-beside-kept-if-decision-10-lets-the-machine-close",
     "steps": [
       {
         "event": {
@@ -3297,7 +3401,75 @@
           ]
         }
       }
-    ]
+    ],
+    "decision10": "machine-may-close"
+  },
+  {
+    "name": "mutation-d-compaction-beside-kept",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "kept"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R4–R18: Reading under the declared kept-record posture; reopening and stale emitter take precedence."
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "q",
+          "record": "covered"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R4–R18: Reading under the declared kept-record posture; reopening and stale emitter take precedence."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R4–R18: Reading under the declared kept-record posture; reopening and stale emitter take precedence."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R4–R18: Reading under the declared kept-record posture; reopening and stale emitter take precedence.",
+        "stock": {
+          "records": [
+            {
+              "session": 1,
+              "kind": "kept",
+              "participant": "p",
+              "at": 1
+            },
+            {
+              "session": 2,
+              "kind": "covered",
+              "participant": "q"
+            }
+          ],
+          "aggregates": []
+        }
+      }
+    ],
+    "about": "R1, R12–R14: Any kept record holds the unit under the default; machine-may-close permits compaction, watch and closure on covered evidence."
   },
   {
     "name": "mutation-e-ruling-on-open",
@@ -3707,7 +3879,7 @@
     ]
   },
   {
-    "name": "guard-is-for-the-current-cure-only",
+    "name": "guard-is-for-the-current-cure-only-if-decision-10-lets-the-machine-close",
     "steps": [
       {
         "event": {
@@ -3778,10 +3950,86 @@
         "state": "cured",
         "rule": "R10, R13, R14, R17 (R13, R14): The older cure was cured again and is not current."
       }
-    ]
+    ],
+    "decision10": "machine-may-close"
   },
   {
-    "name": "watch-needs-quiet-after-the-pass",
+    "name": "guard-is-for-the-current-cure-only",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R4–R18: Reading under the declared kept-record posture; reopening and stale emitter take precedence."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R1, R4–R18: Reading under the declared kept-record posture; reopening and stale emitter take precedence."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 2,
+          "entries": [
+            [
+              1,
+              "cured"
+            ],
+            [
+              2,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R1, R4–R18: Reading under the declared kept-record posture; reopening and stale emitter take precedence."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1, R4–R18: Reading under the declared kept-record posture; reopening and stale emitter take precedence.",
+        "stock": {
+          "current": "release:2"
+        }
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 1,
+          "participant": "p",
+          "record": "kept",
+          "afterHead": false
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R4–R18: Reading under the declared kept-record posture; reopening and stale emitter take precedence."
+      }
+    ],
+    "about": "R1, R12–R14: Any kept record holds the unit under the default; machine-may-close permits compaction, watch and closure on covered evidence."
+  },
+  {
+    "name": "watch-needs-quiet-after-the-pass-if-decision-10-lets-the-machine-close",
     "steps": [
       {
         "event": {
@@ -3885,7 +4133,116 @@
         "state": "cured",
         "rule": "R6, R10, R13, R14, R17: A kept failure interrupts the watch even when its cure was cured again."
       }
-    ]
+    ],
+    "decision10": "machine-may-close"
+  },
+  {
+    "name": "watch-needs-quiet-after-the-pass",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R4–R18: Reading under the declared kept-record posture; reopening and stale emitter take precedence."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R1, R4–R18: Reading under the declared kept-record posture; reopening and stale emitter take precedence."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 2,
+          "entries": [
+            [
+              1,
+              "cured"
+            ],
+            [
+              2,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R1, R4–R18: Reading under the declared kept-record posture; reopening and stale emitter take precedence."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1, R4–R18: Reading under the declared kept-record posture; reopening and stale emitter take precedence."
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "newSession": true
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1, R4–R18: Reading under the declared kept-record posture; reopening and stale emitter take precedence."
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 1,
+          "participant": "p",
+          "record": "kept",
+          "afterHead": false
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R4–R18: Reading under the declared kept-record posture; reopening and stale emitter take precedence."
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R4–R18: Reading under the declared kept-record posture; reopening and stale emitter take precedence."
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "newSession": true
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R4–R18: Reading under the declared kept-record posture; reopening and stale emitter take precedence."
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R4–R18: Reading under the declared kept-record posture; reopening and stale emitter take precedence."
+      }
+    ],
+    "about": "R1, R12–R14: Any kept record holds the unit under the default; machine-may-close permits compaction, watch and closure on covered evidence."
   },
   {
     "name": "withdrawn-before-compaction",
@@ -5078,7 +5435,7 @@
     "about": "Pending decision 10 (section 16): alternative posture permits the R12, R5 transfer to move aggregates despite the standing report; earlier notes keep their own cure."
   },
   {
-    "name": "release-cure-qualifies-before-the-condition",
+    "name": "release-cure-qualifies-before-the-condition-if-decision-10-lets-the-machine-close",
     "about": "A qualifying release cure receives counter-evidence instead of the current condition cure.",
     "steps": [
       {
@@ -5158,6 +5515,90 @@
           "current": "condition:2"
         }
       }
+    ],
+    "decision10": "machine-may-close"
+  },
+  {
+    "name": "release-cure-qualifies-before-the-condition",
+    "about": "R1, R12–R14: Any kept record holds the unit under the default; machine-may-close permits compaction, watch and closure on covered evidence.",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R4–R18: Reading under the declared kept-record posture; reopening and stale emitter take precedence."
+      },
+      {
+        "event": {
+          "type": "condition",
+          "name": "path",
+          "holds": true
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R1, R4–R18: Reading under the declared kept-record posture; reopening and stale emitter take precedence."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1, R4–R18: Reading under the declared kept-record posture; reopening and stale emitter take precedence."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1, R4–R18: Reading under the declared kept-record posture; reopening and stale emitter take precedence."
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 1,
+          "participant": "p",
+          "record": "kept"
+        },
+        "reading": "reopened",
+        "state": "reopened",
+        "rule": "R1, R4–R18: Reading under the declared kept-record posture; reopening and stale emitter take precedence."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 2,
+          "entries": [
+            [
+              1,
+              "cured"
+            ],
+            [
+              2,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R4–R18: Reading under the declared kept-record posture; reopening and stale emitter take precedence.",
+        "stock": {
+          "current": "condition:2"
+        }
+      }
     ]
   },
   {
@@ -5196,7 +5637,7 @@
     ]
   },
   {
-    "name": "same-session-covered-then-kept",
+    "name": "same-session-covered-then-kept-if-decision-10-lets-the-machine-close",
     "about": "R1: The kept failure adds its own record beside the covered record. A cure permits compaction of only the covered record.",
     "steps": [
       {
@@ -5295,6 +5736,109 @@
               "session": 1
             }
           ]
+        }
+      }
+    ],
+    "decision10": "machine-may-close"
+  },
+  {
+    "name": "same-session-covered-then-kept",
+    "about": "R1, R12–R14: Any kept record holds the unit under the default; machine-may-close permits compaction, watch and closure on covered evidence.",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R4–R18: Reading under the declared kept-record posture; reopening and stale emitter take precedence.",
+        "stock": {
+          "records": [
+            {
+              "session": 1,
+              "kind": "covered",
+              "participant": "p"
+            }
+          ]
+        }
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "kept",
+          "newSession": false
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R4–R18: Reading under the declared kept-record posture; reopening and stale emitter take precedence.",
+        "stock": {
+          "records": [
+            {
+              "session": 1,
+              "kind": "covered",
+              "participant": "p"
+            },
+            {
+              "session": 1,
+              "kind": "kept",
+              "participant": "p",
+              "at": 2
+            }
+          ]
+        }
+      },
+      {
+        "event": {
+          "type": "condition",
+          "name": "path",
+          "holds": true
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R4–R18: Reading under the declared kept-record posture; reopening and stale emitter take precedence.",
+        "stock": {
+          "records": [
+            {
+              "session": 1,
+              "kind": "covered",
+              "participant": "p"
+            },
+            {
+              "session": 1,
+              "kind": "kept",
+              "participant": "p",
+              "at": 2
+            }
+          ]
+        }
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R4–R18: Reading under the declared kept-record posture; reopening and stale emitter take precedence.",
+        "stock": {
+          "records": [
+            {
+              "session": 1,
+              "kind": "covered",
+              "participant": "p"
+            },
+            {
+              "session": 1,
+              "kind": "kept",
+              "participant": "p",
+              "at": 2
+            }
+          ],
+          "aggregates": []
         }
       }
     ]
@@ -5663,7 +6207,7 @@
   {
     "name": "two-kept-reports-in-one-session-if-decision-10-lets-the-machine-close",
     "decision10": "machine-may-close",
-    "about": "R1, R10, R12: Each kept report survives separately; decision 10 controls aggregate transfer after the later cure. No second retire has been requested.",
+    "about": "R1, R12–R14: Both kept records survive through compaction, a later participant pass, watch and closure.",
     "steps": [
       {
         "event": {
@@ -5806,54 +6350,38 @@
       },
       {
         "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R5, R6, R12, R13, R14",
+        "reading": "on-watch",
+        "state": "cured"
+      },
+      {
+        "event": {
           "type": "pass",
-          "release": 2,
           "participant": "p",
+          "release": 2,
           "newSession": true
         },
-        "reading": "cure-available",
-        "state": "open",
-        "rule": "R1, R5, R10, R12, R13, R14: Separate kept reports; current-cure counter-evidence and the declared decision-10 posture govern the later cure.",
-        "stock": {
-          "records": [
-            {
-              "session": 2,
-              "kind": "kept",
-              "participant": "p",
-              "at": 4
-            },
-            {
-              "session": 2,
-              "kind": "kept",
-              "participant": "p",
-              "at": 5
-            }
-          ]
-        }
+        "rule": "R1, R5, R6, R12, R13, R14",
+        "reading": "on-watch",
+        "state": "cured"
       },
       {
         "event": {
           "type": "watch"
         },
-        "reading": "cure-available",
-        "state": "open",
-        "rule": "R1, R5, R10, R12, R13, R14: Separate kept reports; current-cure counter-evidence and the declared decision-10 posture govern the later cure.",
-        "stock": {
-          "records": [
-            {
-              "session": 2,
-              "kind": "kept",
-              "participant": "p",
-              "at": 4
-            },
-            {
-              "session": 2,
-              "kind": "kept",
-              "participant": "p",
-              "at": 5
-            }
-          ]
-        }
+        "rule": "R1, R5, R6, R12, R13, R14",
+        "reading": "retired",
+        "state": "cured"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R5, R6, R12, R13, R14",
+        "reading": "retired",
+        "state": "retired"
       }
     ]
   },
@@ -5976,8 +6504,8 @@
     ]
   },
   {
-    "name": "a-commitment-keeps-one-of-two-records",
-    "about": "R1: A commitment keeps the newest covered session record in place, adding no observation. Both values of KEPT_REPORT_HOLDS_A_CLAIM_OPEN give identical readings; decision 10 needs no twin.",
+    "name": "a-commitment-keeps-one-of-two-records-if-decision-10-lets-the-machine-close",
+    "about": "R1, R12, R13, R14: Under machine-may-close the kept record holds nothing; compaction, watch and closure proceed on the covered record while the kept record remains.",
     "steps": [
       {
         "event": {
@@ -6075,11 +6603,114 @@
         "state": "retired",
         "rule": "R1, R4, R5, R6, R12, R13, R14, R16, R17"
       }
+    ],
+    "decision10": "machine-may-close"
+  },
+  {
+    "name": "a-commitment-keeps-one-of-two-records",
+    "about": "R1, R12–R14: Any kept record holds the unit under the default; machine-may-close permits compaction, watch and closure on covered evidence.",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R4–R18: Reading under the declared kept-record posture; reopening and stale emitter take precedence."
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R4–R18: Reading under the declared kept-record posture; reopening and stale emitter take precedence."
+      },
+      {
+        "event": {
+          "type": "commit"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R4–R18: Reading under the declared kept-record posture; reopening and stale emitter take precedence.",
+        "stock": {
+          "records": [
+            {
+              "session": 1,
+              "kind": "covered",
+              "participant": "p"
+            },
+            {
+              "session": 2,
+              "kind": "kept",
+              "participant": "p"
+            }
+          ],
+          "aggregates": [],
+          "notes": []
+        }
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R4–R18: Reading under the declared kept-record posture; reopening and stale emitter take precedence."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R4–R18: Reading under the declared kept-record posture; reopening and stale emitter take precedence."
+      },
+      {
+        "event": {
+          "type": "pass",
+          "release": 1,
+          "participant": "p",
+          "newSession": true
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R4–R18: Reading under the declared kept-record posture; reopening and stale emitter take precedence."
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R4–R18: Reading under the declared kept-record posture; reopening and stale emitter take precedence."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R4–R18: Reading under the declared kept-record posture; reopening and stale emitter take precedence."
+      }
     ]
   },
   {
-    "name": "a-persons-report-before-the-cure-beside-a-covered-record",
-    "about": "R1, R12, R14: A unit holds a person's own report and one covered record, both made before the cure. It is compacted, watched and noted on the covered record; the person's record stays and holds nothing open. Both values of KEPT_REPORT_HOLDS_A_CLAIM_OPEN give identical readings, because that record never counts against the cure. Whether such a report should hold the claim open is part of section 16, decision 10.",
+    "name": "a-persons-report-before-the-cure-beside-a-covered-record-if-decision-10-lets-the-machine-close",
+    "about": "R1, R12, R13, R14: Under machine-may-close the kept record holds nothing; compaction, watch and closure proceed on the covered record while the kept record remains.",
     "steps": [
       {
         "event": {
@@ -6153,6 +6784,2809 @@
         "state": "retired",
         "rule": "R1, R5, R12, R13, R14: a person's report made before the cure counts against no cure (R10), and the unit closes on its covered record."
       }
+    ],
+    "decision10": "machine-may-close"
+  },
+  {
+    "name": "a-persons-report-before-the-cure-beside-a-covered-record",
+    "about": "R1, R12–R14: Any kept record holds the unit under the default; machine-may-close permits compaction, watch and closure on covered evidence.",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "kept"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R4–R18: Reading under the declared kept-record posture; reopening and stale emitter take precedence."
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "q",
+          "record": "covered"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R4–R18: Reading under the declared kept-record posture; reopening and stale emitter take precedence."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R4–R18: Reading under the declared kept-record posture; reopening and stale emitter take precedence."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R4–R18: Reading under the declared kept-record posture; reopening and stale emitter take precedence."
+      },
+      {
+        "event": {
+          "type": "pass",
+          "release": 1,
+          "participant": "q",
+          "newSession": true
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R4–R18: Reading under the declared kept-record posture; reopening and stale emitter take precedence."
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R4–R18: Reading under the declared kept-record posture; reopening and stale emitter take precedence."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R4–R18: Reading under the declared kept-record posture; reopening and stale emitter take precedence."
+      }
     ]
+  },
+  {
+    "name": "reviewer3-X1-kept-before-cure-covered-counter-same-session",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "kept"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "newSession": false
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 1,
+          "participant": "p",
+          "record": "covered",
+          "newSession": false
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "reopened",
+        "state": "reopened"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 2,
+          "entries": [
+            [
+              1,
+              "cured"
+            ],
+            [
+              2,
+              "cured"
+            ]
+          ]
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      }
+    ]
+  },
+  {
+    "name": "reviewer3-X1-kept-before-cure-covered-counter-same-session-if-decision-10-lets-the-machine-close",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "kept"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "newSession": false
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "cure-available",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "on-watch",
+        "state": "cured"
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 1,
+          "participant": "p",
+          "record": "covered",
+          "newSession": false
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "reopened",
+        "state": "reopened"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 2,
+          "entries": [
+            [
+              1,
+              "cured"
+            ],
+            [
+              2,
+              "cured"
+            ]
+          ]
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "cure-available",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "on-watch",
+        "state": "cured"
+      }
+    ],
+    "decision10": "machine-may-close"
+  },
+  {
+    "name": "reviewer3-X2-kept-then-covered-same-session",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "kept"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "newSession": false
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      }
+    ]
+  },
+  {
+    "name": "reviewer3-X2-kept-then-covered-same-session-if-decision-10-lets-the-machine-close",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "kept"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "newSession": false
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "cure-available",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "on-watch",
+        "state": "cured"
+      }
+    ],
+    "decision10": "machine-may-close"
+  },
+  {
+    "name": "reviewer3-A1b-commit-newest-diff-participant",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 1,
+          "participant": "q",
+          "record": "covered"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "commit",
+          "session": 2
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 2,
+          "entries": [
+            [
+              2,
+              "cured"
+            ]
+          ]
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "pass",
+          "release": 2,
+          "participant": "p",
+          "newSession": true
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      }
+    ]
+  },
+  {
+    "name": "reviewer3-A1b-commit-newest-diff-participant-if-decision-10-lets-the-machine-close",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 1,
+          "participant": "q",
+          "record": "covered"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "commit",
+          "session": 2
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 2,
+          "entries": [
+            [
+              2,
+              "cured"
+            ]
+          ]
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "cure-available",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "on-watch",
+        "state": "cured"
+      },
+      {
+        "event": {
+          "type": "pass",
+          "release": 2,
+          "participant": "p",
+          "newSession": true
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "on-watch",
+        "state": "cured"
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "retired",
+        "state": "cured"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "retired",
+        "state": "retired"
+      }
+    ],
+    "decision10": "machine-may-close"
+  },
+  {
+    "name": "reviewer3-A3b-two-commits-two-records",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "commit",
+          "session": 2
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "commit",
+          "session": 1
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      }
+    ]
+  },
+  {
+    "name": "reviewer3-A7-commit-on-reopened-unit-then-later-release",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "cure-available",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "on-watch",
+        "state": "cured"
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 1,
+          "participant": "p",
+          "record": "covered"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "reopened",
+        "state": "reopened"
+      },
+      {
+        "event": {
+          "type": "commit",
+          "session": 2
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "reopened",
+        "state": "reopened"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 2,
+          "entries": [
+            [
+              1,
+              "cured"
+            ],
+            [
+              2,
+              "cured"
+            ]
+          ]
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "pass",
+          "release": 2,
+          "participant": "p",
+          "newSession": true
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      }
+    ]
+  },
+  {
+    "name": "reviewer3-A7-commit-on-reopened-unit-then-later-release-if-decision-10-lets-the-machine-close",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "cure-available",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "on-watch",
+        "state": "cured"
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 1,
+          "participant": "p",
+          "record": "covered"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "reopened",
+        "state": "reopened"
+      },
+      {
+        "event": {
+          "type": "commit",
+          "session": 2
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "reopened",
+        "state": "reopened"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 2,
+          "entries": [
+            [
+              1,
+              "cured"
+            ],
+            [
+              2,
+              "cured"
+            ]
+          ]
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "cure-available",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "on-watch",
+        "state": "cured"
+      },
+      {
+        "event": {
+          "type": "pass",
+          "release": 2,
+          "participant": "p",
+          "newSession": true
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "on-watch",
+        "state": "cured"
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "retired",
+        "state": "cured"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "retired",
+        "state": "retired"
+      }
+    ],
+    "decision10": "machine-may-close"
+  },
+  {
+    "name": "reviewer3-A7k-same-but-person-wrote-it",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "cure-available",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "on-watch",
+        "state": "cured"
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 1,
+          "participant": "p",
+          "record": "kept"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "reopened",
+        "state": "reopened"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 2,
+          "entries": [
+            [
+              1,
+              "cured"
+            ],
+            [
+              2,
+              "cured"
+            ]
+          ]
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "pass",
+          "release": 2,
+          "participant": "p",
+          "newSession": true
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      }
+    ]
+  },
+  {
+    "name": "reviewer3-A7k-same-but-person-wrote-it-if-decision-10-lets-the-machine-close",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "cure-available",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "on-watch",
+        "state": "cured"
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 1,
+          "participant": "p",
+          "record": "kept"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "reopened",
+        "state": "reopened"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 2,
+          "entries": [
+            [
+              1,
+              "cured"
+            ],
+            [
+              2,
+              "cured"
+            ]
+          ]
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "cure-available",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "on-watch",
+        "state": "cured"
+      },
+      {
+        "event": {
+          "type": "pass",
+          "release": 2,
+          "participant": "p",
+          "newSession": true
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "on-watch",
+        "state": "cured"
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "retired",
+        "state": "cured"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "retired",
+        "state": "retired"
+      }
+    ],
+    "decision10": "machine-may-close"
+  },
+  {
+    "name": "reviewer3-B2a-kept-after-condition-holds-before-compaction",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "condition",
+          "name": "path",
+          "holds": true
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "cure-available",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "kept"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "pass",
+          "release": 0,
+          "participant": "p",
+          "newSession": true
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      }
+    ]
+  },
+  {
+    "name": "reviewer3-B2a-kept-after-condition-holds-before-compaction-if-decision-10-lets-the-machine-close",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "condition",
+          "name": "path",
+          "holds": true
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "cure-available",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "kept"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "cure-available",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "on-watch",
+        "state": "cured"
+      },
+      {
+        "event": {
+          "type": "pass",
+          "release": 0,
+          "participant": "p",
+          "newSession": true
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "on-watch",
+        "state": "cured"
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "retired",
+        "state": "cured"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "retired",
+        "state": "retired"
+      }
+    ],
+    "decision10": "machine-may-close"
+  },
+  {
+    "name": "reviewer3-B2c-kept-from-curing-release-before-compaction",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "cure-available",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 1,
+          "participant": "p",
+          "record": "kept"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "reopened",
+        "state": "reopened"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "reopened",
+        "state": "reopened"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 2,
+          "entries": [
+            [
+              1,
+              "cured"
+            ],
+            [
+              2,
+              "cured"
+            ]
+          ]
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "pass",
+          "release": 2,
+          "participant": "p",
+          "newSession": true
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      }
+    ]
+  },
+  {
+    "name": "reviewer3-B2c-kept-from-curing-release-before-compaction-if-decision-10-lets-the-machine-close",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "cure-available",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 1,
+          "participant": "p",
+          "record": "kept"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "reopened",
+        "state": "reopened"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "reopened",
+        "state": "reopened"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 2,
+          "entries": [
+            [
+              1,
+              "cured"
+            ],
+            [
+              2,
+              "cured"
+            ]
+          ]
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "cure-available",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "on-watch",
+        "state": "cured"
+      },
+      {
+        "event": {
+          "type": "pass",
+          "release": 2,
+          "participant": "p",
+          "newSession": true
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "on-watch",
+        "state": "cured"
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "retired",
+        "state": "cured"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "retired",
+        "state": "retired"
+      }
+    ],
+    "decision10": "machine-may-close"
+  },
+  {
+    "name": "reviewer3-B3-kept-counts-against-then-covered-then-later-release",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "cure-available",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "on-watch",
+        "state": "cured"
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 1,
+          "participant": "p",
+          "record": "kept"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "reopened",
+        "state": "reopened"
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 1,
+          "participant": "p",
+          "record": "covered"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "reopened",
+        "state": "reopened"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 2,
+          "entries": [
+            [
+              1,
+              "cured"
+            ],
+            [
+              2,
+              "cured"
+            ]
+          ]
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "pass",
+          "release": 2,
+          "participant": "p",
+          "newSession": true
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      }
+    ]
+  },
+  {
+    "name": "reviewer3-B3-kept-counts-against-then-covered-then-later-release-if-decision-10-lets-the-machine-close",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "cure-available",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "on-watch",
+        "state": "cured"
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 1,
+          "participant": "p",
+          "record": "kept"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "reopened",
+        "state": "reopened"
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 1,
+          "participant": "p",
+          "record": "covered"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "reopened",
+        "state": "reopened"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 2,
+          "entries": [
+            [
+              1,
+              "cured"
+            ],
+            [
+              2,
+              "cured"
+            ]
+          ]
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "cure-available",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "on-watch",
+        "state": "cured"
+      },
+      {
+        "event": {
+          "type": "pass",
+          "release": 2,
+          "participant": "p",
+          "newSession": true
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "on-watch",
+        "state": "cured"
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "retired",
+        "state": "cured"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "retired",
+        "state": "retired"
+      }
+    ],
+    "decision10": "machine-may-close"
+  },
+  {
+    "name": "reviewer3-B3b-covered-reopen-then-kept-then-later-release",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "cure-available",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "on-watch",
+        "state": "cured"
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 1,
+          "participant": "p",
+          "record": "covered"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "reopened",
+        "state": "reopened"
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 1,
+          "participant": "p",
+          "record": "kept"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "reopened",
+        "state": "reopened"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 2,
+          "entries": [
+            [
+              1,
+              "cured"
+            ],
+            [
+              2,
+              "cured"
+            ]
+          ]
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "pass",
+          "release": 2,
+          "participant": "p",
+          "newSession": true
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      }
+    ]
+  },
+  {
+    "name": "reviewer3-B3b-covered-reopen-then-kept-then-later-release-if-decision-10-lets-the-machine-close",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "cure-available",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "on-watch",
+        "state": "cured"
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 1,
+          "participant": "p",
+          "record": "covered"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "reopened",
+        "state": "reopened"
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 1,
+          "participant": "p",
+          "record": "kept"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "reopened",
+        "state": "reopened"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 2,
+          "entries": [
+            [
+              1,
+              "cured"
+            ],
+            [
+              2,
+              "cured"
+            ]
+          ]
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "cure-available",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "on-watch",
+        "state": "cured"
+      },
+      {
+        "event": {
+          "type": "pass",
+          "release": 2,
+          "participant": "p",
+          "newSession": true
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "on-watch",
+        "state": "cured"
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "retired",
+        "state": "cured"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "retired",
+        "state": "retired"
+      }
+    ],
+    "decision10": "machine-may-close"
+  },
+  {
+    "name": "reviewer3-B3c-kept-reopen-then-late-older-covered",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "cure-available",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "on-watch",
+        "state": "cured"
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 1,
+          "participant": "p",
+          "record": "kept"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "reopened",
+        "state": "reopened"
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "reopened",
+        "state": "reopened"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 2,
+          "entries": [
+            [
+              1,
+              "cured"
+            ],
+            [
+              2,
+              "cured"
+            ]
+          ]
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "pass",
+          "release": 2,
+          "participant": "p",
+          "newSession": true
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      }
+    ]
+  },
+  {
+    "name": "reviewer3-B3c-kept-reopen-then-late-older-covered-if-decision-10-lets-the-machine-close",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "cure-available",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "on-watch",
+        "state": "cured"
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 1,
+          "participant": "p",
+          "record": "kept"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "reopened",
+        "state": "reopened"
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "reopened",
+        "state": "reopened"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 2,
+          "entries": [
+            [
+              1,
+              "cured"
+            ],
+            [
+              2,
+              "cured"
+            ]
+          ]
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "cure-available",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "on-watch",
+        "state": "cured"
+      },
+      {
+        "event": {
+          "type": "pass",
+          "release": 2,
+          "participant": "p",
+          "newSession": true
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "on-watch",
+        "state": "cured"
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "retired",
+        "state": "cured"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "retired",
+        "state": "retired"
+      }
+    ],
+    "decision10": "machine-may-close"
+  },
+  {
+    "name": "reviewer3-B3d-kept-reopen-condition-then-covered-then-condition-again",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "condition",
+          "name": "path",
+          "holds": true
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "cure-available",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "on-watch",
+        "state": "cured"
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "kept"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "reopened",
+        "state": "reopened"
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "reopened",
+        "state": "reopened"
+      },
+      {
+        "event": {
+          "type": "condition",
+          "name": "path",
+          "holds": false
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "reopened",
+        "state": "reopened"
+      },
+      {
+        "event": {
+          "type": "condition",
+          "name": "path",
+          "holds": true
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "pass",
+          "release": 0,
+          "participant": "p",
+          "newSession": true
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      }
+    ]
+  },
+  {
+    "name": "reviewer3-B3d-kept-reopen-condition-then-covered-then-condition-again-if-decision-10-lets-the-machine-close",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "condition",
+          "name": "path",
+          "holds": true
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "cure-available",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "on-watch",
+        "state": "cured"
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "kept"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "reopened",
+        "state": "reopened"
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "reopened",
+        "state": "reopened"
+      },
+      {
+        "event": {
+          "type": "condition",
+          "name": "path",
+          "holds": false
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "reopened",
+        "state": "reopened"
+      },
+      {
+        "event": {
+          "type": "condition",
+          "name": "path",
+          "holds": true
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "cure-available",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "on-watch",
+        "state": "cured"
+      },
+      {
+        "event": {
+          "type": "pass",
+          "release": 0,
+          "participant": "p",
+          "newSession": true
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "on-watch",
+        "state": "cured"
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "retired",
+        "state": "cured"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "retired",
+        "state": "retired"
+      }
+    ],
+    "decision10": "machine-may-close"
+  },
+  {
+    "name": "a-persons-report-arrives-during-the-watch",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "participant": "p",
+          "record": "covered",
+          "release": 0
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "cure-available",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "on-watch",
+        "state": "cured"
+      },
+      {
+        "event": {
+          "type": "fail",
+          "participant": "p",
+          "record": "kept",
+          "release": 0
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "release": 1
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      }
+    ]
+  },
+  {
+    "name": "a-persons-report-arrives-during-the-watch-if-decision-10-lets-the-machine-close",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "participant": "p",
+          "record": "covered",
+          "release": 0
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "cure-available",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "on-watch",
+        "state": "cured"
+      },
+      {
+        "event": {
+          "type": "fail",
+          "participant": "p",
+          "record": "kept",
+          "release": 0
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "on-watch",
+        "state": "cured"
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "release": 1
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "on-watch",
+        "state": "cured"
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "retired",
+        "state": "cured"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "retired",
+        "state": "retired"
+      }
+    ],
+    "decision10": "machine-may-close"
+  },
+  {
+    "name": "named-commit-keeps-older-participant",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "participant": "p",
+          "record": "covered",
+          "release": 0
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "fail",
+          "participant": "q",
+          "record": "covered",
+          "release": 0
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "commit",
+          "session": 1
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "release": 1
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      }
+    ]
+  },
+  {
+    "name": "named-commit-keeps-older-participant-if-decision-10-lets-the-machine-close",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "participant": "p",
+          "record": "covered",
+          "release": 0
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "fail",
+          "participant": "q",
+          "record": "covered",
+          "release": 0
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "commit",
+          "session": 1
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "cure-available",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "on-watch",
+        "state": "cured"
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "release": 1
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "on-watch",
+        "state": "cured"
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "on-watch",
+        "state": "cured"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "on-watch",
+        "state": "cured"
+      }
+    ],
+    "decision10": "machine-may-close"
+  },
+  {
+    "name": "unnamed-commit-keeps-newest-participant",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "participant": "p",
+          "record": "covered",
+          "release": 0
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "fail",
+          "participant": "q",
+          "record": "covered",
+          "release": 0
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "commit"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "release": 1
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      }
+    ]
+  },
+  {
+    "name": "unnamed-commit-keeps-newest-participant-if-decision-10-lets-the-machine-close",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "participant": "p",
+          "record": "covered",
+          "release": 0
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "fail",
+          "participant": "q",
+          "record": "covered",
+          "release": 0
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "commit"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "open",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "cure-available",
+        "state": "open"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "on-watch",
+        "state": "cured"
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "release": 1
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "on-watch",
+        "state": "cured"
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "retired",
+        "state": "cured"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "rule": "R1, R4, R5, R6, R10, R11, R12, R13, R14, R16, R17",
+        "reading": "retired",
+        "state": "retired"
+      }
+    ],
+    "decision10": "machine-may-close"
   }
 ]
