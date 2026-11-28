@@ -11549,5 +11549,121 @@
         "rule": "R5, R7, R8, R13"
       }
     ]
+  },
+  {
+    "name": "witness-commit-kept-falls-back-to-newest-under-the-default",
+    "about": "R1: default stock check witness for commit-kept-falls-back-to-newest; the readings agree under the default and the records do not.",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "kept",
+          "newSession": true
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R10, R16"
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "newSession": true
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R10, R16"
+      },
+      {
+        "event": {
+          "type": "commit",
+          "session": 1
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R10–R17: A commitment naming a kept record changes no record; the kept record holds the unit open either way, so only the stock of records tells the fault.",
+        "stock": {
+          "records": [
+            {
+              "session": 1,
+              "kind": "kept",
+              "participant": "p",
+              "at": 1
+            },
+            {
+              "session": 2,
+              "kind": "covered",
+              "participant": "p"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "witness-commit-compacted-with-person-throws-under-the-default",
+    "about": "R1: default throw witness for commit-compacted-with-person-throws.",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "newSession": true
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R10, R16"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R4, R10, R12, R18"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R5, R7, R8, R13"
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "kept",
+          "newSession": true
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R10, R16"
+      },
+      {
+        "event": {
+          "type": "commit",
+          "session": 2
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R10–R17: A commitment naming a kept record of a compacted unit changes nothing; the fault refuses it as not modelled."
+      }
+    ]
   }
 ]

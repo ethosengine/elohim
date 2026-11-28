@@ -512,10 +512,10 @@ test('rule mutations are killed by scripted lives', () => {
     ['g', '!coveredBefore', 'true'],
     ['commit-kept-falls-back-to-newest', "if (record?.kind === 'kept') return unit;",
       "if (record?.kind === 'kept') { const newest = u.records.find(r => r.session === Math.max(...u.records.map(r => r.session)) && r.kind === 'covered'); if (newest) newest.kind = 'kept'; return u; }",
-      ['reviewer5-named-kept-older-than-covered-if-decision-10-lets-the-machine-close']],
+      ['reviewer5-named-kept-older-than-covered-if-decision-10-lets-the-machine-close', ['witness-commit-kept-falls-back-to-newest-under-the-default', 'stock check']]],
     ['commit-compacted-with-person-throws', "if (record?.kind === 'kept') return unit;",
       "if (record?.kind === 'kept') { if (u.aggregates.length) throw new Error('not modelled: compacted'); return unit; }",
-      ['reviewer5-U3-named-after-compaction-with-kept-if-decision-10-lets-the-machine-close']],
+      ['reviewer5-U3-named-after-compaction-with-kept-if-decision-10-lets-the-machine-close', 'witness-commit-compacted-with-person-throws-under-the-default']],
   ];
   const expectedKinds = Object.fromEntries(mutations.map(([name]) => [name, 'reading']));
   for (const name of ['r1-commit-adds-record', 'r1-kept-replaces-covered', 'd']) expectedKinds[name] = 'stock check';
@@ -548,9 +548,9 @@ test('rule mutations are killed by scripted lives', () => {
     const kind = expectedKinds[name];
     assert.ok(kind, `mutation ${name}: expected kill kind missing`);
     const witnesses = required.length ? required : [killed.find(k => k.kind === kind)?.life];
-    for (const life of witnesses) {
-      const hit = killed.find(k => k.life === life && k.kind === kind);
-      assert.ok(hit, `mutation ${name} must die by ${kind} in ${life}`);
+    for (const [life, by] of witnesses.map(w => (Array.isArray(w) ? w : [w, kind]))) {
+      const hit = killed.find(k => k.life === life && k.kind === by);
+      assert.ok(hit, `mutation ${name} must die by ${by} in ${life}`);
       if (life.startsWith('reviewer5-default-') || life.startsWith('witness-')) assert.equal(lives.find(l => l.name === life).decision10, undefined);
       console.log(`${name}: ${hit.kind} killed by ${hit.life} step ${hit.step}`);
     }
