@@ -460,6 +460,12 @@ RUN rm -rf src benches target/release/elohim-storage target/release/libelohim* \
 # uses buildkitd; local one-off builds need DOCKER_BUILDKIT=1.
 # ═══════════════════════════════════════════════════════════════════════════
 FROM dep-sources AS check-deps
+# scripts/ci/storage-quality-gate.sh reads this value from this crate's gate
+# project in elohim/holochain/build-manifest.json and passes it to BuildKit.
+# Scope it to the check branch so release-image cargo behaviour is unchanged.
+ARG CARGO_BUILD_JOBS
+RUN case "$CARGO_BUILD_JOBS" in ''|*[!0-9]*|0) echo "check target requires a positive CARGO_BUILD_JOBS build arg" >&2; exit 1;; esac
+ENV CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS}
 # Placeholder targets: dep-sources already wrote these; rewriting them is
 # idempotent and keeps this stage correct if that step ever moves.
 RUN mkdir -p src benches && \

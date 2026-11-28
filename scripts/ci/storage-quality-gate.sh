@@ -19,6 +19,21 @@
 set -euo pipefail
 
 WORKSPACE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+STORAGE_BUILD_MANIFEST="${WORKSPACE_ROOT}/elohim/holochain/build-manifest.json"
+
+# Keep the Edge check target on the same resource contract as the local gate.
+# Node is already part of the CI builder; the manifest remains the one source
+# for elohim-storage's cargo environment instead of duplicating the cap here.
+STORAGE_CARGO_BUILD_JOBS="$(node -e '
+const fs = require("node:fs");
+const manifest = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+const value = manifest.gate?.projects?.["elohim-storage"]?.run?.cargo?.env?.CARGO_BUILD_JOBS;
+if (!/^[1-9][0-9]*$/.test(value ?? "")) {
+  console.error("elohim-storage gate CARGO_BUILD_JOBS must be a positive integer");
+  process.exit(1);
+}
+process.stdout.write(value);
+' "${STORAGE_BUILD_MANIFEST}")"
 
 # Dead-config lint first — cheap (grep-only, no toolchain), and a knob with no
 # reader is a design defect worth catching before spending Docker build time.
@@ -36,4 +51,5 @@ buildctl --addr unix:///run/buildkit/buildkitd.sock build \
     --local dockerfile=. \
     --opt filename=elohim/elohim-storage/Dockerfile \
     --opt target=check \
+    --opt build-arg:CARGO_BUILD_JOBS="${STORAGE_CARGO_BUILD_JOBS}" \
     --progress plain
