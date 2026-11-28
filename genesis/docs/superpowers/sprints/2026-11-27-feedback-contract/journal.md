@@ -7,8 +7,8 @@ steward: human:matthew
 author: shem session 3d494616 (Claude Fable 5.2), designing; shem session cacccb55 integrating
 serves: [private-feedback-loop, dev-system-equilibrium]
 cites:
-  - "feedback-loop-contract-plan | the plan whose FC stations are this sprint | sha256:8b44cca1e3eb8aee | path: genesis/docs/superpowers/plans/2026-11-27-feedback-loop-contract-plan.md"
-  - "feedback-as-a-lifecycle-item-design | the spec the sprint takes into a contract | sha256:02c6c9be76a9434f | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
+  - "feedback-loop-contract-plan | the plan whose FC stations are this sprint | sha256:0e2d5d15bd455754 | path: genesis/docs/superpowers/plans/2026-11-27-feedback-loop-contract-plan.md"
+  - "feedback-as-a-lifecycle-item-design | the spec the sprint takes into a contract | sha256:6af9042774cc0d7a | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
   - "one-loop-for-every-producer-design | the companion that sketches the contract and the producers it must serve | sha256:e7361b750b95dce3 | path: genesis/docs/superpowers/specs/2026-11-27-one-loop-for-every-producer-design.md"
 ---
 
@@ -555,3 +555,19 @@ for it. Not even a person's ruling closes a held unit, since a ruling acts on `o
 spec says that now, in section 6 and in decision 10. Codex (astra) ported the lives and made the
 `commit` event consistent. 120 lives, 848 steps, 40 checked changes, 160 tests across three
 files.
+
+### 2026-11-28, a commitment names its record
+
+The integrator's reader passed the batch through station FC-8 as safe to land and left seven
+points for a later one. The first was the only one with a consequence: an unnamed commitment
+tied the newest session's record, and where that session held only a person's record it tied
+nothing, silently, even when an older session held a covered one. The store has no unnamed form,
+since a commitment link names one occurrence, so the model's was removed: `session` is required.
+The reader's three lives for it are ported, with its life for a kept record that is itself a
+recurrence after a note, which reads `reopened` first; section 7 now says so. The check of the
+model's changes records how each one dies. Of the eleven that had no witness under the default,
+three have one now, one went with the rule it changed, and seven cannot have one because the
+hold hides the difference; the quiet-watch clause is among those. Section 5.5's rule for which
+numbers a summary carries is prose that nothing checks, and the spec lists that with what the
+model does not handle. Codex (astra) did the model side. 132 lives, 918 steps, 41 checked
+changes, 172 tests across three files.
