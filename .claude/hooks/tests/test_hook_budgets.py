@@ -62,9 +62,49 @@ class ResolverBudgetTest(unittest.TestCase):
                                 env={k: v for k, v in os.environ.items() if k != 'PYTHONPATH'})
         self.assertEqual((result.returncode, result.stderr), (0, ''))
 
+    def test_dialogue_sensor_fails_open_before_a_slow_child_reaches_the_harness_limit(self):
+        child = self.root / 'slow-child'
+        child.write_text('#!/bin/sh\nsleep 10\n')
+        child.chmod(child.stat().st_mode | stat.S_IXUSR)
+        env = {k: v for k, v in os.environ.items() if not k.startswith('STASIS_')}
+        env.update(CLAUDE_PROJECT_DIR=str(self.root),
+                   STASIS_JOURNAL_ROOT=str(self.root / 'journal'),
+                   STASIS_COORDINATOR_BIN=str(child), EPR_BIN=str(child),
+                   STASIS_SENSE_DEADLINE_S='0.15')
+        event = {'session_id': 'hook-budget', 'hook_event_name': 'SessionStart'}
+        result, seconds = self.run_hook(SENSE, event, env)
+        self.assertEqual((result.returncode, result.stdout, result.stderr), (0, '', ''))
+        self.assertLess(seconds, BUDGET, f'{seconds:.2f}s')
+        self.assertFalse((self.root / 'journal').exists(), 'deadline path writes no partial journal')
 
-if __name__ == '__main__':
-    unittest.main()
+
+    def test_dialogue_sensor_cut_short_by_its_deadline_still_advances_its_transcript_cursor(self):
+        # Row 108: a scan stopped by the inner deadline must still commit its cursor, or a loaded
+        # device rescans the same stretch on every call and never progresses.
+        quick = self.root / 'quick-child'
+        quick.write_text('#!/bin/sh\nexit 0\n')
+        quick.chmod(quick.stat().st_mode | stat.S_IXUSR)
+        transcript = self.root / 'transcript.jsonl'
+        line = json.dumps({'type': 'assistant', 'message': {'content': 'x' * 200}}) + '\n'
+        transcript.write_text(line * 400_000)
+        env = {k: v for k, v in os.environ.items() if not k.startswith('STASIS_')}
+        env.update(CLAUDE_PROJECT_DIR=str(self.root),
+                   STASIS_JOURNAL_ROOT=str(self.root / 'journal'),
+                   STASIS_COORDINATOR_BIN=str(quick), EPR_BIN=str(quick),
+                   STASIS_SENSE_DEADLINE_S='1.0')
+        event = {'session_id': 'hook-progress', 'hook_event_name': 'PostToolUse',
+                 'transcript_path': str(transcript), 'tool_name': 'Bash',
+                 'tool_input': {'command': 'true'}, 'tool_response': {}}
+        offsets = []
+        for _ in range(2):
+            result, seconds = self.run_hook(SENSE, event, env)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertLess(seconds, BUDGET, f'{seconds:.2f}s')
+            state = json.loads((self.root / 'journal' / 'hook-progress' / 'state.json').read_text())
+            offsets.append(max(c['offset'] for c in state['transcripts'].values()))
+        self.assertGreater(offsets[0], 0)
+        self.assertGreater(offsets[1], offsets[0], offsets)
+        self.assertLess(offsets[1], transcript.stat().st_size, 'the fixture must outlast two scans')
 
 
 if __name__ == '__main__':
