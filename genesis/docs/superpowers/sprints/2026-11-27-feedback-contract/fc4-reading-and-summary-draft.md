@@ -231,18 +231,26 @@ workspace).
   explained in the next bullet.) The integrator's reader asked whether they have a life under
   the default. Both do, and each is now pinned by a new life.
   `commit-compacted-with-person-throws` dies under the default by a throw at the fifth step of
-  a five-step life, as it does in its twin. `commit-kept-falls-back-to-newest` dies under the
+  a five-step life, as it does in its twin. That life names a session whose only record is a
+  kept one, in a unit that already holds aggregates; no session in it was itself compacted. `commit-kept-falls-back-to-newest` dies under the
   default at the third step of a three-step life, and by a stock check only. A stock check is
   a step's own statement of what the unit holds, here its records, compared with what the
   model holds after that step. In the model, a commitment that names a kept record changes no
   record. The changed model instead marks the newest covered record kept; a covered record is
   one captured automatically that no commitment is tied to, which compaction may replace with
-  a count. The readings agree, because the kept record already holds the unit open. A search
-  six events deep found no life under the default where the reading or the summary state
-  differs. It drew on thirteen events: the failures, commitments, releases, changes of a
-  condition and retire commands that the lives use, in their variants
-  (398,138 sequences tried, and a pair of states already seen, the step counter aside, was
-  not extended; a bounded search, not a proof). In its twin it dies by a reading, as before.
+  a count. The readings agree, because the kept record already holds the unit open, and under
+  the default they cannot differ at any later step. The integrator's reader gave the argument
+  and the designing session checked it against the model's text. The change acts only when
+  the named session holds only kept records, so the unit holds a kept record, and no event
+  removes one: the hold stands for the rest of the life. The one fact that reads a record's
+  kind, besides the hold itself, is whether a covered record exists, and the order of
+  readings consults it only where the hold is absent. The retire command, which also reads
+  the kind, is refused on every reading a held unit can have. The summary state follows from
+  the reading, the note and whether the release is known, none of which reads a record's
+  kind. A search agrees as far as it went: six events deep, over
+  thirteen events (the failures, commitments, releases, changes of a condition and retire
+  commands that the lives use, in their variants), 398,138 sequences tried, no difference in
+  the reading or the summary state. In its twin it dies by a reading, as before.
   The check used to hold every life required of a change to one way of dying (a reading, a
   summary state, a stock check or a throw). It now lets a required life state its own way, so
   this change is asserted to die by a reading in the twin and by a stock check under the
