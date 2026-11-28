@@ -521,6 +521,25 @@ each hold a grant can both claim one miss is not established (above, "Three case
    combination the option's own description named. The integrator owns the follow-on (it changes what a gate
    reading counts, the governance class) and will ask him about that combination in its own session before
    changing `gate-grade.mjs`. Nothing in slices 0 to 5 waits on it.
+   **He is not settled on it.** About 14:30Z the same day he wrote, as typed: "hey.. just so you know .. I'm a
+   little torn about the answer I gave you regarding how a jenkins run can satisfy a gate, because I see
+   tradeoffs either way.. but the reason I gave a yes answer there, was because I was thinking about the
+   inclusive developer story, where someone with a thin-client like a chromebook or tablet, needs options for
+   "offloading" heavy compilation to another device.. and if it actutually would help to dispatch jenkins jobs to
+   cover gates, and reduce waiting, if you could work on something else in the meantime. We already give the
+   option to skip gates, and land on CI.. and that increases the likelyhood of failing, but if it does succeed
+   then that would be nice to feedback.. anyway.. just wanted to let you know I'm not entirely settled on it. I
+   think the bigger unlock is the lvi option, where gates could be run on the remote machine on behalf of the
+   thin client.. our "lvi" epic.. but there might be cases to offload jobs to test stuff you're not sure about
+   ... like compatibility/architectur matrixes or something, so it unblocks other work seems to be the best
+   reason for valuaing gate reuse, IF it allows the dev workspace to shorten/incrementalize it's own push
+   ladder." And then: "yeah.. the paramid's weren't built in a day.. and I think that's the strongest case for
+   enabling jenkins to build incremental gate coverage.. that allows a developer to shorten their own gats, one
+   module at a time or something, ideally that grant should enable incremnetal feedback (ie incremental gate
+   coverage)". So the ruling's purpose, in his words, is offloading for a thin client and incremental gate
+   coverage that lets a workspace shorten its own push ladder, with lvi (gates run on a remote machine on the
+   thin client's behalf) named as the bigger unlock. The follow-on is to be asked with that purpose in view, not
+   built from the option label.
 7. **When station F4-portal-consent starts.** Asked: "Carrier decision 7: when should the portal-consent station
    start? It replaces quoted words with your own approval in the consent portal, and rolls the fleet." Offered:
    "After slice 3 has carried (Recommended)": "Start once carry-watch ships and has carried under real grants.
