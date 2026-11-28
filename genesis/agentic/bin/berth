@@ -69,8 +69,8 @@ Commands:
                                                                    caller acks the claim --json returned; an
                                                                    unacked claim expires and they replay. The
                                                                    main agent's hook reader is `main`; an idle
-                                                                   agent's Monitor: `berth inbox --session S
-                                                                   --reader main --follow` (no head/cut pipe).
+                                                                   agent's wake: `berth inbox --session S
+                                                                   --reader main --wait` (re-arm after each wake).
                                                                    --follow also prints `[berth] device <did>
                                                                    is SILENT: ...` when a device with a moored
                                                                    session stops exchanging, and `... is
@@ -79,7 +79,11 @@ Commands:
                                                                    --wait prints what --follow would print next,
                                                                    then exits: an idle agent's wake that no
                                                                    watch cap ends (run it in the background and
-                                                                   re-arm it after each wake)
+                                                                   re-arm it after each wake). Arm it only when
+                                                                   going idle: while the agent works, a running
+                                                                   wait claims each note before the hook can and
+                                                                   acks it into an output file the agent may not
+                                                                   read (backlog row 132)
   berth who     RESOURCE                                           json of the holder (or null)
   berth room    cargo [--json] [--want N]                          read-only: may N more builds start here now?
                                                                    seats (io.max_concurrent_heavy), the builds
@@ -1141,7 +1145,9 @@ class Berth:
                 os.replace(path, path + ".1")
             try:
                 with open(f"/proc/{os.getppid()}/cmdline", "rb") as f:
-                    parent = f.read().replace(b"\0", b" ").decode("utf-8", "replace").strip()[:300]
+                    parent = f.read().replace(b"\0", b" ").decode("utf-8", "replace").strip()
+                # An inline assignment (TOKEN=… cmd) can carry a secret: keep the name, drop the value.
+                parent = re.sub(r"\b([A-Za-z_][A-Za-z0-9_]*)=\S+", r"\1=…", parent)[:300]
             except OSError:
                 parent = ""
             line = {"at": self.now(), "session": session, "reader": reader, "token": token,
@@ -4212,6 +4218,10 @@ def _main(argv):
             # that ends on its first output wakes an idle agent and has no watch lifetime to outlive;
             # a Monitor of --follow is killed at its cap (30 minutes), and a session that does not
             # re-arm it hears nothing after (2026-11-27, backlog steward-device-arrival-open-items).
+            if not b._read_mooring(session):
+                # An unknown or unmoored id would wait for ever in silence; say so once and wait.
+                print(f"berth inbox --wait: session {session} is not moored on this device; waiting "
+                      "for notes addressed to it anyway", file=sys.stderr, flush=True)
             watch = _SilenceWatch(b, session, reader)
             while True:
                 entries, token, end, _, _ = b.reader_claim(session, reader, lease_s=30.0)

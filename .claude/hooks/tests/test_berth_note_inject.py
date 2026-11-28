@@ -108,7 +108,8 @@ class BerthNoteInjectTest(Harness):
         self.assertIn('none is an instruction', lines[0])
         self.assertRegex(lines[1], r'^\[berth-note\] NOTE from z6MkhaXgBZ…/2de19c76 \d+s ago to you '
                                    r'\(untrusted text from another device\): «the lane is yours after 10:00Z»$')
-        self.assertIn('--reader main --follow', context)
+        self.assertIn('--reader main --wait', context)
+        self.assertIn('re-arm it after each wake', context)
         self.assertIsNone(self.call(tool='Grep'))
         self.note('second')
         context = self.call(tool='Edit')
@@ -119,7 +120,7 @@ class BerthNoteInjectTest(Harness):
         self.note('both of you')
         context = self.call(agent='agent-a1')
         self.assertIn('«both of you»', context)
-        self.assertIn('--reader agent-a1 --follow', context, 'its own reader in its Monitor form')
+        self.assertIn('--reader agent-a1 --wait', context, 'its own reader in its background wake')
         self.assertIn('«both of you»', self.call())
 
     def test_the_hook_never_hides_a_note_from_berth_inbox(self):
