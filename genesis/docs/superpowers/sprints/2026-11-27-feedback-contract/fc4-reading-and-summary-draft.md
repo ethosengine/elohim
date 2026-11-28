@@ -41,7 +41,7 @@ they would be built to.
 | `fc4/reading-to-state.json` | For each reading: the summary state it sends, and the words a person is shown |
 | `fc4/facts.json` | Sixteen yes-or-no facts about what a device holds for one claim, each with the rule of the design that defines it |
 | `fc4/precedence-cases.json` | 73 cases: a set of facts, the reading the design gives, and the rule that decides it |
-| `fc4/lives.json` | 137 lives of one claim, 946 steps in all: each step is an event, and the reading and summary state that must follow it |
+| `fc4/lives.json` | 139 lives of one claim, 954 steps in all: each step is an event, and the reading and summary state that must follow it |
 | `fc4/fixtures/` | Sixteen files the schemas accept and thirty-two they refuse, each refused file wrong in one way and named for it |
 
 The checks are a test, `genesis/orchestrator/reading-and-summary-schema.test.mjs`, which the
@@ -88,9 +88,12 @@ ordinary sequence of events after which the reading was wrong, each time in a st
 correction had opened. So the test now also carries a small model of one claim's life: an event
 goes in (a failure, a pass, a release arriving, the retire command, a ruling, the watch
 elapsing), the model updates what the device holds, the facts are worked out from that, and the
-reading comes out. `fc4/lives.json` scripts 132 such lives and states the reading and the
-summary state after every step. Twenty-one of them are a reviewer's own, written to break the
-model, and seven exist because the reviewer showed that a change to the model went unnoticed. Among them: a claim fixed by a release through two fixes and two
+reading comes out. `fc4/lives.json` scripts 139 such lives and states the reading and the
+summary state after every step. Seventy-two of them carry a reviewer's name: a reviewer wrote
+them to break the model, or they replay such a life with the switch described below set the
+other way. Eleven more exist because a reviewer showed that a change to the model went
+unnoticed: the seven whose names begin `mutation-` and the four whose names begin `witness-`.
+Among them: a claim fixed by a release through two fixes and two
 notes; a test that goes red, green, red, green; a claim closed by a person's ruling; and the
 sequences the reviewer found. The design's section 6 is written from the same eighteen rules the
 model runs, numbered R1 to R18, and the cases and lives cite those numbers.
@@ -213,16 +216,39 @@ workspace).
   four-step life. Replayed at the earlier commit, twelve changes had died only by a twin or a
   stock check, not eleven. As the test now records them: four die by a reading under the
   default (`r1-two-kept-collapse`, `d4-condition-also-counted-against`,
-  `r1-kept-dropped-after-compaction`, `e`), the last two by lives the reader found; one was
+  `r1-kept-dropped-after-compaction`, `e`), the last two by two lives the reader found; one was
   removed with the rule it changed (`decision10-h-commit-default-oldest`); two die under the
   default by a stock check and by a reading only in a twin (`r1-commit-adds-record`,
   `r1-kept-replaces-covered`); and five die only in a twin (`decision10-m-commit-first-kind`,
   `decision10-f-kept-suppresses-covered`, `decision10-g-commit-ignores-session`, `d`,
-  `j-quiet-watch`). That the hold hides the difference for those seven is reasoned from the
-  model and has not been searched, except `j-quiet-watch`, for which the reader searched every
+  `j-quiet-watch`). That the hold hides the difference for those seven is an argument from the
+  model's text and has not been searched, except `j-quiet-watch`, for which the reader searched every
   continuation of four events. Three lives were added for how a reopening ends (W1, W2, W3 of
   the reader), with no change to the model. 137 lives, 946 steps, 73 cases, 41 checked changes,
   152 tests.
+- Two of the 41 checked changes are newer than the commit that replay was run at, and they too
+  named only a twin as the life that catches them. (The default, the hold and a twin are
+  explained in the next bullet.) The integrator's reader asked whether they have a life under
+  the default. Both do, and each is now pinned by a new life.
+  `commit-compacted-with-person-throws` dies under the default by a throw at the fifth step of
+  a five-step life, as it does in its twin. `commit-kept-falls-back-to-newest` dies under the
+  default at the third step of a three-step life, and by a stock check only. A stock check is
+  a step's own statement of what the unit holds, here its records, compared with what the
+  model holds after that step. In the model, a commitment that names a kept record changes no
+  record. The changed model instead marks the newest covered record kept; a covered record is
+  one captured automatically that no commitment is tied to, which compaction may replace with
+  a count. The readings agree, because the kept record already holds the unit open. A search
+  six events deep found no life under the default where the reading or the summary state
+  differs. It drew on thirteen events: the failures, commitments, releases, changes of a
+  condition and retire commands that the lives use, in their variants
+  (398,138 sequences tried, and a pair of states already seen, the step counter aside, was
+  not extended; a bounded search, not a proof). In its twin it dies by a reading, as before.
+  The check used to hold every life required of a change to one way of dying (a reading, a
+  summary state, a stock check or a throw). It now lets a required life state its own way, so
+  this change is asserted to die by a reading in the twin and by a stock check under the
+  default. No existing life changed and the model did not change. 139 lives, 954 steps, 73
+  cases, 41 checked changes; 154 tests in the reading test and 6 in the declaration test. The
+  "152 tests" above counted the reading test alone.
 - One thing the model does behind a named switch, because it is not the designing session's to
   decide: whether a claim can close while a kept record of it stands, without that record's
   author. The switch is `KEPT_REPORT_HOLDS_A_CLAIM_OPEN`, true until the steward rules. With it

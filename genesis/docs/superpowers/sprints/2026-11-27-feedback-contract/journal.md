@@ -648,3 +648,39 @@ a kept record under the other outcome; node 10 of section 7a says what is missin
 command does when an address is already held, since section 7 does give each address; and the
 table of section 7 says "at each compaction". Codex (astra) did the model side. 137 lives, 946
 steps, 41 checked changes, 177 tests across three files.
+
+### 2026-11-28, two more changes get a life under the default, and what the slice's reader left
+
+The integrator's reader had named two checked changes of the model that still listed only a
+twin as their witness. Codex (astra) ran both against the 102 lives under the default and found
+none that catches either, then searched. One, a commitment refused on a compacted unit, is
+caught under the default by a five-step life that ends in the refusal. The other, a commitment
+naming a kept record that falls back to the newest covered one, is caught under the default
+only in the stock of records: the readings agree, because the kept record holds the unit open
+whichever record the commitment marks. Codex's first witness for it caught a counter and not
+the record, and to satisfy the check it had added a stock check to an existing twin. The
+designing session replaced the witness with one that pins the records, restored the twin, and
+changed the check so that a required life names its own kind. It then searched six events deep
+for a difference in the reading or the summary state under the default and found none. 139
+lives, 954 steps, 154 tests in the reading test.
+
+The founding slice's follow-up fixes passed their independent reader as safe to land, with
+seven things for a later batch. Four are code and are in that batch: the drain names each note
+it could not remove and why; a relative `HOME` gets a message and a cure that fit it; names
+that are not notes are counted apart, so the count of notes read cannot pass 256; and a cure is
+not printed with a path a terminal cannot show safely. Two belong to brit, and the brit lane
+answered through the integrator that it will change: `HOME` counts only when absolute, no
+directory when it is unset, only `*.json` counted toward the limit of 256, and temporary files
+older than an hour removed under the spool's lock. The feedback reader already resolves the
+directory by that rule. That is brit's statement of intent for its next release, not yet a
+release.
+
+The seventh is a missing node, and it is recorded here in the shape the chain wants. Chain:
+the capture gap, from brit's note to a held record. Between "the drain appends the note's
+record" and "the store reclaims a group it may reclaim", missing node: what a retried note
+does after its record was reclaimed. Assertion wanted: a note drained twice is one record for
+as long as the note exists. Probe: drain with a note that cannot be removed, reclaim, drain
+again. Current state, as the reader found it and this session has not run: the second drain
+records it again, once for each reclaim, because the store answers "already held" only while
+it holds the address. It belongs with the retire command's contract with the store (node 10
+of section 7a), which has no design station yet.
