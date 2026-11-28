@@ -272,7 +272,9 @@ fn options(args: &[String]) -> Result<(BTreeMap<String, String>, bool)> {
         {
             return Err("unknown feedback option".into());
         }
-        let value = args.get(i + 1).ok_or("option requires value")?;
+        let value = args
+            .get(i + 1)
+            .ok_or_else(|| format!("option requires value: --{key}"))?;
         if result.insert(key.to_owned(), value.clone()).is_some() {
             return Err("duplicate option".into());
         }

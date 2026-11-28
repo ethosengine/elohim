@@ -1054,9 +1054,23 @@ fn feedback_recorder_check(fact: &FeedbackRecorderFact) -> Check {
         detail,
         Some(format!(
             "epr feedback drain-spool --root {}",
-            root.display()
+            shell_word(&root.display().to_string())
         )),
     )
+}
+
+/// A path as one word of a POSIX shell command, so a printed cure can be pasted: bare when
+/// every byte is plain, otherwise in single quotes with an embedded quote written `'\''`.
+fn shell_word(text: &str) -> String {
+    let plain = !text.is_empty()
+        && text
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b"_./-+:=@%,".contains(&b));
+    if plain {
+        text.to_owned()
+    } else {
+        format!("'{}'", text.replace('\'', "'\\''"))
+    }
 }
 
 #[path = "arrival_sysroot.rs"]
@@ -3870,5 +3884,21 @@ mod tests {
             feedback_recorder_fact(&nested, &env),
             reading(vec![("2026-11-27T10:00:00Z".into(), "timeout".into())], 1)
         );
+        // A name that is neither a note nor brit's own temporary is counted, and left alone.
+        fs::write(spool.join("note.txt"), "untouched").unwrap();
+        fs::write(spool.join(".tmpAb12Cd"), "untouched").unwrap();
+        assert_eq!(
+            feedback_recorder_fact(&nested, &env),
+            reading(vec![("2026-11-27T10:00:00Z".into(), "timeout".into())], 2)
+        );
+        assert_eq!(fs::read(spool.join("note.txt")).unwrap(), b"untouched");
+    }
+
+    #[test]
+    fn a_cure_root_with_a_space_or_a_quote_is_one_shell_word() {
+        assert_eq!(shell_word("/repo"), "/repo");
+        assert_eq!(shell_word("/my repo"), "'/my repo'");
+        assert_eq!(shell_word("/it's"), "'/it'\\''s'");
+        assert_eq!(shell_word(""), "''");
     }
 }

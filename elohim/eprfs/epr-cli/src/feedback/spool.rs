@@ -24,7 +24,8 @@ pub(crate) const BATCH: usize = 256;
 pub(crate) const CAUSES: [&str; 4] = ["not-found", "timeout", "refused", "spawn-failed"];
 
 /// `$XDG_STATE_HOME/brit/feedback-spool` when that variable is an absolute path, else
-/// `$HOME/.local/state/brit/feedback-spool`. The one resolver the drain and the status share.
+/// `$HOME/.local/state/brit/feedback-spool` when HOME is absolute, else no directory.
+/// The one resolver the drain and the status share.
 pub(crate) fn dir(env: &dyn Fn(&str) -> Option<OsString>) -> Option<PathBuf> {
     if let Some(state) = env("XDG_STATE_HOME").map(PathBuf::from) {
         if state.is_absolute() {
@@ -32,8 +33,9 @@ pub(crate) fn dir(env: &dyn Fn(&str) -> Option<OsString>) -> Option<PathBuf> {
         }
     }
     env("HOME")
-        .filter(|home| !home.is_empty())
-        .map(|home| PathBuf::from(home).join(".local/state/brit/feedback-spool"))
+        .map(PathBuf::from)
+        .filter(|home| home.is_absolute())
+        .map(|home| home.join(".local/state/brit/feedback-spool"))
 }
 
 /// One valid spool file. Open fields (`stderr`, `recorder`) are never carried.
@@ -51,7 +53,7 @@ pub(crate) struct Gap {
 }
 
 /// What a read of the spool found: valid gaps, oldest first (by `at`, then file name), the
-/// count of `*.json` files left in place as invalid, and whether more than [`BATCH`] waited.
+/// count of entries left in place as unreadable notes, and whether more than [`BATCH`] waited.
 #[derive(Debug, Default)]
 pub(crate) struct Scan {
     pub(crate) gaps: Vec<Gap>,
@@ -82,9 +84,18 @@ pub(crate) fn scan(dir: &Path) -> std::io::Result<Scan> {
     let mut read = 0;
     for entry in entries {
         let path = entry?.path();
-        // Only `*.json` entries are gap notes. Brit writes by rename, so another name (its
-        // temporary file) may exist for a moment; it is neither read nor counted.
+        // Brit writes a note by renaming a temporary file it makes in this directory, named
+        // `.tmp` and random letters, so such a name may exist for a moment; it is neither read
+        // nor counted. Brit's lock lives beside the spool, not in it.
+        if path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| name.starts_with(".tmp"))
+        {
+            continue;
+        }
         if path.extension().and_then(|e| e.to_str()) != Some("json") {
+            scan.skipped += 1;
             continue;
         }
         if read == BATCH {
@@ -201,8 +212,16 @@ pub(crate) fn occurrence(gap: &Gap) -> Occurrence {
 }
 
 /// Append each valid gap and remove its file. A store refusal stops the drain with that error
-/// and leaves the file in place; a file replaced after it was read is kept and counted skipped.
+/// and leaves the file in place; a replaced or unremovable file is kept and counted skipped.
 pub(crate) fn drain(store: &FeedbackStore, dir: &Path) -> Result<Value> {
+    drain_with_remove(store, dir, remove_if_unchanged)
+}
+
+fn drain_with_remove(
+    store: &FeedbackStore,
+    dir: &Path,
+    mut remove: impl FnMut(&Gap) -> std::io::Result<bool>,
+) -> Result<Value> {
     let scan =
         scan(dir).map_err(|error| format!("spool unreadable: {}: {error}", dir.display()))?;
     let mut drained = 0;
@@ -211,7 +230,9 @@ pub(crate) fn drain(store: &FeedbackStore, dir: &Path) -> Result<Value> {
         store
             .append(Feedback::Occurrence(occurrence(gap)), false)
             .map_err(|error| format!("{}: {error}", gap.path.display()))?;
-        if remove_if_unchanged(gap).map_err(|error| format!("{}: {error}", gap.path.display()))? {
+        // A removal failure is safe to retry: occurrence makes equal records for equal
+        // notes, so the next drain returns the held address without recording it twice.
+        if matches!(remove(gap), Ok(true)) {
             drained += 1;
         } else {
             skipped += 1;
@@ -250,6 +271,74 @@ mod tests {
             Some(PathBuf::from("/h/.local/state/brit/feedback-spool"))
         );
         assert_eq!(dir(&env(None, None)), None);
+        assert_eq!(dir(&env(None, Some("relative"))), None);
+        assert_eq!(dir(&env(Some("relative"), Some("relative"))), None);
+    }
+
+    #[test]
+    fn scan_counts_non_notes_but_not_writer_files() {
+        let temp = tempfile::tempdir().unwrap();
+        for name in ["note.txt", "unknown", ".tmpAb12Cd"] {
+            std::fs::write(temp.path().join(name), b"untouched").unwrap();
+        }
+        let found = scan(temp.path()).unwrap();
+        assert!(found.gaps.is_empty());
+        assert_eq!(found.skipped, 2);
+        assert_eq!(found.read(), json!(2));
+        for name in ["note.txt", "unknown", ".tmpAb12Cd"] {
+            assert_eq!(std::fs::read(temp.path().join(name)).unwrap(), b"untouched");
+        }
+    }
+
+    #[test]
+    fn drain_continues_after_a_removal_error_and_retries_safely() {
+        let temp = tempfile::tempdir().unwrap();
+        let spool = temp.path().join("spool");
+        std::fs::create_dir(&spool).unwrap();
+        for (name, at, session) in [
+            ("old.json", "2026-11-27T09:00:00Z", "a".repeat(64)),
+            ("new.json", "2026-11-27T10:00:00Z", "b".repeat(64)),
+        ] {
+            std::fs::write(spool.join(name), gap(at, &session)).unwrap();
+        }
+        let policy = serde_json::from_value(json!({
+            "id":"fixture@1", "authority":"human:fixture", "producers":["brit"],
+            "automaticCapture":true, "deliberateEvidence":true,
+            "maxBytes":1000000, "maxRecordBytes":65536,
+            "response":"report", "sharing":"separately-authorized"
+        }))
+        .unwrap();
+        let store = FeedbackStore::new(temp.path(), policy).unwrap();
+        let first = drain_with_remove(&store, &spool, |gap| {
+            if gap.path == spool.join("old.json") {
+                Err(std::io::Error::from(std::io::ErrorKind::PermissionDenied))
+            } else {
+                remove_if_unchanged(gap)
+            }
+        })
+        .unwrap();
+        assert_eq!(first["drained"], 1);
+        assert_eq!(first["skipped"], 1);
+        assert!(spool.join("old.json").exists());
+        assert!(!spool.join("new.json").exists());
+        let held: Vec<_> = store
+            .read()
+            .unwrap()
+            .into_iter()
+            .map(|entry| entry.cid)
+            .collect();
+        assert_eq!(held.len(), 2);
+        let second = drain(&store, &spool).unwrap();
+        assert_eq!(second["drained"], 1);
+        assert_eq!(second["skipped"], 0);
+        let reread: Vec<_> = store
+            .read()
+            .unwrap()
+            .into_iter()
+            .map(|entry| entry.cid)
+            .collect();
+        assert_eq!(reread, held);
+        assert!(!spool.join("old.json").exists());
     }
 
     #[test]
@@ -336,7 +425,8 @@ mod tests {
         for n in 0..BATCH {
             std::fs::write(temp.path().join(format!("{n}.json")), b"{}").unwrap();
         }
-        std::fs::write(temp.path().join("partial.tmp"), b"{}").unwrap();
+        // The name brit's writer gives its temporary file: neither read nor counted.
+        std::fs::write(temp.path().join(".tmpAb12Cd"), b"{}").unwrap();
         let exact = scan(temp.path()).unwrap();
         assert!(!exact.bounded);
         assert_eq!(exact.read(), json!(BATCH));
@@ -364,7 +454,7 @@ mod tests {
         std::fs::write(temp.path().join("b.json"), b"not json").unwrap();
         std::fs::write(temp.path().join("note.txt"), b"ignored").unwrap();
         let found = scan(temp.path()).unwrap();
-        assert_eq!(found.skipped, 1);
+        assert_eq!(found.skipped, 2);
         let names: Vec<_> = found
             .gaps
             .iter()

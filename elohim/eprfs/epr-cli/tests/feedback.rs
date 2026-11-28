@@ -636,7 +636,7 @@ fn claim_capture_accepts_any_operation_word_that_legacy_capture_refuses() {
     ));
     assert_eq!(occurrences(dir.path()).len(), 1);
     // A producer outside the policy's list is still refused by the store.
-    assert!(!run_env(
+    let output = run_env(
         dir.path(),
         &[
             "capture",
@@ -645,12 +645,13 @@ fn claim_capture_accepts_any_operation_word_that_legacy_capture_refuses() {
             "--operation",
             "x",
             "--outcome",
-            "refused"
+            "refused",
         ],
         &[("EPR_FEEDBACK_CLAIM", CLAIM)],
-    )
-    .status
-    .success());
+    );
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr)
+        .contains("invalid occurrence or producer outside policy"));
 }
 
 #[test]
@@ -1002,4 +1003,20 @@ fn drain_spool_reads_at_most_256_notes_and_says_so() {
     assert_eq!(second["drained"], 2);
     assert_eq!(second["read"], 2);
     assert_eq!(occurrences(dir.path()).len(), 258);
+}
+
+#[test]
+fn trailing_option_requires_value_and_names_the_option() {
+    let dir = fixture();
+    for option in ["--dir", "--root"] {
+        let output = Command::new(env!("CARGO_BIN_EXE_epr"))
+            .args(["feedback", "drain-spool", option])
+            .current_dir(dir.path())
+            .env("EPR_SESSION_LAZY", "1")
+            .output()
+            .expect("epr");
+        assert!(!output.status.success());
+        assert!(String::from_utf8_lossy(&output.stderr)
+            .contains(&format!("option requires value: {option}")));
+    }
 }
