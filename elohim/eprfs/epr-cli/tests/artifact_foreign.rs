@@ -158,6 +158,7 @@ impl Foreign {
             .env("CARGO_HOME", self.dir.path().join("cargo-home"))
             .env("CARGO_TARGET_DIR", self.dir.path().join("target"))
             .env("XDG_CONFIG_HOME", self.dir.path().join("config"))
+            .env("XDG_CACHE_HOME", self.dir.path().join("cache-home"))
             .env("XDG_DATA_HOME", self.dir.path().join("data"))
             .env("EPR_PAYLOAD_STORE", self.payload())
             .env("EPR_STORE", self.dir.path().join("store"))

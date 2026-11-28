@@ -110,6 +110,7 @@ impl Device {
         command
             .env(device_key::DEVICE_KEY_ENV, &self.key_file)
             .env("XDG_CONFIG_HOME", self.config.path())
+            .env("XDG_CACHE_HOME", self.config.path().join("cache-home"))
             .env("EPR_STORE", self.config.path().join("epr-store"))
             .env("EPR_PAYLOAD_STORE", self.payload())
             .env("EPR_BIN", env!("CARGO_BIN_EXE_epr"))

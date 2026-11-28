@@ -311,6 +311,7 @@ fn run_epr(root: &Path, config: &Path, args: &[&str]) -> std::process::Output {
         .env_remove("ELOHIM_DEVICE_KEY_FILE")
         .env("XDG_CONFIG_HOME", config.join("xdg-config"))
         .env("HOME", config.join("home"))
+        .env("XDG_CACHE_HOME", config.join("xdg-cache"))
         .output()
         .unwrap()
 }

@@ -98,6 +98,7 @@ impl Fixture {
             .args(args)
             .current_dir(base.join("repo"))
             .env("XDG_CONFIG_HOME", base.join("config"))
+            .env("XDG_CACHE_HOME", base.join("cache-home"))
             .env("ELOHIM_STATE_DIR", base.join("state"))
             .env("EPR_BIN_TOOLS", base.join("registry.json"))
             .env("BIN_STORE", base.join("store"))
@@ -287,6 +288,7 @@ fn device_command(
     command
         .env(device_key::DEVICE_KEY_ENV, key_file)
         .env("XDG_CONFIG_HOME", config)
+        .env("XDG_CACHE_HOME", config.join("cache-home"))
         .env("ELOHIM_STATE_DIR", config.join("state"))
         .env("EPR_STORE", bin_store.join("epr"))
         .env("EPR_PAYLOAD_STORE", payload)

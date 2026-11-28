@@ -133,6 +133,7 @@ impl Fixture {
             .current_dir(&self.root)
             .env("EPR_UNDER_TEST", "1")
             .env("XDG_CONFIG_HOME", self.temporary.path().join("config"))
+            .env("XDG_CACHE_HOME", self.temporary.path().join("cache-home"))
             .env(
                 "ELOHIM_DEVICE_KEY_FILE",
                 self.temporary.path().join("absent-device"),

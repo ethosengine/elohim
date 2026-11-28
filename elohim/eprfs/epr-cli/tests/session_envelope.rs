@@ -219,6 +219,7 @@ fn gc_continues_after_one_dead_owner_record_cannot_close() {
         .env("BIN_STORE", fixture.path().join("stores"))
         .env("EPR_PROC_ROOT", fixture.path().join("proc"))
         .env("XDG_CONFIG_HOME", fixture.path().join("config-home"))
+        .env("XDG_CACHE_HOME", fixture.path().join("cache-home"))
         .env("CLAUDE_PROJECT_DIR", &root)
         .env("CLAUDE_CONFIG_DIR", fixture.path().join("config"))
         .env("BERTH_DIR", fixture.path().join("berth"))
@@ -360,6 +361,7 @@ impl Cli {
             .env("BIN_STORE", base.join("stores"))
             .env("EPR_PROC_ROOT", base.join("proc"))
             .env("XDG_CONFIG_HOME", base.join("config-home"))
+            .env("XDG_CACHE_HOME", base.join("cache-home"))
             .env("CLAUDE_PROJECT_DIR", base.join("repo"))
             .env("CLAUDE_CONFIG_DIR", base.join("config"))
             .env("BERTH_DIR", base.join("berth"))
@@ -716,6 +718,7 @@ fn the_real_holder_releases_when_the_owner_start_changes_or_its_proc_entry_vanis
             .env_clear()
             .env("EPR_PROC_ROOT", base.join("proc"))
             .env("XDG_CONFIG_HOME", base.join("config-home"))
+            .env("XDG_CACHE_HOME", base.join("cache-home"))
             .env("HOME", std::env::var("HOME").unwrap_or_default())
             .spawn()
             .unwrap();

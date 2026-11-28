@@ -18,6 +18,7 @@ fn epr_with_env(base: &Path, args: &[&str], extra_env: &[(&str, &str)]) -> Outpu
         .current_dir(base.join("repo"))
         .env("HOME", base)
         .env("XDG_CONFIG_HOME", base.join("config"))
+        .env("XDG_CACHE_HOME", base.join("cache-home"))
         .env("ELOHIM_DEVICE_KEY_FILE", base.join("device/seed"))
         .env("EPR_BIN_TOOLS", base.join("registry.json"))
         .env("BIN_STORE", base.join("store"))
@@ -466,9 +467,17 @@ fn would_input_stall_is_reported_within_deadline_without_changing_status_exit() 
         "forecast added {forecast_overhead:?}: ordinary {ordinary_elapsed:?}, forecast \
          {forecast_elapsed:?}"
     );
-    assert_eq!(forecast.status.code(), ordinary.status.code());
-    assert!(String::from_utf8_lossy(&forecast.stdout)
-        .contains("timed out after 10s while running gate selection"));
+    let forecast_stdout = String::from_utf8_lossy(&forecast.stdout);
+    let forecast_stderr = String::from_utf8_lossy(&forecast.stderr);
+    assert_eq!(
+        forecast.status.code(),
+        ordinary.status.code(),
+        "forecast stdout:\n{forecast_stdout}\nforecast stderr:\n{forecast_stderr}"
+    );
+    assert!(
+        forecast_stdout.contains("timed out after 10s while running gate selection"),
+        "forecast stdout:\n{forecast_stdout}\nforecast stderr:\n{forecast_stderr}"
+    );
 }
 
 #[test]

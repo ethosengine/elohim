@@ -1767,6 +1767,7 @@ fn peer_leases_names_a_workspace_that_is_not_one_of_its_stewards_devices() {
             keys.path().join("absent/ed25519.seed"),
         )
         .env("XDG_CONFIG_HOME", b.config.path())
+        .env("XDG_CACHE_HOME", b.config.path().join("cache"))
         .output()
         .unwrap();
     assert!(

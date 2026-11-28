@@ -60,6 +60,7 @@ impl Fixture {
             .arg("--json")
             .args(tail)
             .env("XDG_CONFIG_HOME", self.config.path())
+            .env("XDG_CACHE_HOME", self.config.path().join("cache-home"))
             .env("EPR_PROC_ROOT", self.proc_root.path())
             .env("EPR_STORE", self.root.path().join(".eprfs"))
             .env(

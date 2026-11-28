@@ -101,6 +101,7 @@ impl Fixture {
                 "--json",
             ])
             .env("XDG_CONFIG_HOME", self.keys.path())
+            .env("XDG_CACHE_HOME", self.keys.path().join("cache-home"))
             .env_remove("ELOHIM_DEVICE_KEY_FILE")
             .output()
             .unwrap()
@@ -123,6 +124,7 @@ impl Fixture {
             .args(target)
             .args(extra)
             .env("XDG_CONFIG_HOME", self.keys.path())
+            .env("XDG_CACHE_HOME", self.keys.path().join("cache-home"))
             .env_remove("ELOHIM_DEVICE_KEY_FILE")
             .env_remove("CLAUDE_CODE_SESSION_ID")
             .env_remove("CLAUDE_SESSION_ID")
@@ -399,6 +401,7 @@ fn reserved_unknown_kinds_and_unknown_verdict_append_nothing() {
                 "judge-v1",
             ])
             .env("XDG_CONFIG_HOME", fixture.keys.path())
+            .env("XDG_CACHE_HOME", fixture.keys.path().join("cache-home"))
             .env_remove("ELOHIM_DEVICE_KEY_FILE")
             .output()
             .unwrap();

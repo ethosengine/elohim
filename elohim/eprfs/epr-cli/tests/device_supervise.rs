@@ -59,6 +59,7 @@ impl Fixture {
             // A launcher an arrival installs lands in the fixture, never the host's cargo home.
             .env("CARGO_HOME", self.base.join("cargo-home"))
             .env("XDG_CONFIG_HOME", self.base.join("config"))
+            .env("XDG_CACHE_HOME", self.base.join("cache-home"))
             .env("ELOHIM_DEVICE_KEY_FILE", self.base.join("device/seed"))
             .env("BIN_STORE", self.base.join("bins"))
             .env("ARK_BIN", &self.ark)
@@ -2119,6 +2120,7 @@ fn spawn_epr(fx: &Fixture, args: &[String], extra: &[(&str, &OsStr)]) -> Child {
         .env("HOME", &fx.base)
         .env("CARGO_HOME", fx.base.join("cargo-home"))
         .env("XDG_CONFIG_HOME", fx.base.join("config"))
+        .env("XDG_CACHE_HOME", fx.base.join("cache-home"))
         .env("ELOHIM_DEVICE_KEY_FILE", fx.base.join("device/seed"))
         .env("BIN_STORE", fx.base.join("bins"))
         .env("ARK_BIN", &fx.ark)
@@ -2487,6 +2489,7 @@ fn the_readiness_wait_holds_no_lock() {
         .current_dir(&fx.repo)
         .env("HOME", &fx.base)
         .env("XDG_CONFIG_HOME", fx.base.join("config"))
+        .env("XDG_CACHE_HOME", fx.base.join("cache-home"))
         .env("ELOHIM_DEVICE_KEY_FILE", fx.base.join("device/seed"))
         .env("BIN_STORE", fx.base.join("bins"))
         .env("ARK_BIN", &fx.ark)

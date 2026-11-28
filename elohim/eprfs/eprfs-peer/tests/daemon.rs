@@ -2417,7 +2417,16 @@ async fn closed_with(connection: &iroh::endpoint::Connection) -> Option<u64> {
         Ok(iroh::endpoint::ConnectionError::ApplicationClosed(close)) => {
             Some(close.error_code.into_inner())
         }
-        _ => None,
+        Ok(other) => {
+            eprintln!(
+                "closed_with: the connection closed with {other:?}, not an ApplicationClosed"
+            );
+            None
+        }
+        Err(_) => {
+            eprintln!("closed_with: timed out after {WITHIN:?}");
+            None
+        }
     }
 }
 
