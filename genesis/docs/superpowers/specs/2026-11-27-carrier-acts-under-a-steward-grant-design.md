@@ -44,6 +44,17 @@ carries it to the steward's other devices, which `berth.channel.crosses` in the 
 A **station** is a named step of the plan (`2026-10-29-native-dev-tooling-over-peers-plan.md`); a **slice** is
 one commit-sized piece of this design, numbered 0 to 5 at the end of the page.
 
+The tools it names, one line each: a **gate** is a named check a change must pass before it lands (`just gate
+<project>`); **berth** is the device's tool for session moorings, leases on shared resources such as cargo
+seats, and notes between sessions; **brit** is this repository's git implementation, which also stores signed
+covenant clauses as notes; **epr** is the repository's flow, session and covenant command line; **ark** is the
+device runtime that supervises background processes and runs placement tasks; **REA** is the
+resource-event-agent accounting model whose records (here a Commitment) epr keeps in the flow store; an **Edge
+roll** is a deploy of the Edge pipeline that restarts the fleet's pods (about twenty minutes of churn), which
+some paths select; the **roster** is the tracked list of devices Matthew has admitted as his own.
+
+Every command this page names that does not exist yet is marked with the slice that builds it at its first use.
+
 ## The steward's words
 
 All said by human:matthew on 2026-11-27 in ethosengine session `d6cfb7e1-ee3c-4e45-bfb2-ae04ec4b50a3`, quoted
@@ -109,7 +120,7 @@ as typed. Everything else on this page is derivation, marked as such where it mi
 
 | Option | What it is | Cost | Verdict |
 |---|---|---|---|
-| A. a new `ParticipantRef` kind (today there are three: agent, human, service) | `runner:<role>@<did>` | a new kind makes an older epr refuse the WHOLE flow log (`FlowRecord` has no catch-all, store.rs:22-32; an unknown prefix parses as a malformed agent, actor.rs:310); epr-rea selects an Edge roll (holochain build-manifest.json:131); and it names the service as an agent, against the ruling | rejected |
+| A. a new `ParticipantRef` kind (today there are three: agent, human, service) | `runner:<role>@<did>` | a new kind makes an older epr refuse the WHOLE flow log (`FlowRecord` has no catch-all, store.rs:22-32; an unknown prefix parses as a malformed agent, actor.rs:310); epr-rea selects an Edge roll (holochain build-manifest.json:131); and it names the service as an agent, against the ruling | rejected for now (decision 1) |
 | B. `agent:carrier@<build>` | the agent form | no AI model stands behind it | rejected |
 | C. `service:carrier` | the provenance form | `service:` is not an actor by definition (actor.rs:269-272; enforced: elohim/epr-rea/src/actor.rs `parse_acting_participant`, :321) | rejected |
 | D. **the runner as itself, under a steward grant** | a device's did:key (or a system's identity, below) acts; the steward answers | no ontology change; needs one change to attribution (the next section) and a home for the grant | **recommended** (the author's derivation, not a ruling) |
@@ -135,7 +146,9 @@ the **runner is named by its signature and `env:runner=<did>`**. The one resolve
 actor, steward set) rather than a second resolver beside it. A human's labour is then not inferred from a
 machine's act, and no reader parses a new form. The cost, stated: a reader that looks only at the actor slot
 sees nobody, not the device; it must read `env:runner` to see who ran. Moving the runner into the slot is
-option A, with its roll. Whether that cost meets his "visibily the devices" is put to him as decision 1 below.
+option A, with its roll. He ruled on that cost (2026-11-28, choosing among offered options): "Beside now, slot
+later": the device is named beside the actor slot in these slices, and moving it into the slot is its own later
+station, with its roll.
 
 ## The grant: his quoted words, traceable to the act that said them
 
@@ -143,14 +156,17 @@ His call 1: a grant needs no act only he can perform, provided the words are tra
 of ~22:20Z ("go with option 2 then") sets the first stage: a **same-device covenant clause asked through the main
 conversation**, with portal consent as a later upgrade (station F4-portal-consent, below).
 
-**Two records, one act.** The words are recorded as a covenant clause on the carrying device: `epr covenant
+**Two records, one act.** The words are recorded as a covenant clause on the carrying device (the
+`grantsCarry` kind exists in brit 0.3.13, pinned in f07f678d8; epr's side of it is slice 1, not built): `epr covenant
 record --kind grantsCarry --party human:matthew --quote "<his words>" --valid-until <RFC3339>` (covenant.rs:993-1060:
 quote, validity, revocation, the prior steward affirmation; the clause is a brit-signed note and stays on the
 device). The **grant itself is a native REA `Commitment`** in the same device's flow store (epr-rea
 model.rs:352-371), minted by the same command: slice 1 extends `epr covenant record` so that, for
 `grantsCarry` only, it stores the clause and then writes the Commitment naming it. The carrier reads the
 Commitment, so a clause whose Commitment was not written grants nothing: a failure between the two fails
-closed. The Commitment's fields:
+closed. The contract (slice 1): if the Commitment write fails, the command exits non-zero naming the stored
+clause's CID, `verify-grant` reports such a clause as an orphan, and the same command given that clause CID
+writes the missing Commitment once (the words are already recorded, so the new-words rule does not apply to it). The Commitment's fields:
 
 | Field | Value |
 |---|---|
@@ -163,7 +179,7 @@ closed. The Commitment's fields:
 | `inScopeOf` | the repository scope, as every carry record |
 
 Its CID is the grant's address. The record binds his words **by hash only** (`words:<clause cid>`): the quote
-itself stays on the device (his ruling "Both, quote stays home").
+itself stays on the device (his ruling "Both, quote stays home"): no record that crosses includes it.
 
 - **Where it may be recorded.** Only in the main conversation of a session on the device the grant names as its
   runner, and the recording device's did must equal `runner:<did>`. What enforces that today, and what does not:
@@ -191,13 +207,16 @@ itself stays on the device (his ruling "Both, quote stays home").
   grow once shipped): `runner`, a `did:key:z…` whose key is ed25519 (brit refuses any other key type);
   `projects`, a non-empty list of gate project names, or exactly `["*"]`; `refs`, a non-empty list of branch
   globs without the `refs/heads/` prefix (`self/*`), `*` the only metacharacter, matching any run of characters
-  including `/`. The quote is the clause's own quote field, the validity its signed body's `validFrom` and
+  including `/`. Under his ruling of 2026-11-28 ("Refuse dev and main"), slice 1 refuses at record time a grant
+  any of whose `refs` would match `dev` or `main`, saying so (reason `shared branch`); brit's shape check is
+  unchanged. The quote is the clause's own quote field, the validity its signed body's `validFrom` and
   `validUntil`, the steward its party. The clause does not name the Commitment (the Commitment names the
   clause). Brit checks shape only; whether the runner stands for the steward and whether a run falls inside the
   coverage stay with epr.
-- **Expiry.** `--valid-until` is required for `grantsCarry` and at most 24 hours ahead. Every reader (carrier,
-  lander, `carry show`) also refuses a grant whose `validUntil` is more than 24 hours after its `validFrom`,
-  whoever wrote it (the reader-side check, slice 3). In brit the bound is a well-formedness check on the
+- **Expiry.** `--valid-until` is required for `grantsCarry` and at most 24 hours ahead. The reader-side check is one
+  validator, `verify-grant`'s, which refuses a grant whose `validUntil` is more than 24 hours after its
+  `validFrom` whoever wrote it; the carrier (slice 3), the lander and `carry show` (slice 4) each call it rather
+  than check on their own. In brit the bound is a well-formedness check on the
   clause's signed body (`CovenantClauseBody`), beside the payload check. A grant that expires mid-carry stops
   nothing already claimed: the carry finishes and records its verdict, but no new claim starts under it, and a
   lander does not reuse a verdict recorded after `validUntil` (it runs the gate itself). That compute is spent
@@ -208,12 +227,15 @@ itself stays on the device (his ruling "Both, quote stays home").
   old quote is refused (today `covenant record` refuses only an empty quote, covenant.rs:1005-1009). A renewal is
   a new grant with its own Commitment. A **revocation** is a clause by the same route whose `revokesClause`
   names the grant's clause CID (brit's field, which takes any clause CID); slice 1 then writes the record that
-  settles the Commitment, and the grant is void from that moment, before its expiry. No code path writes a
-  successor or a revocation except `covenant record` run in a session: slice 1 adds no other writer.
+  settles the Commitment, and the grant is void from that moment, before its expiry. In today's code no
+  path writes a `grantsCarry` successor or revocation except `covenant record` run in a session, and slice 1's
+  design adds no other writer.
 - **How it crosses.** A Commitment stays on the device that wrote it, so the grant crosses as one signed `Cite`
   event on the Commitment, a new kind `grant` under `dev-landing@1` built by the landing module's one event builder
-  as the carry claim is (flow/carry.rs, "Two records"), with the Commitment's fields in its env slots, and carry
-  claims carry `env:grant=<commitment cid>`. The Cite also carries the clause's session and recording time, so
+  as the carry claim is (flow/carry.rs, "Two records"), with the Commitment's fields in its env slots (slice 1):
+  `env:grant=<commitment cid>`, `env:runner=<did>`, one `env:project=` and one `env:ref=` per entry,
+  `env:valid_from=` and `env:valid_until=`, `env:words=<clause cid>`, `env:clause_session=` and `env:clause_at=`;
+  and carry claims carry `env:grant=<commitment cid>`. The Cite also carries the clause's session and recording time, so
   a second device has them without the clause. The kind joins `KINDS` (flow/intend.rs) and the policy's
   `berth.channel.crosses` entry. A receiver whose policy lacks `grant` drops the event and counts it, and
   `just status device` shows the Degraded crossing-drop line, whose cure is to refresh the policy and restart
@@ -234,7 +256,7 @@ this for now ("quoted words suffice, because as long as the words are traceable.
 acconutability.. back to my own act"; the residual "Acceptable, bounded"; "go with option 2 then"). Station
 F4-portal-consent removes it.
 
-**Who audits the grant, and when.** The verifier is one read, `epr flow carry verify-grant <cid>`, run (1) by the
+**Who audits the grant, and when.** The verifier is one read, `epr flow carry verify-grant <cid>` (slice 1, not built), run (1) by the
 answering session before it acknowledges the first claim under a grant (the carrier's claim note names the
 grant's CID, so a grant the session has not verified is how it learns of a new one) and (2) by the lander before
 it reuses a carried verdict.
@@ -272,7 +294,7 @@ record; a recipient that has folded no head of the issuer within berth's `freshn
 The answering session is in none of these records (sessions are replaced; the grant resolves who answers now),
 and the device did appears only on what leaves the device.
 
-`epr flow carry show [--device <did>] [--carry <id>]` answers from the folded carry claims: the runner, the
+`epr flow carry show [--device <did>] [--carry <id>]` (slice 4, not built) answers from the folded carry claims: the runner, the
 steward, the grant (decoded, its CID recomputed, the clause's session and time), its expiry, the miss, commit,
 closure, since when and the outcome. **Who answers now** is not in those records, so carry show reports it only
 on the carrying device (from its berth state); from another device it says so and names the device to ask.
@@ -289,8 +311,10 @@ carrier: it is any session Matthew has open on the carrying device, moored by th
 `berth inbox --wait` wake and acknowledges the carrier's notes. With none, carries decline. The answering
 session is **on the carrying device** (a berth
 acknowledgement is visible only on the reader's device), and a carry claims only after that session has
-**acknowledged** the claim note (`berth inbox --reader … --ack`) within 120 seconds (a working default, open
-for the steward). No acknowledgement in time declines the carry, recorded. If the answering session goes away
+**acknowledged** the claim note within 120 seconds (decision 3). The session acknowledges by reading the note
+on its own `main` reader (the hook or the `--wait` wake does this). carry-watch learns of it through a berth read
+that slice 3 adds, `berth acked --session <S> --note <cid>`, which exits 0 once any reader of that session has
+acknowledged that note. No acknowledgement in time declines the carry, recorded. If the answering session goes away
 mid-carry, the job in flight finishes (it holds a seat and a worktree; stopping it would waste the work without
 making it safer) and records `carry-unanswered@1`; no new carry starts until an answering session acknowledges
 again (step 3 below is that check). A note addressed to the carrier needs an address berth does not have today (berth addresses sessions):
@@ -322,19 +346,22 @@ independent reader). It is cited here, not fixed here.
 
 ## The carry-watch, its isolation, and which commits it may run
 
-- `epr flow carry-watch` is an ark `processes[]` child under `epr device supervise`. It finds misses by polling,
+- `epr flow carry-watch` (slice 3, not built) is an ark `processes[]` child under `epr device supervise`. It finds misses by polling,
   as `held-tool-watch carry` does today: it reads the device fold with `epr peer intents --json` every 60 s
   (`DEFAULT_CARRY_EVERY_S`), takes at most one miss per pass, and between passes holds nothing. Correction to the first
   draft: the supervisor does not hold `device-ark`; the session that runs `epr device supervise` claims it
   with a TTL, and the sessionless path refuses (supervise.rs:1434-1462; berth:4030 "no P1 session"). A cargo
   seat held under a grant with no session is therefore a **new berth holder kind**, scoped to `cargo`: its
   holder names the grant's Commitment CID and the carry-watch pid instead of a session, and it is live while the
-  grant is valid and that pid is alive (berth's existing pid-liveness check); berth refuses that holder for any
-  resource but `cargo` (slice 3).
+  grant is valid and that pid is alive (berth's existing pid-liveness check). Its record (slice 3, not built):
+  `{"kind": "grant", "commitment": "<cid>", "pid": <n>, "since": <time>, "ttl": <s>}`, and berth is to refuse
+  that holder for any resource but `cargo` (slice 3, not built).
 - **The bounds he accepted, each with where it is enforced, in this order.** Every refusal records a declined
-  carry claim (`env:declined=<reason>`), which crosses like any carry claim and shows in `carry show`. An older
+  carry claim: the same carry-claim record with `env:declined=<reason>`, which crosses like any carry claim and shows in `carry show`. An older
   epr ignores the `env:` tag, so a declined claim also carries a `valid_until` at or before its own time: every
   reader, old or new, sees it lapsed and does not wait on it.
+  0. *At record time* (slice 1): a grant longer than 24 hours (`too long`) or whose refs would match `dev` or
+     `main` (`shared branch`) is not recorded at all.
   1. *At grant admission* (when carry-watch loads the grant): the carrying device is on the roster standing for
      the grant's steward, the grant names this device, and it verifies as above. Else no carries; reason
      `grant`.
@@ -347,9 +374,10 @@ independent reader). It is cited here, not fixed here.
   5. *A detached worktree, read as data:* as held-tool-watch does today (:47-60, :1064-1090), a detached
      worktree is created with checkout hooks, LFS and attribute filters disabled and checked clean, and the
      Cargo home kept outside it. The closure is then recomputed with the RUNNER's trusted orchestrator code from
-     a private execution root (a read-only worktree of the runner's own last-landed `dev` tip, outside the
-     candidate's tree: trusted because it is code this device already gated and landed, not the candidate's;
-     the author's derivation, for slice 3), reading the worktree as data (the closure includes cargo-derived and directory
+     a private execution root (a read-only worktree of the commit `origin/dev` named at the runner's last
+     fetch, outside the candidate's tree; trusted because every commit on `dev` passed the full gate when it
+     landed, and it is not the candidate's; refreshed at the start of each pass, never during a carry; the
+     author's derivation, for slice 3), reading the worktree as data (the closure includes cargo-derived and directory
      reads, so a key from the object store alone exists nowhere today), and must equal the miss's key. Else
      reason `key`, and the worktree is removed.
   6. *Only then* the vouched-for recipe runs in that worktree. The candidate's code first runs here.
@@ -415,40 +443,54 @@ gate-grade.mjs:14-20 already counts sponsored results zero. Wiring it is its own
 Ruled and no longer open: a grant outliving its session and its signed summary crossing without the quote
 ("Both, quote stays home", ~18:40Z); no log of his turns ("Approve in the portal", ~20:00Z, which also retired the
 turn digest); the first stage being a same-device clause, portal consent its own station ("go with option 2 then",
-~22:20Z). A grant said on one device for another is not possible in this stage.
+~22:20Z). A grant said on one device for another is not possible in this stage. On 2026-11-28, choosing among
+offered options: decision 1, "Beside now, slot later", and decision 4, "Refuse dev and main" (both below, kept for
+the record).
 
-Open, each a decision for him, with the options, what each costs, and the author's recommendation:
+Open, each a decision for him, with the options, what each costs, and the author's recommendation. One more
+point is not a decision but a gap to know of: whether two devices that each hold a grant can both claim one miss
+is not established (above, "Three cases a stranger asks about").
 
-1. **"Visibily the devices": is the device named beside the actor slot enough?** (a) As designed: the actor
-   slot is empty, the steward slot names him, the device is named by its signature and `env:runner`. No roll,
-   no reader changes; a reader that looks only at the actor slot sees nobody. (b) Option A: a new participant
-   kind so the device sits in the actor slot. Every older epr refuses the whole flow log until upgraded, it
-   selects an Edge roll, and it names the device as an agent. (c) (a) now, (b) as its own later station.
-   Recommended: (c).
+1. **Ruled: the device is named beside the actor slot now, and moving it into the slot is its own later
+   station** ("Beside now, slot later"). The options were: (a) beside the slot only, for good; (b) the new
+   participant kind now, which makes every older epr refuse the whole flow log until each device upgrades,
+   rides an Edge roll (a fleet restart, about twenty minutes of churn), and names the device as an agent; (c)
+   (a) now and (b) later, whose cost is the same work later plus a migration of the records written meanwhile.
 2. **Ship the first carrier before station F4-limits-answerable?** Nothing observes a carry exceeding its
-   declared limits (condition 4, unwired). (a) Ship it, with condition 4 stated as unwired in `carry show`.
-   The runner is one of his own devices, whose compute he knows, bounded by the 24-hour grant and steps 1-6.
-   (b) Wait for F4-limits-answerable. Recommended: (a); the limits question bites first for a runner whose
-   compute someone else affords (Jenkins, a provider).
+   declared limits (condition 4, unwired). This is not the risk he already called "Acceptable, bounded", which
+   is about a branch's code running on his device; this one is about the carrier's compute going unobserved.
+   (a) Ship it, with condition 4 stated as unwired in `carry show`. Cost: a carry could use more of a device
+   than intended and nothing would say so; the runner is one of his own devices, whose compute he knows, and the
+   grant ends within 24 hours. (b) Wait for F4-limits-answerable, which is not started. Cost: until it lands,
+   every missed gate is run by the device that posted it, as today. Recommended: (a); the limits question bites
+   first for a runner whose compute someone else affords (Jenkins, a provider).
 3. **The liveness standard.** (a) A carry claims only after the answering session acknowledges its note within
-   120 seconds; otherwise it declines `unanswered`. (b) A session with a live wake on the device is enough,
-   with no acknowledgement. (c) (a) with a longer bound, e.g. 10 minutes. (b) is what failed today: a moored
-   session with a follow read nothing for hours. Recommended: (a).
-4. **What a branch glob covers.** As agreed with the brit lane, `*` matches any run of characters including
-   `/`, so `refs: ["*"]` covers every branch, `dev` and `main` among them. (a) Keep it. (b) `*` stops at `/`.
-   (c) Keep the matching, and refuse at record time a grant whose refs would match `dev` or `main`: the carrier
-   carries hand-over branches, and landings are the lander's. Recommended: (c), which changes nothing brit ships
-   (brit checks shape only; matching is epr's).
+   120 seconds, else it declines `unanswered`. The basis is the author's: the `--wait` wake delivered a note in
+   9 seconds when first used, and a session busy in a long tool call acknowledges at its next call, so 120 s
+   covers ordinary work and declines when nobody is there. Cost: a session in one tool call longer than that
+   misses the window, and the posting device then runs the gate itself, which is what happens with no carrier.
+   (b) A session with a live wake on the device is enough, with no acknowledgement. Cost: this is what failed on
+   2026-11-27: a moored session with a follow read nothing for hours. (c) (a) with a longer bound, e.g. 10
+   minutes. Cost: a miss can wait that long before it is declined and the posting device runs it. Recommended: (a).
+4. **Ruled: a grant cannot cover `dev` or `main`** ("Refuse dev and main"). In plain words, under the matching
+   agreed with brit a `*` crosses `/`, so `self/*` covers every hand-over branch however deep and `*` alone would
+   cover every branch. The options were: (a) keep that, so a grant can cover any branch, `dev` and `main`
+   included; (b) make `*` stop at `/`, so `self/*` covers `self/x` and not `self/x/y`; (c) keep the matching and
+   refuse at record time a grant whose refs would match `dev` or `main`. Slice 1 builds (c) (bound 0 above).
 5. **Grant-forwarding for work a runner spawns** ("epr-service compliant", above). (a) As derived: the child
-   carries the grant's CID and its parent runner, and a child grant is a narrowing. (b) Each spawned workload is
-   enrolled on its own. (c) Decide when the first non-device runner is built. Recommended: (c); nothing here
-   spawns workloads.
+   carries the grant's CID and its parent runner, and a child grant is a narrowing. Cost: a forwarding check in
+   every runner that spawns work. (b) Each spawned workload is enrolled on its own. Cost: an enrolment per pod or
+   container, and a roster that grows with them. (c) Decide when the first non-device runner is built. Cost:
+   none now; the choice is made later, with that runner in view. Recommended: (c); nothing here spawns workloads.
 6. **Should a granted Jenkins result ever count toward sufficiency?** (a) It counts zero until condition 4 is
-   wired for Jenkins. (b) It counts as a sibling device's does. Recommended: (a), which is what gate-grade.mjs
-   does today.
+   wired for Jenkins. Cost: a Jenkins result never spares a landing its own gate run until then. (b) It counts as
+   a sibling device's does. Cost: a result from compute whose limits nobody can see would count as evidence.
+   Recommended: (a), which is what gate-grade.mjs does today.
 7. **When station F4-portal-consent starts.** It moves the consent crate's boundary from recognition to
    authority and must answer an agent that drives the browser where his controller is signed in. (a) After
-   slice 3 ships and has carried under real grants. (b) Now, in parallel. Recommended: (a).
+   slice 3 ships and has carried under real grants. Cost: the unwitnessed-quote residual stays until then.
+   (b) Now, in parallel. Cost: the portal work, which also rolls the fleet, competes with slices 1 to 5 for the
+   same hands. Recommended: (a).
 
 ## Known gaps in slice 2, from its review
 
@@ -469,15 +511,16 @@ answering session; a miss declined at each of steps 2, 4 and 5; a grant recorded
 conversation refused; and a grant that does not verify voided and traced to the session that wrote it. Then, each
 its own commit: (1) the attribution case, the `grantsCarry` clause kind with its required expiry and new-words
 renewal, the grant Commitment and its signed `Cite` event of kind `grant`, and `carry verify-grant`; (2) the
-lander's intent and the yields (landed as 59725bf2c), and the lander's grant check; (3) carry-watch under the supervisor with steps
+lander's intent and the yields, LANDED in 59725bf2c; (2b) the lander's grant check, NOT built: the lander calls
+`verify-grant` before reusing a carried verdict, in the lander's reuse code that the integrator owns
+(`gate-carry.mjs`), so it is the integrator's change, after slice 1 exists; (3) carry-watch under the supervisor with steps
 1-6, the grant-held cargo lease, the acknowledged answering agent and the three measures with their registry
 declarations and headline slot, together, so no carrier ships without an answering agent; (4) carry show; (5)
 the `carrier@<device>` berth address. device-runtime/** is an Edge watch glob (holochain build-manifest.json:126),
 so slices that touch it ride an authorised roll bundle; so does slice 3's entry in `processes[]` of
 `genesis/orchestrator/manifests/runtime/workspace-device.manifest.json`, an Edge watch glob too (holochain
-build-manifest.json:127); epr-cli is the eprfs gate; berth is agentic tools; epr-rea is untouched. Slice 1 starts
-in brit, and that is certain, not possible: brit refuses a clause kind it does not know (covenant.rs:14-52, the
-closed kind enum and its `FromStr`) and validates each kind's payload (`validate_payload`, :94-115). So the order
-is: the brit change (the `grantsCarry` kind, its payload, the body's 24-hour check and the cross-session list),
-brit release 0.3.13, the pin move, then slice 1's epr work. An older brit decodes the clause as unverifiable and
-lists it so, which fails closed. Station F4-portal-consent rolls the fleet on its own.
+build-manifest.json:127); epr-cli is the eprfs gate; berth is agentic tools; epr-rea is untouched. Slice 1 started in brit, and that part is landed: brit refuses a clause kind it does not know (covenant.rs:14-52,
+the closed kind enum and its `FromStr`) and validates each kind's payload (`validate_payload`, :94-115), so the
+`grantsCarry` kind, its payload, the body's 24-hour check and the cross-session list came first, in brit 0.3.13,
+pinned in f07f678d8. Slice 1's epr work is next. An older brit decodes the clause as unverifiable and lists it so,
+which fails closed. Station F4-portal-consent rolls the fleet on its own.
