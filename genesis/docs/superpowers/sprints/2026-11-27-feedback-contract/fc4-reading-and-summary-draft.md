@@ -7,8 +7,8 @@ steward: human:matthew
 author: shem session 3d494616 (Claude Fable 5.2), called the designing session below, orchestrating and checking; schemas, cases, fixtures and the check by Codex (astra) in two rounds
 serves: [private-feedback-loop]
 cites:
-  - "feedback-loop-contract-plan | the plan whose station FC-4 this draft answers | sha256:9f368d170f451ae3 | path: genesis/docs/superpowers/plans/2026-11-27-feedback-loop-contract-plan.md"
-  - "feedback-as-a-lifecycle-item-design | the design whose sections 5.5 and 6 these schemas and cases put into a form that can be run | sha256:13ae49af0eded2ca | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
+  - "feedback-loop-contract-plan | the plan whose station FC-4 this draft answers | sha256:8b44cca1e3eb8aee | path: genesis/docs/superpowers/plans/2026-11-27-feedback-loop-contract-plan.md"
+  - "feedback-as-a-lifecycle-item-design | the design whose sections 5.5 and 6 these schemas and cases put into a form that can be run | sha256:02c6c9be76a9434f | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
   - "feedback-contract-fc2-declaration-draft | the sibling draft whose claim-id pattern and test conventions this one reuses | sha256:4f0f5246e0b18034 | path: genesis/docs/superpowers/sprints/2026-11-27-feedback-contract/fc2-declaration-draft.md"
 ---
 
@@ -41,7 +41,7 @@ they would be built to.
 | `fc4/reading-to-state.json` | For each reading: the summary state it sends, and the words a person is shown |
 | `fc4/facts.json` | Sixteen yes-or-no facts about what a device holds for one claim, each with the rule of the design that defines it |
 | `fc4/precedence-cases.json` | 73 cases: a set of facts, the reading the design gives, and the rule that decides it |
-| `fc4/lives.json` | 107 lives of one claim, 784 steps in all: each step is an event, and the reading and summary state that must follow it |
+| `fc4/lives.json` | 120 lives of one claim, 848 steps in all: each step is an event, and the reading and summary state that must follow it |
 | `fc4/fixtures/` | Sixteen files the schemas accept and thirty-two they refuse, each refused file wrong in one way and named for it |
 
 The checks are a test, `genesis/orchestrator/reading-and-summary-schema.test.mjs`, which the
@@ -88,7 +88,7 @@ ordinary sequence of events after which the reading was wrong, each time in a st
 correction had opened. So the test now also carries a small model of one claim's life: an event
 goes in (a failure, a pass, a release arriving, the retire command, a ruling, the watch
 elapsing), the model updates what the device holds, the facts are worked out from that, and the
-reading comes out. `fc4/lives.json` scripts 107 such lives and states the reading and the
+reading comes out. `fc4/lives.json` scripts 120 such lives and states the reading and the
 summary state after every step. Twenty-one of them are a reviewer's own, written to break the
 model, and seven exist because the reviewer showed that a change to the model went unnoticed. Among them: a claim fixed by a release through two fixes and two
 notes; a test that goes red, green, red, green; a claim closed by a person's ruling; and the
@@ -196,11 +196,17 @@ workspace).
   readings are kept as twins. Twelve of the reader's lives were ported. A commitment now names
   the record it is tied to. 107 lives, 784 steps, 73 cases, 34 checked changes to the model,
   122 tests.
+- The reader ran it again and judged the hold sound. It left one life that had to exist: a unit
+  already archival, with its note, that then receives a person's report reads `open` and stays
+  there, which the design's section 7 had denied. That life and five more of the reader's are
+  ported, the `commit` event is made consistent for a session that holds a person's record,
+  and six more checked changes each die by a reading. 120 lives, 848 steps, 73 cases, 40
+  checked changes, 135 tests.
 - One thing the model does behind a named switch, because it is not the designing session's to
   decide: whether a claim can close while a kept record of it stands, without that record's
   author. The switch is `KEPT_REPORT_HOLDS_A_CLAIM_OPEN`, true until the steward rules. With it
   true, a unit that holds any kept record reads none of `cure-available`, `on-watch` and
-  `retired`. Twenty-six lives are twins, whose names end
+  `retired`. Thirty-one lives are twins, whose names end
   `-if-decision-10-lets-the-machine-close`: each shows what its partner's unit does when kept
   records hold nothing.
 - The designing session then changed the check six ways on a scratch copy, and each change

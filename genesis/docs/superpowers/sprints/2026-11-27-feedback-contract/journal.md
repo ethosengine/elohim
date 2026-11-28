@@ -7,8 +7,8 @@ steward: human:matthew
 author: shem session 3d494616 (Claude Fable 5.2), designing; shem session cacccb55 integrating
 serves: [private-feedback-loop, dev-system-equilibrium]
 cites:
-  - "feedback-loop-contract-plan | the plan whose FC stations are this sprint | sha256:9f368d170f451ae3 | path: genesis/docs/superpowers/plans/2026-11-27-feedback-loop-contract-plan.md"
-  - "feedback-as-a-lifecycle-item-design | the spec the sprint takes into a contract | sha256:13ae49af0eded2ca | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
+  - "feedback-loop-contract-plan | the plan whose FC stations are this sprint | sha256:8b44cca1e3eb8aee | path: genesis/docs/superpowers/plans/2026-11-27-feedback-loop-contract-plan.md"
+  - "feedback-as-a-lifecycle-item-design | the spec the sprint takes into a contract | sha256:02c6c9be76a9434f | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
   - "one-loop-for-every-producer-design | the companion that sketches the contract and the producers it must serve | sha256:e7361b750b95dce3 | path: genesis/docs/superpowers/specs/2026-11-27-one-loop-for-every-producer-design.md"
 ---
 
@@ -539,3 +539,19 @@ readings as twins, the life this session wrote by hand among them: what the last
 showed is now true only of its twin. Section 16 puts three things to the steward: which
 outcome; whether he wants the narrower rule, which is not modelled; and what releases a held
 claim. 107 lives, 784 steps, 73 cases, 34 checked changes, 147 tests across three files.
+
+### 2026-11-28, a held unit that was already archival
+
+The integrator's reader re-ran its first 25 lives under both values and closed both findings.
+It left one, small and blocking. Section 7 said a unit that holds a kept record does not leave
+the first step. In the model a unit already on watch or archival that then receives a person's
+report goes back to `open` and stays, holding its aggregates and its note, so the device sends
+`open` after `cured` or `retired` with no recurrence. Section 7 and section 5.5 now say so, and
+the reader's life for it is ported with five more: a held unit still reads `superseded`,
+`review-due` and `unrecorded`, and `stale-emitter` still comes first. The reader also answered a
+doubt this session had sent it: under the default the quiet-watch clause of `retireWhen` cannot
+be observed at all (it searched every continuation of four events), so the spec cites the twin
+for it. Not even a person's ruling closes a held unit, since a ruling acts on `on-watch`; the
+spec says that now, in section 6 and in decision 10. Codex (astra) ported the lives and made the
+`commit` event consistent. 120 lives, 848 steps, 40 checked changes, 160 tests across three
+files.
