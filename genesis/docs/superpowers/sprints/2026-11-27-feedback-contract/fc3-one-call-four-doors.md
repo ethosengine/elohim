@@ -27,7 +27,7 @@ Twelve fields are carried by the three `epr feedback` doors and absent from POST
 
 ## How it was made, and by whom
 
-Codex (astra) read the code, read-only, in this repository at commit `ad0b5ea177`. A Claude Haiku agent that had not written the table opened about 150 of its code citations, confirmed every quoted refusal message, tested the central claim itself, and corrected four citations and one list. The designing session (shem session 3d494616, Claude Fable 5.2) briefed and checked. Prose and layout are by a Claude scribe agent.
+Codex (astra) read the code, read-only, in this repository, on this work's branch before it was rebased onto dev; the files it read are unchanged on dev at `bf76a01d91`. A Claude Haiku agent that had not written the table opened about 150 of its code citations, confirmed every quoted refusal message, tested the central claim itself, and corrected four citations and one list. The designing session (shem session 3d494616, Claude Fable 5.2) briefed and checked. Prose and layout are by a Claude scribe agent.
 
 CONFIRMED on a row means every cited line was opened and matched. Every line number is true of the commit it was read at and will move as the files change.
 

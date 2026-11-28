@@ -25,7 +25,7 @@ The condition is not met and cannot be met with the rule vocabulary as it stands
 
 ## How it was made, and by whom
 
-Codex (astra) read the resolver, its engine, the authoring guide and the tests, read-only, at commit `97f5358480`. A Claude Haiku agent that had not written the inventory opened all 54 of its citations: 50 supported their sentence, 4 supported it in part (a line number off by a few lines, or a line that showed less than was claimed), none failed and none was missing. The designing session then confirmed facts 3 to 6 against the code itself, made the one change described under "The ledger case", and drove the hook by hand for the four cases tabled there. No gate was run.
+Codex (astra) read the resolver, its engine, the authoring guide and the tests, read-only, on this work's branch before it was rebased onto dev; the files it read are unchanged on dev at `bf76a01d91`. A Claude Haiku agent that had not written the inventory opened all 54 of its citations: 50 supported their sentence, 4 supported it in part (a line number off by a few lines, or a line that showed less than was claimed), none failed and none was missing. The designing session then confirmed facts 3 to 6 against the code itself, made the one change described under "The ledger case", and drove the hook by hand for the four cases tabled there. No gate was run.
 
 ## The mechanism, in six facts
 
