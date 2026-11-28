@@ -98,6 +98,8 @@ Feature: A device carries a sibling's gate miss unattended, under its steward's 
     And the breach is recorded naming the session that recorded it
     And a feedback item addressed to Matthew, saying a grant in his name did not check out, is recorded
 
+  # Needs the carrier@<device> berth address (the design's slice 5).
+  @requires:carrier-address
   Scenario: when asked what it is doing, the answering session answers for the carry
     Given the carrier on "workstation" is carrying a miss under a valid grant
     When a session on "laptop" asks "workstation" what its carrier is doing
