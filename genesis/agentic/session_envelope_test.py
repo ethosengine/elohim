@@ -91,6 +91,9 @@ class Fixture:
                 'BIN_STORE': str(self.base / 'stores'), 'EPR_PROC_ROOT': str(self.base / 'proc'),
                 'HOME': str(self.base / 'home'), 'XDG_DATA_HOME': str(self.base / 'data-home'),
                 'XDG_CONFIG_HOME': str(self.base / 'config-home'),
+                # A cache home of the fixture's own: epr's flow-log reads write a verified-prefix cache, and with
+                # none set it lands in HOME/.cache (so HOME exists before a case creates it) or in the host's.
+                'XDG_CACHE_HOME': str(self.base / 'cache-home'),
                 'CLAUDE_PROJECT_DIR': str(self.root), 'CLAUDE_CONFIG_DIR': str(self.base / 'config'),
                 'BERTH_DIR': str(self.base / 'berth'), 'BERTH_UNDER_TEST': '1',
                 'BRIT_BUILD_REF_BIN': str(self.base / 'brit-stub'), 'FIXTURE_OWNER': str(pid),
