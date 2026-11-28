@@ -731,7 +731,7 @@
     "because": "R1, R12, R13, R14: A kept record holds the unit against compaction, watch and closure, after reopening and stale-emitter."
   },
   {
-    "name": "commit-keeps-newest-but-another-record-is-covered",
+    "name": "named-commit-keeps-newer-but-another-record-is-covered",
     "facts": {
       "failed": true,
       "coveredRecords": true,
