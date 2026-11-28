@@ -269,8 +269,11 @@ Then(
   function (tier: string, conclusion: string) {
     assert.ok(fx);
     assert.ok(existsSync(fx.eprLog), 'the fake epr was never invoked');
-    const lines = readFileSync(fx.eprLog, 'utf8').trim().split('\n');
-    assert.equal(lines.length, 1, lines.join('\n'));
+    // The gate makes other epr calls too (since 30f25044f every gate appends its run's readings
+    // with `epr flow reading append`); this step counts only pin-attestation observations.
+    const all = readFileSync(fx.eprLog, 'utf8').trim().split('\n');
+    const lines = all.filter(l => l.includes('--measure pin-attestation@1'));
+    assert.equal(lines.length, 1, all.join('\n'));
     assert.match(
       lines[0],
       /^flow note --kind observation --measure pin-attestation@1 --subject comp --value 1 --unit reads /
