@@ -7,8 +7,8 @@ steward: human:matthew
 author: shem session 3d494616 (Claude Fable 5.2), called the designing session below, orchestrating and checking; schemas, cases, fixtures and the check by Codex (astra) in two rounds
 serves: [private-feedback-loop]
 cites:
-  - "feedback-loop-contract-plan | the plan whose station FC-4 this draft answers | sha256:295822228cd72766 | path: genesis/docs/superpowers/plans/2026-11-27-feedback-loop-contract-plan.md"
-  - "feedback-as-a-lifecycle-item-design | the design whose sections 5.5 and 6 these schemas and cases put into a form that can be run | sha256:20f22882feea7ab4 | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
+  - "feedback-loop-contract-plan | the plan whose station FC-4 this draft answers | sha256:a7d1d8a98839c206 | path: genesis/docs/superpowers/plans/2026-11-27-feedback-loop-contract-plan.md"
+  - "feedback-as-a-lifecycle-item-design | the design whose sections 5.5 and 6 these schemas and cases put into a form that can be run | sha256:4f57fdff063a4d6c | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
   - "feedback-contract-fc2-declaration-draft | the sibling draft whose claim-id pattern and test conventions this one reuses | sha256:4f0f5246e0b18034 | path: genesis/docs/superpowers/sprints/2026-11-27-feedback-contract/fc2-declaration-draft.md"
 ---
 
@@ -41,7 +41,7 @@ they would be built to.
 | `fc4/reading-to-state.json` | For each reading: the summary state it sends, and the words a person is shown |
 | `fc4/facts.json` | Sixteen yes-or-no facts about what a device holds for one claim, each with the rule of the design that defines it |
 | `fc4/precedence-cases.json` | 63 cases: a set of facts, the reading the design gives, and the rule that decides it |
-| `fc4/lives.json` | 61 lives of one claim, 432 steps in all: each step is an event, and the reading and summary state that must follow it |
+| `fc4/lives.json` | 66 lives of one claim, 465 steps in all: each step is an event, and the reading and summary state that must follow it |
 | `fc4/fixtures/` | Sixteen files the schemas accept and thirty-two they refuse, each refused file wrong in one way and named for it |
 
 The checks are a test, `genesis/orchestrator/reading-and-summary-schema.test.mjs`, which the
@@ -88,16 +88,12 @@ ordinary sequence of events after which the reading was wrong, each time in a st
 correction had opened. So the test now also carries a small model of one claim's life: an event
 goes in (a failure, a pass, a release arriving, the retire command, a ruling, the watch
 elapsing), the model updates what the device holds, the facts are worked out from that, and the
-reading comes out. `fc4/lives.json` scripts 61 such lives and states the reading and the
+reading comes out. `fc4/lives.json` scripts 66 such lives and states the reading and the
 summary state after every step. Twenty-one of them are a reviewer's own, written to break the
 model, and seven exist because the reviewer showed that a change to the model went unnoticed. Among them: a claim fixed by a release through two fixes and two
 notes; a test that goes red, green, red, green; a claim closed by a person's ruling; and the
 sequences the reviewer found. The design's section 6 is written from the same eighteen rules the
 model runs, numbered R1 to R18, and the cases and lives cite those numbers.
-
-In the lives' own notes, `D4` and `D5` are the designing session's working names for the last two
-amendments, to R10 and to R12 with R5. The design states them inside those rules and does not use
-the names, because it already has a ruling called D4 that is something else.
 
 The model is a reference for the rules and not an implementation of the judge: the real judge
 has to work the facts out from a store, which nothing here does.
@@ -175,6 +171,13 @@ workspace).
   brief had expected the wrong reading. The integrator's reader judged the result sound against
   thirteen more lives of its own. Both known gaps are closed by it. 61 lives, 432 steps, 63
   cases, 74 tests.
+- A later batch pinned two corners of the first rule that no life had exercised, and in doing so
+  found the model wrong about a person's own report: written in a session that already held an
+  automatic record it replaced that record, and written after that record had been compacted it
+  was not stored at all. Every such report is now its own record. One earlier life changed its
+  readings. The working names in the lives' notes were replaced by the design's rule numbers,
+  and a guard the integrator's reader had shown to be redundant was removed. 66 lives, 465 steps,
+  63 cases, 79 tests.
 - One thing the model does behind a named switch, because it is not the designing session's to
   decide: whether a machine-checked recovery may close a claim while a person's own report of
   its return still stands. The switch is `KEPT_REPORT_HOLDS_A_CLAIM_OPEN`, true until the steward

@@ -7,8 +7,8 @@ steward: human:matthew
 author: shem session 3d494616 (Claude Fable 5.2), orchestrating; checklist and walk-throughs by Codex (astra); citations opened by a Claude Haiku subagent; prose by a Claude scribe agent
 serves: [private-feedback-loop]
 cites:
-  - "feedback-loop-contract-plan | the plan whose station FC-7 this checklist delivers, and whose condition it finds unmet | sha256:295822228cd72766 | path: genesis/docs/superpowers/plans/2026-11-27-feedback-loop-contract-plan.md"
-  - "feedback-as-a-lifecycle-item-design | the design most checklist lines come from, cited in rows as L | sha256:20f22882feea7ab4 | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
+  - "feedback-loop-contract-plan | the plan whose station FC-7 this checklist delivers, and whose condition it finds unmet | sha256:a7d1d8a98839c206 | path: genesis/docs/superpowers/plans/2026-11-27-feedback-loop-contract-plan.md"
+  - "feedback-as-a-lifecycle-item-design | the design most checklist lines come from, cited in rows as L | sha256:4f57fdff063a4d6c | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
   - "one-loop-for-every-producer-design | the companion whose sections 4 and 6 say what a producer declares and calls, cited as O | sha256:e7361b750b95dce3 | path: genesis/docs/superpowers/specs/2026-11-27-one-loop-for-every-producer-design.md"
   - "feedback-contract-fc5-acts-and-authority | the table of acts that shows which things a producer is asked for have no command yet | sha256:f243475a0de4973a | path: genesis/docs/superpowers/sprints/2026-11-27-feedback-contract/fc5-acts-and-authority.md"
   - "feedback-contract-fc9-observer-safeguards | the safeguards table whose three headings this checklist shares | sha256:36b9313a84e6fa30 | path: genesis/docs/superpowers/sprints/2026-11-27-feedback-contract/fc9-observer-safeguards.md"

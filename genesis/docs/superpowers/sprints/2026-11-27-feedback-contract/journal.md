@@ -7,8 +7,8 @@ steward: human:matthew
 author: shem session 3d494616 (Claude Fable 5.2), designing; shem session cacccb55 integrating
 serves: [private-feedback-loop, dev-system-equilibrium]
 cites:
-  - "feedback-loop-contract-plan | the plan whose FC stations are this sprint | sha256:295822228cd72766 | path: genesis/docs/superpowers/plans/2026-11-27-feedback-loop-contract-plan.md"
-  - "feedback-as-a-lifecycle-item-design | the spec the sprint takes into a contract | sha256:20f22882feea7ab4 | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
+  - "feedback-loop-contract-plan | the plan whose FC stations are this sprint | sha256:a7d1d8a98839c206 | path: genesis/docs/superpowers/plans/2026-11-27-feedback-loop-contract-plan.md"
+  - "feedback-as-a-lifecycle-item-design | the spec the sprint takes into a contract | sha256:4f57fdff063a4d6c | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
   - "one-loop-for-every-producer-design | the companion that sketches the contract and the producers it must serve | sha256:e7361b750b95dce3 | path: genesis/docs/superpowers/specs/2026-11-27-one-loop-for-every-producer-design.md"
 ---
 
@@ -474,3 +474,20 @@ findings, a headline that said more than the rows and a row under the wrong head
 The same four names, `run`, `subject`, `kind` and one detail key, mean different things by
 door. The table proposes no interface. What it gives the next station is the list of what an
 interface would have to translate or leave out.
+
+### 2026-11-28, a person's report is its own record
+
+The integrator's reader had named two corners of the first rule that the prose did not mention
+and no life exercised. Pinning them showed the model was wrong, not merely silent. It kept one
+record per session and applied that to a person's own report as well: a report written in a
+session that already held an automatic record replaced that record, and one written after that
+record had been compacted left no record. The design says a record a person wrote is kept as it
+is. The rule now says an automatic record is at most one per session and every report a person
+writes is its own record, which replaces nothing and is not dropped. Codex (astra) changed the
+model after the designing session wrote the rule; one earlier life changed its readings, and a
+new life with its twin shows two reports in one session under both outcomes of decision 10.
+
+The same batch removed a guard the reader had shown to be redundant, replaced the working names
+in the lives' notes with the design's rule numbers and made the test refuse such names, and
+settled three points of wording. Nothing of it has been read by anyone but the designing
+session. 66 lives, 465 steps, 85 tests across the two files.
