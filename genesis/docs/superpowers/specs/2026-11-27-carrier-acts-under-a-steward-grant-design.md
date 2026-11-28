@@ -415,7 +415,7 @@ independent reader). It is cited here, not fixed here.
 
 His call 2: the acting authority "CAN be more than just a device": Jenkins holds an RBAC service grant of its
 own to operate on k8s pods, and the containers such a system creates should be "epr-service compliant, so the
-accountability is automatically extendable". Derivation, for his ruling: a **runner** is whatever identity acts
+accountability is automatically extendable". Derivation (his ruling, decision 5, defers its shape to the first such runner): a **runner** is whatever identity acts
 under a grant (a device did today; a system identity such as Jenkins's later). Work a runner spawns (a pod, a
 container, an ark task) carries its grant forward: the spawned workload receives the grant's CID and its
 parent runner in its environment or labels, its results cite both, and a child grant is a narrowing of its
@@ -440,62 +440,93 @@ gate-grade.mjs:14-20 already counts sponsored results zero. Wiring it is its own
 - **Narrowing:** a grant may name fewer gate projects than every miss (`"*"` by default), checked against the
   gate registry at issue and at claim; capacity admission still applies on top; a miss the grant does not cover
   is recorded `declined-by-grant`, visible in carry show.
-- **Jenkins:** acts under a grant as a runner, not an actor; its results cite the grant; counting them toward
-  sufficiency is a separate ruling, and they count zero until then.
+- **Jenkins:** acts under a grant as a runner, not an actor; its results cite the grant. He ruled that a granted
+  Jenkins result counts as a sibling device's does (decision 6); until the integrator's follow-on changes
+  `gate-grade.mjs`, its shadow reading still lists it apart and counts it zero.
 
-## Open for the steward
+## The steward's rulings on the seven decisions
 
-Ruled and no longer open: a grant outliving its session and its signed summary crossing without the quote
-("Both, quote stays home", ~18:40Z); no log of his turns ("Approve in the portal", ~20:00Z, which also retired the
-turn digest); the first stage being a same-device clause, portal consent its own station ("go with option 2 then",
-~22:20Z). A grant said on one device for another is not possible in this stage. On 2026-11-28, choosing among
-offered options: decision 1, "Beside now, slot later", and decision 4, "Refuse dev and main" (both below, kept for
-the record).
+Ruled earlier: a grant outliving its session and its signed summary crossing without the quote ("Both, quote
+stays home", ~18:40Z); no log of his turns ("Approve in the portal", ~20:00Z, which also retired the turn digest);
+the first stage being a same-device clause, portal consent its own station ("go with option 2 then", ~22:20Z). A
+grant said on one device for another is not possible in this stage.
 
-Open, each a decision for him, with the options, what each costs, and the author's recommendation. One more
-point is not a decision but a gap to know of: whether two devices that each hold a grant can both claim one miss
-is not established (above, "Three cases a stranger asks about").
+The seven decisions below were put to him on 2026-11-28 in ethosengine session
+`d6cfb7e1-ee3c-4e45-bfb2-ae04ec4b50a3`, as multiple-choice questions, decisions 1 and 4 at about 12:50Z and the
+other five at about 13:15Z. For each, what was offered is quoted as shown to him (the option label, then its
+description; the recommended option's label carried "(Recommended)"), and what he did was choose one option. He
+typed nothing beyond the choice, so the label he chose is the whole of his words for that decision. Each also
+keeps the reasoning given before it was asked. One point is not a decision but a gap: whether two devices that
+each hold a grant can both claim one miss is not established (above, "Three cases a stranger asks about").
 
-1. **Ruled: the device is named beside the actor slot now, and moving it into the slot is its own later
-   station** ("Beside now, slot later"). The options were: (a) beside the slot only, for good; (b) the new
-   participant kind now, which makes every older epr refuse the whole flow log until each device upgrades,
-   rides an Edge roll (a fleet restart, about twenty minutes of churn), and names the device as an agent; (c)
-   (a) now and (b) later, whose cost is the same work later plus a migration of the records written meanwhile.
-2. **Ship the first carrier before station F4-limits-answerable?** Nothing observes a carry exceeding its
-   declared limits (condition 4, unwired). This is not the risk he already called "Acceptable, bounded", which
-   is about a branch's code running on his device; this one is about the carrier's compute going unobserved.
-   (a) Ship it, with condition 4 stated as unwired in `carry show`. Cost: a carry could use more of a device
-   than intended and nothing would say so; the runner is one of his own devices, whose compute he knows, and the
-   grant ends within 24 hours. (b) Wait for F4-limits-answerable, which is not started. Cost: until it lands,
-   every missed gate is run by the device that posted it, as today. Recommended: (a); the limits question bites
-   first for a runner whose compute someone else affords (Jenkins, a provider).
-3. **The liveness standard.** (a) A carry claims only after the answering session acknowledges its note within
-   120 seconds, else it declines `unanswered`. The basis is the author's: the `--wait` wake delivered a note in
-   9 seconds when first used, and a session busy in a long tool call acknowledges at its next call, so 120 s
-   covers ordinary work and declines when nobody is there. Cost: a session in one tool call longer than that
-   misses the window, and the posting device then runs the gate itself, which is what happens with no carrier.
-   (b) A session with a live wake on the device is enough, with no acknowledgement. Cost: this is what failed on
-   2026-11-27: a moored session with a follow read nothing for hours. (c) (a) with a longer bound, e.g. 10
-   minutes. Cost: a miss can wait that long before it is declined and the posting device runs it. Recommended: (a).
-4. **Ruled: a grant cannot cover `dev` or `main`** ("Refuse dev and main"). In plain words, under the matching
-   agreed with brit a `*` crosses `/`, so `self/*` covers every hand-over branch however deep and `*` alone would
-   cover every branch. The options were: (a) keep that, so a grant can cover any branch, `dev` and `main`
-   included; (b) make `*` stop at `/`, so `self/*` covers `self/x` and not `self/x/y`; (c) keep the matching and
-   refuse at record time a grant whose refs would match `dev` or `main`. Slice 1 builds (c) (bound 0 above).
-5. **Grant-forwarding for work a runner spawns** ("epr-service compliant", above). (a) As derived: the child
-   carries the grant's CID and its parent runner, and a child grant is a narrowing. Cost: a forwarding check in
-   every runner that spawns work. (b) Each spawned workload is enrolled on its own. Cost: an enrolment per pod or
-   container, and a roster that grows with them. (c) Decide when the first non-device runner is built. Cost:
-   none now; the choice is made later, with that runner in view. Recommended: (c); nothing here spawns workloads.
-6. **Should a granted Jenkins result ever count toward sufficiency?** (a) It counts zero until condition 4 is
-   wired for Jenkins. Cost: a Jenkins result never spares a landing its own gate run until then. (b) It counts as
-   a sibling device's does. Cost: a result from compute whose limits nobody can see would count as evidence.
-   Recommended: (a), which is what gate-grade.mjs does today.
-7. **When station F4-portal-consent starts.** It moves the consent crate's boundary from recognition to
-   authority and must answer an agent that drives the browser where his controller is signed in. (a) After
-   slice 3 ships and has carried under real grants. Cost: the unwitnessed-quote residual stays until then.
-   (b) Now, in parallel. Cost: the portal work, which also rolls the fleet, competes with slices 1 to 5 for the
-   same hands. Recommended: (a).
+1. **Attribution: the device beside the actor slot.** Asked: "Carrier attribution: you asked that unattended
+   carry work be 'visibily the devices'. As designed, a carry record leaves the actor slot empty, names you as the
+   steward, and names the device by its signature and an env:runner tag. Putting the device in the actor slot
+   itself needs a new participant kind, which makes every older epr refuse the whole flow log until it's
+   upgraded, and needs an Edge roll. Which do you want?" Offered: "Beside now, slot later (Recommended)": "Ship
+   with the device named beside the actor slot (no roll, no reader changes). Moving it into the actor slot becomes
+   its own later station with its roll."; "Beside the slot is enough": "Device named by signature and env:runner;
+   actor slot stays empty for machine work, permanently."; "In the actor slot now": "Add the new participant kind
+   in slice 1: every epr reader must upgrade first, and it rides an Edge roll." **He chose "Beside now, slot
+   later".** The cost of the later move is that work plus a migration of the records written meanwhile.
+2. **Ship the first carrier before station F4-limits-answerable.** Asked: "Carrier decision 2: no part of the
+   system yet watches whether a carry uses more of the device than it declared (that monitoring is a separate
+   station not yet started). This is a different risk from the one you already called 'Acceptable, bounded',
+   which was about a branch's code running on your device. Ship the first carrier before that monitoring exists?"
+   Offered: "Ship now, say it's unwired (Recommended)": "Carry show states that limits are unwatched. The runner
+   is your own device, and every grant ends within 24 h. The limits question bites first for compute someone else
+   pays for."; "Wait for the monitoring": "No carrier until that station lands (not started). Meanwhile each
+   device keeps running its own missed gates, as today." **He chose "Ship now, say it's unwired".** So `carry show`
+   (slice 4) states that condition 4 is unwired.
+3. **The liveness standard.** Asked: "Carrier decision 3: how a carry knows a live agent is answering for it.
+   Yesterday a session with a running watch read nothing for hours, which is why an explicit acknowledgement is
+   proposed." Offered: "Acknowledge within 120 s (Recommended)": "The carrier claims only after the answering
+   session acknowledges its note within 120 s, else declines 'unanswered'. A miss it declines is run by the
+   posting device, as it is today with no carrier."; "A live wake is enough": "No acknowledgement: a session with
+   a running wake on the device counts. This is the kind of watch that failed yesterday."; "Acknowledge within 10
+   min": "Same rule, longer bound: a miss can wait up to 10 minutes before being declined." **He chose
+   "Acknowledge within 120 s".** The basis offered for 120 s is the author's: the `--wait` wake delivered a note in
+   9 seconds when first used, and a session busy in a long tool call acknowledges at its next call.
+4. **What a branch glob covers.** Asked: "Carrier grant branch patterns: a '*' in a grant's branch list matches
+   across '/', so a grant naming '*' would cover every branch, dev and main included. The carrier is meant to
+   carry hand-over (self/) branches; landings onto dev are the lander's job. What should a grant be allowed to
+   cover?" Offered: "Refuse dev and main (Recommended)": "Keep the matching, but refuse at record time any grant
+   whose branch patterns would match dev or main. Changes nothing in the brit release."; "Keep it as is": "'*'
+   matches across '/', and a grant can cover any branch, dev and main included."; "'*' stops at '/'": "A '*'
+   matches within one path segment only, so 'self/*' covers 'self/x' but not 'self/x/y'." **He chose "Refuse dev
+   and main".** Slice 1 builds it (bound 0 above, reason `shared branch`).
+5. **Grant-forwarding for work a runner spawns.** Asked: "Carrier decision 5: work a runner spawns (a pod, a
+   container, a task) and the grant it acts under — you asked that such work be 'epr-service compliant, so the
+   accountability is automatically extendable'. Nothing in these slices spawns workloads. How should a spawned
+   workload carry its accountability?" Offered: "Decide with the first such runner (Recommended)": "No cost now;
+   the shape is chosen when the first non-device runner (e.g. Jenkins pods) is built, with it in view."; "Forward
+   the grant, narrowed": "As derived: the child carries the grant's CID and its parent runner, and a child's grant
+   can only narrow its parent's. Needs a forwarding check in every runner that spawns work."; "Enrol each
+   workload": "Each pod or container is enrolled on its own, so the roster grows with every spawned workload."
+   **He chose "Decide with the first such runner".** The derivation above ("Runners other than a device") stays a
+   proposal until then.
+6. **Whether a granted Jenkins result counts toward sufficiency.** Asked: "Carrier decision 6: should a Jenkins
+   result run under a grant ever count as evidence that lets a landing skip running its own gate?" Offered:
+   "Counts zero for now (Recommended)": "It counts zero until Jenkins's resource limits are watched and
+   answerable. That's what gate-grade.mjs does today; a landing still runs its own gate."; "Count like a device":
+   "It counts as a sibling device's result does, even though nobody can see the limits of the compute that
+   produced it." **He chose "Count like a device"**, not the recommended option.
+   What that does and does not change today: `gate-grade.mjs` is a shadow reading with no `on`. It prints one line
+   per gate, and it reads against the proposed graded table of the verdict-attestation design, which is a
+   proposal, not a ruling. So today the ruling changes what that printed line and the proposed table would say
+   for a granted Jenkins result (counted as a sibling's, where it is now listed apart and counted zero); it changes
+   no verdict, no reuse and no landing. It would become a rule a landing obeys only when a graded table is ruled
+   in. How it sits with condition 4: the page calls condition 4 (a runner's limits answerable to the network)
+   UNWIRED for Jenkins, so a Jenkins result counted as a sibling's while nothing observes its envelope is the
+   combination the option's own description named. The integrator owns the follow-on (it changes what a gate
+   reading counts, the governance class) and will ask him about that combination in its own session before
+   changing `gate-grade.mjs`. Nothing in slices 0 to 5 waits on it.
+7. **When station F4-portal-consent starts.** Asked: "Carrier decision 7: when should the portal-consent station
+   start? It replaces quoted words with your own approval in the consent portal, and rolls the fleet." Offered:
+   "After slice 3 has carried (Recommended)": "Start once carry-watch ships and has carried under real grants.
+   The risk of an unwitnessed quote stays until then."; "Start now, in parallel": "Begin now, beside slices 1-5.
+   It competes with them for the same work, and it rolls the fleet on its own." **He chose "After slice 3 has
+   carried".**
 
 ## Known gaps in slice 2a, from its review
 
