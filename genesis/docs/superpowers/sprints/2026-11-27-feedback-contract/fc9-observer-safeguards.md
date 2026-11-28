@@ -7,7 +7,7 @@ steward: human:matthew
 author: shem session 3d494616 (Claude Fable 5.2), orchestrating; mapping by Codex (astra); citations opened by a Claude Haiku subagent; prose by a Claude scribe agent
 serves: [private-feedback-loop]
 cites:
-  - "feedback-loop-contract-plan | the plan whose station FC-9 this table delivers, and whose condition seven rows do not meet | sha256:d29a95ac372adc78 | path: genesis/docs/superpowers/plans/2026-11-27-feedback-loop-contract-plan.md"
+  - "feedback-loop-contract-plan | the plan whose station FC-9 this table delivers, and whose condition seven rows do not meet | sha256:295822228cd72766 | path: genesis/docs/superpowers/plans/2026-11-27-feedback-loop-contract-plan.md"
   - "observer-protocol | the epic whose Part VIII lists the eighteen safeguards this table goes through, cited as OP | sha256:78afb76e1fb58772 | path: genesis/docs/content/elohim-protocol/observer-protocol.md"
   - "feedback-as-a-lifecycle-item-design | the design searched for an answer to each safeguard, cited in rows as L | sha256:20f22882feea7ab4 | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
   - "one-loop-for-every-producer-design | the companion whose section 1b sets the feedback loop beside the Observer Protocol, cited as C | sha256:e7361b750b95dce3 | path: genesis/docs/superpowers/specs/2026-11-27-one-loop-for-every-producer-design.md"

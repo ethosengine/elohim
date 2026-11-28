@@ -7,7 +7,7 @@ steward: human:matthew
 author: shem session 3d494616 (Claude Fable 5.2), designing; shem session cacccb55 integrating
 serves: [private-feedback-loop, dev-system-equilibrium]
 cites:
-  - "feedback-loop-contract-plan | the plan whose FC stations are this sprint | sha256:d29a95ac372adc78 | path: genesis/docs/superpowers/plans/2026-11-27-feedback-loop-contract-plan.md"
+  - "feedback-loop-contract-plan | the plan whose FC stations are this sprint | sha256:295822228cd72766 | path: genesis/docs/superpowers/plans/2026-11-27-feedback-loop-contract-plan.md"
   - "feedback-as-a-lifecycle-item-design | the spec the sprint takes into a contract | sha256:20f22882feea7ab4 | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
   - "one-loop-for-every-producer-design | the companion that sketches the contract and the producers it must serve | sha256:e7361b750b95dce3 | path: genesis/docs/superpowers/specs/2026-11-27-one-loop-for-every-producer-design.md"
 ---
@@ -456,3 +456,21 @@ nothing. And the spec said a withdrawal counts only while it is the latest entry
 counts every withdrawn entry in the head's declaration, which is what lets a unit move to the
 cure that follows it. Both sentences are corrected, with three statements of what brit "does"
 changed to what brit has said it will do.
+
+### 2026-11-28, the one call has four doors that agree on nothing (FC-3)
+
+`fc3-one-call-four-doors.md` sets every field of an observation against the four doors that
+record one today: `epr feedback capture`, `ingest-genesis` and `record`, which write to a device's
+private store, and `POST /api/v1/observations`, which writes to storage. Codex (astra) read the
+code; a Claude Haiku agent opened about 150 citations, confirmed every refusal message character
+for character, tested the central claim itself and corrected four citations and one list; a
+Claude scribe agent wrote the prose; the designing session corrected one row the scribe had
+taken from an imprecise line of its brief.
+
+The finding is that the station's condition cannot be met as things stand. No field is carried
+by all four doors in one form; the time of observation is the only one that means the same thing
+at all four, and it comes in two forms. One blind reader read the table; its two correctness
+findings, a headline that said more than the rows and a row under the wrong heading, are fixed.
+The same four names, `run`, `subject`, `kind` and one detail key, mean different things by
+door. The table proposes no interface. What it gives the next station is the list of what an
+interface would have to translate or leave out.
