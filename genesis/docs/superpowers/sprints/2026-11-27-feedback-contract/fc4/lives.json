@@ -1,0 +1,5187 @@
+[
+  {
+    "name": "a-release-life",
+    "about": "R1–R14: two release cures, two watches, two archival notes.",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R16, R1, R10"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R12, R4"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R13, R5, R7, R8"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R13, R5, R7, R8"
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "newSession": true
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R13, R4, R6"
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "reading": "retired",
+        "state": "cured",
+        "rule": "R14, R6"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "retired",
+        "state": "retired",
+        "rule": "R14, R5, R7, R8"
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "reading": "retired",
+        "state": "retired",
+        "rule": "R14, R6"
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 1,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "reopened",
+        "state": "reopened",
+        "rule": "R10, R1, R10"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 2,
+          "entries": [
+            [
+              1,
+              "cured"
+            ],
+            [
+              2,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R12, R4"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R13, R5, R7, R8"
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "newSession": true
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R13, R4, R6"
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "reading": "retired",
+        "state": "cured",
+        "rule": "R14, R6"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "retired",
+        "state": "retired",
+        "rule": "R14, R5, R7, R8"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "retired",
+        "state": "retired",
+        "rule": "R14, R5, R7, R8"
+      }
+    ]
+  },
+  {
+    "name": "b-observed-red-green-red-green",
+    "about": "R4, R10: a new holding condition instance ends the prior reopening.",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false,
+          "clears": "observed"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R16, R1, R10"
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "newSession": true
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R12, R4, R6"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R13, R5, R7, R8"
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "reopened",
+        "state": "reopened",
+        "rule": "R10, R1, R10"
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "newSession": true
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R12, R4, R6"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R13, R5, R7, R8"
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "newSession": true
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R13, R4, R6"
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "reading": "retired",
+        "state": "cured",
+        "rule": "R14, R6"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "retired",
+        "state": "retired",
+        "rule": "R14, R5, R7, R8"
+      }
+    ]
+  },
+  {
+    "name": "c-false-retired",
+    "about": "R10, R14, R16: cure 2 cannot rehabilitate cure 1’s invalidated note; kept records stay open. Pending decision 10 (section 16): with a person's report standing, the claim stays open.",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R16, R1, R10"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R12, R4"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R13, R5, R7, R8"
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "newSession": true
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R13, R4, R6"
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "reading": "retired",
+        "state": "cured",
+        "rule": "R14, R6"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "retired",
+        "state": "retired",
+        "rule": "R14, R5, R7, R8"
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 1,
+          "participant": "p",
+          "record": "kept",
+          "afterHead": false
+        },
+        "reading": "reopened",
+        "state": "reopened",
+        "rule": "R10, R1, R10"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 2,
+          "entries": [
+            [
+              1,
+              "cured"
+            ],
+            [
+              2,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R12 (D5), R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R12 (D5), R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "newSession": true
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R12 (D5), R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R12 (D5), R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R12 (D5), R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
+      }
+    ]
+  },
+  {
+    "name": "d-ruling",
+    "about": "R6, R8: unnamed aggregates persist and cannot meet a watch; a second ruling is refused.",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": null,
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R16, R1, R10"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R12, R4"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R13, R5, R7, R8"
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R13, R6"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R13, R5, R7, R8"
+      },
+      {
+        "event": {
+          "type": "retire",
+          "ruling": "person"
+        },
+        "reading": "retired",
+        "state": "retired",
+        "rule": "R14, R5, R7, R8"
+      },
+      {
+        "event": {
+          "type": "retire",
+          "ruling": "person"
+        },
+        "reading": "retired",
+        "state": "retired",
+        "rule": "R14, R5, R7, R8"
+      }
+    ]
+  },
+  {
+    "name": "e-reopened-before-compaction",
+    "about": "R10: a curing release can fail before any compaction.",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R16, R1, R10"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R12, R4"
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 1,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "reopened",
+        "state": "reopened",
+        "rule": "R10, R1, R10"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 2,
+          "entries": [
+            [
+              1,
+              "cured"
+            ],
+            [
+              2,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R12, R4"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R13, R5, R7, R8"
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "newSession": true
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R13, R4, R6"
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "reading": "retired",
+        "state": "cured",
+        "rule": "R14, R6"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "retired",
+        "state": "retired",
+        "rule": "R14, R5, R7, R8"
+      }
+    ]
+  },
+  {
+    "name": "f-only-kept",
+    "about": "R1, R5, R16: a cure cannot compact kept records. It reads open under both decision-10 postures: the steward’s decision would not change this case unless he also gives such a claim a way to close.",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "kept",
+          "afterHead": false
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R16, R1, R10"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R16, R4"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R16, R5, R7, R8"
+      }
+    ]
+  },
+  {
+    "name": "g-late-own-emitter",
+    "about": "R11, R12, R14: an old-emitter record made before head landing arrives after the note; no pin lag.",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R16, R1, R10"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R12, R4"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R13, R5, R7, R8"
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "newSession": true
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R13, R4, R6"
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "reading": "retired",
+        "state": "cured",
+        "rule": "R14, R6"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "retired",
+        "state": "retired",
+        "rule": "R14, R5, R7, R8"
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R12, R1, R10"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "retired",
+        "state": "retired",
+        "rule": "R14, R5, R7, R8"
+      }
+    ]
+  },
+  {
+    "name": "h-pin-lag",
+    "about": "R11: a head observation makes pin lag give way.",
+    "steps": [
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": []
+        },
+        "reading": null,
+        "state": null,
+        "rule": "R9, R4"
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": true
+        },
+        "reading": "stale-emitter",
+        "state": null,
+        "rule": "R11, R1, R10"
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "newSession": true,
+          "release": 1
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R16, R4, R6"
+      }
+    ]
+  },
+  {
+    "name": "i-observed-fails-before-retire",
+    "about": "R4, R10: losing an observed condition before compaction does not reopen.",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false,
+          "clears": "observed"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R16, R1, R10"
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "newSession": true
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R12, R4, R6"
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R16, R1, R10"
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "newSession": true
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R12, R4, R6"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R13, R5, R7, R8"
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "newSession": true
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R13, R4, R6"
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "reading": "retired",
+        "state": "cured",
+        "rule": "R14, R6"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "retired",
+        "state": "retired",
+        "rule": "R14, R5, R7, R8"
+      }
+    ]
+  },
+  {
+    "name": "j-ruling-twice",
+    "about": "R2, R6, R8: old unnamed aggregates survive reopening and require another ruling.",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": null,
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R16, R1, R10"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R12, R4"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R13, R5, R7, R8"
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R13, R6"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R13, R5, R7, R8"
+      },
+      {
+        "event": {
+          "type": "retire",
+          "ruling": "person"
+        },
+        "reading": "retired",
+        "state": "retired",
+        "rule": "R14, R5, R7, R8"
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 1,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "reopened",
+        "state": "reopened",
+        "rule": "R10, R1, R10"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 2,
+          "entries": [
+            [
+              1,
+              "cured"
+            ],
+            [
+              2,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R12, R4"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R13, R5, R7, R8"
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "newSession": true
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R13, R4, R6"
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R13, R6"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R13, R5, R7, R8"
+      },
+      {
+        "event": {
+          "type": "retire",
+          "ruling": "person"
+        },
+        "reading": "retired",
+        "state": "retired",
+        "rule": "R14, R5, R7, R8"
+      },
+      {
+        "event": {
+          "type": "retire",
+          "ruling": "person"
+        },
+        "reading": "retired",
+        "state": "retired",
+        "rule": "R14, R5, R7, R8"
+      }
+    ]
+  },
+  {
+    "name": "k-superseded",
+    "about": "R15: declared supersession.",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R16, R1, R10"
+      },
+      {
+        "event": {
+          "type": "supersede"
+        },
+        "reading": "superseded",
+        "state": null,
+        "rule": "R15, R15"
+      }
+    ]
+  },
+  {
+    "name": "k-review-due",
+    "about": "R15: a known emitter’s validity horizon passes without a cure.",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R16, R1, R10"
+      },
+      {
+        "event": {
+          "type": "horizon"
+        },
+        "reading": "review-due",
+        "state": "open",
+        "rule": "R15, R15"
+      }
+    ]
+  },
+  {
+    "name": "k-unrecorded",
+    "about": "R15: an unknown emitter has no validity horizon.",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R16, R1, R10"
+      },
+      {
+        "event": {
+          "type": "known",
+          "value": false
+        },
+        "reading": "unrecorded",
+        "state": null,
+        "rule": "R15, R15"
+      },
+      {
+        "event": {
+          "type": "horizon"
+        },
+        "reading": "unrecorded",
+        "state": null,
+        "rule": "R15, R15"
+      },
+      {
+        "event": {
+          "type": "known",
+          "value": true
+        },
+        "reading": "review-due",
+        "state": "open",
+        "rule": "R15, R15"
+      }
+    ]
+  },
+  {
+    "name": "condition-edges",
+    "about": "R4, R10: explicit non-observed condition instances cure again.",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R16, R1, R10"
+      },
+      {
+        "event": {
+          "type": "condition",
+          "name": "path",
+          "holds": true
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R12, R4"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R13, R5, R7, R8"
+      },
+      {
+        "event": {
+          "type": "condition",
+          "name": "path",
+          "holds": false
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R13, R4"
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "reopened",
+        "state": "reopened",
+        "rule": "R10, R1, R10"
+      },
+      {
+        "event": {
+          "type": "condition",
+          "name": "path",
+          "holds": true
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R12, R4"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R13, R5, R7, R8"
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "newSession": false
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R13, R4, R6"
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R13, R6"
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "newSession": true
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R13, R4, R6"
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "reading": "retired",
+        "state": "cured",
+        "rule": "R14, R6"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "retired",
+        "state": "retired",
+        "rule": "R14, R5, R7, R8"
+      }
+    ]
+  },
+  {
+    "name": "only-passed",
+    "about": "R9: passing observations alone have no reading or summary.",
+    "steps": [
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "newSession": true,
+          "release": 0
+        },
+        "reading": null,
+        "state": null,
+        "rule": "R9, R4, R6"
+      }
+    ]
+  },
+  {
+    "name": "reviewer-A1-second-cure-before-compaction-then-fail-on-r1",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 2,
+          "entries": [
+            [
+              1,
+              "cured"
+            ],
+            [
+              2,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 1,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": true
+        },
+        "reading": "stale-emitter",
+        "state": null,
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries. Revised result differs from reviewer model (reopened/reopened): R10, R13, R14 invalidate only the current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "newSession": true,
+          "release": 2
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries. Revised result differs from reviewer model (reopened/reopened): R10, R13, R14 invalidate only the current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 3,
+          "entries": [
+            [
+              1,
+              "cured"
+            ],
+            [
+              2,
+              "cured"
+            ],
+            [
+              3,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      }
+    ]
+  },
+  {
+    "name": "reviewer-A2-noncuring-later-release",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 2,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "newSession": true,
+          "release": 2
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "reading": "retired",
+        "state": "cured",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "retired",
+        "state": "retired",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      }
+    ],
+    "about": "R4: Release 2 adds no entry; its cumulative declaration still carries the cure made by release 1."
+  },
+  {
+    "name": "reviewer-A3-reopen-on-current-head",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "newSession": true
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "reading": "retired",
+        "state": "cured",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "retired",
+        "state": "retired",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 1,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "reopened",
+        "state": "reopened",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "newSession": true
+        },
+        "reading": "reopened",
+        "state": "reopened",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "reading": "reopened",
+        "state": "reopened",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      }
+    ]
+  },
+  {
+    "name": "reviewer-A4-observed-flap",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false,
+          "clears": "observed"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "newSession": true
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "reopened",
+        "state": "reopened",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "newSession": true
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "reopened",
+        "state": "reopened",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "newSession": true
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "reopened",
+        "state": "reopened",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "newSession": true
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "newSession": true
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "reading": "retired",
+        "state": "cured",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "retired",
+        "state": "retired",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "reopened",
+        "state": "reopened",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "newSession": true
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      }
+    ]
+  },
+  {
+    "name": "reviewer-A5-ruling-cure-reopen",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": null,
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "retire",
+          "ruling": "person"
+        },
+        "reading": "retired",
+        "state": "retired",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 1,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "reopened",
+        "state": "reopened",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 2,
+          "entries": [
+            [
+              1,
+              "cured"
+            ],
+            [
+              2,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "newSession": true
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 2,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "reopened",
+        "state": "reopened",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      }
+    ]
+  },
+  {
+    "name": "reviewer-A6-superseded-then-again",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "supersede"
+        },
+        "reading": "superseded",
+        "state": null,
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "superseded",
+        "state": null,
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "newSession": true
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "reading": "retired",
+        "state": "cured",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "retired",
+        "state": "retired",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 1,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "reopened",
+        "state": "reopened",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      }
+    ]
+  },
+  {
+    "name": "reviewer-B1-horizon-then-cure-then-condition-lost",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "horizon"
+        },
+        "reading": "review-due",
+        "state": "open",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "condition",
+          "name": "path",
+          "holds": true
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "condition",
+          "name": "path",
+          "holds": false
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "newSession": true
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "reading": "retired",
+        "state": "cured",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "retired",
+        "state": "retired",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "condition",
+          "name": "path",
+          "holds": false
+        },
+        "reading": "retired",
+        "state": "retired",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      }
+    ]
+  },
+  {
+    "name": "reviewer-B2-horizon-after-reopen-on-condition",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "condition",
+          "name": "path",
+          "holds": true
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "condition",
+          "name": "path",
+          "holds": false
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "horizon"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "reopened",
+        "state": "reopened",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      }
+    ]
+  },
+  {
+    "name": "reviewer-B3-unrecorded-then-cure",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "known",
+          "value": false
+        },
+        "reading": "unrecorded",
+        "state": null,
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": null,
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries. Revised result differs from reviewer model (cure-available/open): R10, R13, R14 invalidate only the current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": null,
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries. Revised result differs from reviewer model (on-watch/cured): R10, R13, R14 invalidate only the current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "newSession": true
+        },
+        "reading": "on-watch",
+        "state": null,
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries. Revised result differs from reviewer model (on-watch/cured): R10, R13, R14 invalidate only the current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "reading": "retired",
+        "state": null,
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries. Revised result differs from reviewer model (retired/cured): R10, R13, R14 invalidate only the current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "retired",
+        "state": null,
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries. Revised result differs from reviewer model (retired/retired): R10, R13, R14 invalidate only the current cure; R17 suppresses unknown-emitter summaries."
+      }
+    ]
+  },
+  {
+    "name": "reviewer-B4-kept-at-each-point",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "kept",
+          "afterHead": false
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "kept",
+          "afterHead": false
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "newSession": true
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "reading": "retired",
+        "state": "cured",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "retired",
+        "state": "retired",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "kept",
+          "afterHead": false
+        },
+        "reading": "retired",
+        "state": "retired",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      }
+    ]
+  },
+  {
+    "name": "reviewer-B5-kept-during-watch-from-head",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "newSession": true
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 1,
+          "participant": "p",
+          "record": "kept",
+          "afterHead": false
+        },
+        "reading": "reopened",
+        "state": "reopened",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 2,
+          "entries": [
+            [
+              1,
+              "cured"
+            ],
+            [
+              2,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R12 (D5), R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R12 (D5), R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "newSession": true
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R12 (D5), R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R12 (D5), R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R12 (D5), R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
+      }
+    ],
+    "about": " Pending decision 10 (section 16): with a person's report standing, the claim stays open."
+  },
+  {
+    "name": "reviewer-B6-passes-only-then-ruling",
+    "steps": [
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "newSession": true,
+          "release": 0
+        },
+        "reading": null,
+        "state": null,
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "retire",
+          "ruling": "person"
+        },
+        "reading": null,
+        "state": null,
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": null,
+        "state": null,
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      }
+    ]
+  },
+  {
+    "name": "reviewer-B7-condition-held-before-fail",
+    "steps": [
+      {
+        "event": {
+          "type": "condition",
+          "name": "path",
+          "holds": true
+        },
+        "reading": null,
+        "state": null,
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "newSession": true
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "reading": "retired",
+        "state": "cured",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "retired",
+        "state": "retired",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      }
+    ]
+  },
+  {
+    "name": "reviewer-B8-stale-then-reopen-mix",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": true
+        },
+        "reading": "stale-emitter",
+        "state": null,
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "stale-emitter",
+        "state": null,
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": true
+        },
+        "reading": "stale-emitter",
+        "state": null,
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "newSession": true,
+          "release": 1
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": true
+        },
+        "reading": "stale-emitter",
+        "state": null,
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      }
+    ]
+  },
+  {
+    "name": "reviewer-B9-same-session-fail-pass-fail",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false,
+          "clears": "observed"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "newSession": false
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false,
+          "newSession": false
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      }
+    ]
+  },
+  {
+    "name": "reviewer-B10-ruling-when-watch-meetable",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "newSession": true
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "retire",
+          "ruling": "person"
+        },
+        "reading": "retired",
+        "state": "retired",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "reading": "retired",
+        "state": "retired",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      }
+    ]
+  },
+  {
+    "name": "reviewer-B11-two-participants",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "q",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "newSession": true
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "q",
+          "newSession": true
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "reading": "retired",
+        "state": "cured",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "retired",
+        "state": "retired",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      }
+    ]
+  },
+  {
+    "name": "reviewer-C1-kept-reopen-during-watch-then-watch-met",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "newSession": true
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 1,
+          "participant": "p",
+          "record": "kept",
+          "afterHead": false
+        },
+        "reading": "reopened",
+        "state": "reopened",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 2,
+          "entries": [
+            [
+              1,
+              "cured"
+            ],
+            [
+              2,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R12 (D5), R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "newSession": true
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R12 (D5), R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R12 (D5), R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R12 (D5), R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "newSession": true
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R12 (D5), R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R12 (D5), R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R12 (D5), R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
+      }
+    ],
+    "about": " Pending decision 10 (section 16): with a person's report standing, the claim stays open."
+  },
+  {
+    "name": "reviewer-C2-covered-reopen-during-watch-control",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "newSession": true
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 1,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "reopened",
+        "state": "reopened",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 2,
+          "entries": [
+            [
+              1,
+              "cured"
+            ],
+            [
+              2,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "newSession": true
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "reading": "retired",
+        "state": "cured",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "retired",
+        "state": "retired",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      }
+    ]
+  },
+  {
+    "name": "reviewer-C3-two-cures-then-fail-on-r1-no-pinlag",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 2,
+          "entries": [
+            [
+              1,
+              "cured"
+            ],
+            [
+              2,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 1,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries. Revised result differs from reviewer model (reopened/reopened): R10, R13, R14 invalidate only the current cure; R17 suppresses unknown-emitter summaries."
+      }
+    ]
+  },
+  {
+    "name": "reviewer-C4-kept-reopen-during-watch-no-new-release",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "newSession": true
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 1,
+          "participant": "p",
+          "record": "kept",
+          "afterHead": false
+        },
+        "reading": "reopened",
+        "state": "reopened",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "newSession": true
+        },
+        "reading": "reopened",
+        "state": "reopened",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "reading": "reopened",
+        "state": "reopened",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      }
+    ]
+  },
+  {
+    "name": "mutation-a-pass-by-nobody",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": null,
+          "record": "covered"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R2, R5, R6, R8, R11, R15: Explicit regression witness."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R1, R2, R5, R6, R8, R11, R15: Explicit regression witness."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1, R2, R5, R6, R8, R11, R15: Explicit regression witness."
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": null
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1, R2, R5, R6, R8, R11, R15: Explicit regression witness."
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1, R2, R5, R6, R8, R11, R15: Explicit regression witness."
+      }
+    ]
+  },
+  {
+    "name": "mutation-b-failure-before-head",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": true
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R2, R5, R6, R8, R11, R15: Explicit regression witness."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": []
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R2, R5, R6, R8, R11, R15: Explicit regression witness."
+      }
+    ]
+  },
+  {
+    "name": "mutation-c-horizon-with-kept-cure",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "kept"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R2, R5, R6, R8, R11, R15: Explicit regression witness."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R2, R5, R6, R8, R11, R15: Explicit regression witness."
+      },
+      {
+        "event": {
+          "type": "horizon"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R2, R5, R6, R8, R11, R15: Explicit regression witness."
+      }
+    ]
+  },
+  {
+    "name": "mutation-d-compaction-beside-kept",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "kept"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R2, R5, R6, R8, R11, R15: Explicit regression witness."
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "q",
+          "record": "covered"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R2, R5, R6, R8, R11, R15: Explicit regression witness."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R1, R2, R5, R6, R8, R11, R15: Explicit regression witness."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1, R2, R5, R6, R8, R11, R15: Explicit regression witness.",
+        "stock": {
+          "records": [
+            {
+              "session": 1,
+              "kind": "kept",
+              "participant": "p"
+            }
+          ],
+          "aggregates": [
+            {
+              "cure": "release:1",
+              "participant": "q",
+              "at": 4,
+              "session": 2
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "mutation-e-ruling-on-open",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "kept"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R2, R5, R6, R8, R11, R15: Explicit regression witness."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R2, R5, R6, R8, R11, R15: Explicit regression witness."
+      },
+      {
+        "event": {
+          "type": "retire",
+          "ruling": "person"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R2, R5, R6, R8, R11, R15: Explicit regression witness.",
+        "stock": {
+          "notes": [],
+          "current": null,
+          "tick": 2
+        }
+      }
+    ]
+  },
+  {
+    "name": "mutation-g-one-record-per-session",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R2, R5, R6, R8, R11, R15: Explicit regression witness."
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "newSession": false
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R2, R5, R6, R8, R11, R15: Explicit regression witness.",
+        "stock": {
+          "records": [
+            {
+              "session": 1,
+              "kind": "covered",
+              "participant": "p"
+            }
+          ]
+        }
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R2, R5, R6, R8, R11, R15: Explicit regression witness."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R1, R2, R5, R6, R8, R11, R15: Explicit regression witness."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1, R2, R5, R6, R8, R11, R15: Explicit regression witness.",
+        "stock": {
+          "aggregates": [
+            {
+              "cure": "release:1",
+              "participant": "p",
+              "at": 5,
+              "session": 2
+            }
+          ]
+        }
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "newSession": false
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1, R2, R5, R6, R8, R11, R15: Explicit regression witness.",
+        "stock": {
+          "records": []
+        }
+      }
+    ]
+  },
+  {
+    "name": "ruling-on-cure-available",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R2, R5, R6, R8, R11, R15: Explicit regression witness."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R1, R2, R5, R6, R8, R11, R15: Explicit regression witness."
+      },
+      {
+        "event": {
+          "type": "retire",
+          "ruling": "person"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1, R2, R5, R6, R8, R11, R15: Explicit regression witness.",
+        "stock": {
+          "notes": [],
+          "current": "release:1"
+        }
+      }
+    ]
+  },
+  {
+    "name": "skipped-release-still-sees-the-cure",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R4, R10, R12–R18"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 2,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R4, R10, R12–R18"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R4, R10, R12–R18"
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R4, R10, R12–R18"
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "reading": "retired",
+        "state": "cured",
+        "rule": "R4, R10, R12–R18"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "retired",
+        "state": "retired",
+        "rule": "R4, R10, R12–R18",
+        "stock": {
+          "current": "release:1",
+          "notes": [
+            {
+              "cure": "release:1",
+              "at": 6
+            }
+          ]
+        }
+      }
+    ],
+    "about": "R4: The head carries the cure made by release 1 even though the device only took release 2."
+  },
+  {
+    "name": "precedence-release-over-condition",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R4, R5, R10, R13, R17 (D1): The release cure takes precedence; compaction selects it."
+      },
+      {
+        "event": {
+          "type": "condition",
+          "name": "path",
+          "holds": true
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R4, R5, R10, R13, R17 (D1): The release cure takes precedence; compaction selects it."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R4, R5, R10, R13, R17 (D1): The release cure takes precedence; compaction selects it."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R4, R5, R10, R13, R17 (D1): The release cure takes precedence; compaction selects it.",
+        "stock": {
+          "current": "release:1"
+        }
+      },
+      {
+        "event": {
+          "type": "condition",
+          "name": "path",
+          "holds": false
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R4, R5, R10, R13, R17 (D1): The release cure takes precedence; compaction selects it."
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 1,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "reopened",
+        "state": "reopened",
+        "rule": "R4, R5, R10, R13, R17 (D1): The release cure takes precedence; compaction selects it."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 2,
+          "entries": [
+            [
+              1,
+              "cured"
+            ],
+            [
+              2,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R4, R5, R10, R13, R17 (D1): The release cure takes precedence; compaction selects it."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R4, R5, R10, R13, R17 (D1): The release cure takes precedence; compaction selects it.",
+        "stock": {
+          "current": "release:2"
+        }
+      }
+    ]
+  },
+  {
+    "name": "downgrade-below-the-cure",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R4, R16, R17: A taken cure above the head is not present."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R4, R16, R17: A taken cure above the head is not present."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 0,
+          "entries": []
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R4, R16, R17: A taken cure above the head is not present."
+      }
+    ]
+  },
+  {
+    "name": "guard-is-for-the-current-cure-only",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R10, R13, R14, R17 (D2): The older cure was cured again and is not current."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R10, R13, R14, R17 (D2): The older cure was cured again and is not current."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 2,
+          "entries": [
+            [
+              1,
+              "cured"
+            ],
+            [
+              2,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R10, R13, R14, R17 (D2): The older cure was cured again and is not current."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R10, R13, R14, R17 (D2): The older cure was cured again and is not current.",
+        "stock": {
+          "current": "release:2"
+        }
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 1,
+          "participant": "p",
+          "record": "kept",
+          "afterHead": false
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R10, R13, R14, R17 (D2): The older cure was cured again and is not current."
+      }
+    ]
+  },
+  {
+    "name": "watch-needs-quiet-after-the-pass",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R6, R10, R13, R14, R17: A kept failure interrupts the watch even when its cure was cured again."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R6, R10, R13, R14, R17: A kept failure interrupts the watch even when its cure was cured again."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 2,
+          "entries": [
+            [
+              1,
+              "cured"
+            ],
+            [
+              2,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R6, R10, R13, R14, R17: A kept failure interrupts the watch even when its cure was cured again."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R6, R10, R13, R14, R17: A kept failure interrupts the watch even when its cure was cured again."
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "newSession": true
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R6, R10, R13, R14, R17: A kept failure interrupts the watch even when its cure was cured again."
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 1,
+          "participant": "p",
+          "record": "kept",
+          "afterHead": false
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R6, R10, R13, R14, R17: A kept failure interrupts the watch even when its cure was cured again."
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R6, R10, R13, R14, R17: A kept failure interrupts the watch even when its cure was cured again."
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "newSession": true
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R6, R10, R13, R14, R17: A kept failure interrupts the watch even when its cure was cured again."
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "reading": "retired",
+        "state": "cured",
+        "rule": "R6, R10, R13, R14, R17: A kept failure interrupts the watch even when its cure was cured again."
+      }
+    ]
+  },
+  {
+    "name": "withdrawn-before-compaction",
+    "about": "R4, R18: Withdrawal removes the present cure before any compaction; a later cure can compact the remaining covered record.",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R4, R10, R12–R18"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R4, R10, R12–R18"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 2,
+          "entries": [
+            [
+              1,
+              "cured"
+            ],
+            [
+              2,
+              "withdrawn"
+            ]
+          ]
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R4, R10, R12–R18"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 3,
+          "entries": [
+            [
+              1,
+              "cured"
+            ],
+            [
+              2,
+              "withdrawn"
+            ],
+            [
+              3,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R4, R10, R12–R18"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R4, R10, R12–R18"
+      }
+    ]
+  },
+  {
+    "name": "withdrawn-during-watch",
+    "about": "R18, R5 and R12 (D5): Withdrawal reopens the current cure; release 3 permits aggregate transfer and a fresh watch, ending in its own note.",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R4, R10, R12–R18"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R4, R10, R12–R18"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R4, R10, R12–R18"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 2,
+          "entries": [
+            [
+              1,
+              "cured"
+            ],
+            [
+              2,
+              "withdrawn"
+            ]
+          ]
+        },
+        "reading": "reopened",
+        "state": "reopened",
+        "rule": "R4, R10, R12–R18"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 3,
+          "entries": [
+            [
+              1,
+              "cured"
+            ],
+            [
+              2,
+              "withdrawn"
+            ],
+            [
+              3,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R5, R12 (D5), R6, R10, R13, R14, R18: The new cure permits aggregate transfer; its watch requires a pass in a session after the selecting retire. Earlier notes remain with their own cure."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R5, R12 (D5), R6, R10, R13, R14, R18: The new cure permits aggregate transfer; its watch requires a pass in a session after the selecting retire. Earlier notes remain with their own cure."
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R5, R12 (D5), R6, R10, R13, R14, R18: The new cure permits aggregate transfer; its watch requires a pass in a session after the selecting retire. Earlier notes remain with their own cure."
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "reading": "retired",
+        "state": "cured",
+        "rule": "R5, R12 (D5), R6, R10, R13, R14, R18: The new cure permits aggregate transfer; its watch requires a pass in a session after the selecting retire. Earlier notes remain with their own cure."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "retired",
+        "state": "retired",
+        "rule": "R5, R12 (D5), R6, R10, R13, R14, R18: The new cure permits aggregate transfer; its watch requires a pass in a session after the selecting retire. Earlier notes remain with their own cure.",
+        "stock": {
+          "current": "release:3",
+          "notes": [
+            {
+              "cure": "release:3",
+              "at": 9
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "withdrawn-after-note",
+    "about": "R18, R5 and R12 (D5): Withdrawal reopens the current cure; release 3 permits aggregate transfer and a fresh watch, ending in its own note.",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R4, R10, R12–R18"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R4, R10, R12–R18"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R4, R10, R12–R18"
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R4, R10, R12–R18"
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "reading": "retired",
+        "state": "cured",
+        "rule": "R4, R10, R12–R18"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "retired",
+        "state": "retired",
+        "rule": "R4, R10, R12–R18"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 2,
+          "entries": [
+            [
+              1,
+              "cured"
+            ],
+            [
+              2,
+              "withdrawn"
+            ]
+          ]
+        },
+        "reading": "reopened",
+        "state": "reopened",
+        "rule": "R4, R10, R12–R18"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 3,
+          "entries": [
+            [
+              1,
+              "cured"
+            ],
+            [
+              2,
+              "withdrawn"
+            ],
+            [
+              3,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R5, R12 (D5), R6, R10, R13, R14, R18: The new cure permits aggregate transfer; its watch requires a pass in a session after the selecting retire. Earlier notes remain with their own cure."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R5, R12 (D5), R6, R10, R13, R14, R18: The new cure permits aggregate transfer; its watch requires a pass in a session after the selecting retire. Earlier notes remain with their own cure."
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R5, R12 (D5), R6, R10, R13, R14, R18: The new cure permits aggregate transfer; its watch requires a pass in a session after the selecting retire. Earlier notes remain with their own cure."
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "reading": "retired",
+        "state": "cured",
+        "rule": "R5, R12 (D5), R6, R10, R13, R14, R18: The new cure permits aggregate transfer; its watch requires a pass in a session after the selecting retire. Earlier notes remain with their own cure."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "retired",
+        "state": "retired",
+        "rule": "R5, R12 (D5), R6, R10, R13, R14, R18: The new cure permits aggregate transfer; its watch requires a pass in a session after the selecting retire. Earlier notes remain with their own cure.",
+        "stock": {
+          "current": "release:3",
+          "notes": [
+            {
+              "cure": "release:1",
+              "at": 6
+            },
+            {
+              "cure": "release:3",
+              "at": 12
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "downgrade-reads-the-shorter-list",
+    "about": "R4: The earlier head replaces the longer declaration.",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R4, R10, R12–R18"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 2,
+          "entries": [
+            [
+              2,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R4, R10, R12–R18"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": []
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R4, R10, R12–R18"
+      }
+    ]
+  },
+  {
+    "name": "withdrawal-does-not-cure-an-observation",
+    "about": "R10, R18: A later withdrawn entry is not cured again, including before compaction.",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R4, R10, R12–R18"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R4, R10, R12–R18"
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 1,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "reopened",
+        "state": "reopened",
+        "rule": "R4, R10, R12–R18"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 2,
+          "entries": [
+            [
+              1,
+              "cured"
+            ],
+            [
+              2,
+              "withdrawn"
+            ]
+          ]
+        },
+        "reading": "reopened",
+        "state": "reopened",
+        "rule": "R4, R10, R12–R18"
+      }
+    ]
+  },
+  {
+    "name": "semantic-release-precedence",
+    "about": "R4, R10: SemVer precedence selects entries regardless of array order; build metadata has no precedence.",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": "0.9.0",
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R4, R10, R12–R18"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": "1.0.0",
+          "entries": [
+            [
+              "1.0.0",
+              "withdrawn"
+            ],
+            [
+              "1.0.0-rc.10",
+              "cured"
+            ],
+            [
+              "1.0.0-rc.2",
+              "cured"
+            ]
+          ]
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R4, R10, R12–R18"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": "1.10.0",
+          "entries": [
+            [
+              "1.10.0",
+              "cured"
+            ],
+            [
+              "1.0.0",
+              "withdrawn"
+            ],
+            [
+              "1.0.0-rc.10",
+              "cured"
+            ],
+            [
+              "1.0.0-rc.2",
+              "cured"
+            ],
+            [
+              "1.2.0",
+              "withdrawn"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R4, R10, R12–R18"
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": "1.0.0-rc.9",
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R4, R10, R12–R18"
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": "1.10.0+build.7",
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "reopened",
+        "state": "reopened",
+        "rule": "R4, R10, R12–R18"
+      }
+    ]
+  },
+  {
+    "name": "condition-reopening-ended-by-a-release",
+    "about": "R10 (D4): A late observation from release 0 counts against the compacted condition; the present release cure has already cured it again.",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R10 (D4), R5 and R12 (D5), R6, R7, R14: Release cures end condition reopening; aggregate transfer starts a fresh watch and preserves earlier notes."
+      },
+      {
+        "event": {
+          "type": "condition",
+          "name": "path",
+          "holds": true
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R10 (D4), R5 and R12 (D5), R6, R7, R14: Release cures end condition reopening; aggregate transfer starts a fresh watch and preserves earlier notes."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R10 (D4), R5 and R12 (D5), R6, R7, R14: Release cures end condition reopening; aggregate transfer starts a fresh watch and preserves earlier notes."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R10 (D4), R5 and R12 (D5), R6, R7, R14: Release cures end condition reopening; aggregate transfer starts a fresh watch and preserves earlier notes."
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R10 (D4), R5 and R12 (D5), R6, R7, R14: Release cures end condition reopening; aggregate transfer starts a fresh watch and preserves earlier notes."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R10 (D4), R5 and R12 (D5), R6, R7, R14: Release cures end condition reopening; aggregate transfer starts a fresh watch and preserves earlier notes.",
+        "stock": {
+          "current": "release:1",
+          "notes": []
+        }
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "newSession": true
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R10 (D4), R5 and R12 (D5), R6, R7, R14: Release cures end condition reopening; aggregate transfer starts a fresh watch and preserves earlier notes."
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "reading": "retired",
+        "state": "cured",
+        "rule": "R10 (D4), R5 and R12 (D5), R6, R7, R14: Release cures end condition reopening; aggregate transfer starts a fresh watch and preserves earlier notes."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "retired",
+        "state": "retired",
+        "rule": "R10 (D4), R5 and R12 (D5), R6, R7, R14: Release cures end condition reopening; aggregate transfer starts a fresh watch and preserves earlier notes.",
+        "stock": {
+          "current": "release:1",
+          "notes": [
+            {
+              "cure": "release:1",
+              "at": 9
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "condition-reopening-by-ruling-then-release",
+    "about": "R10 (D4), R5 and R12 (D5): Release 1 ends the condition reopening after a ruling; its watch retains unnamed aggregates and the old condition note.",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": null,
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R10 (D4), R5 and R12 (D5), R6, R7, R14: Release cures end condition reopening; aggregate transfer starts a fresh watch and preserves earlier notes."
+      },
+      {
+        "event": {
+          "type": "condition",
+          "name": "path",
+          "holds": true
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R10 (D4), R5 and R12 (D5), R6, R7, R14: Release cures end condition reopening; aggregate transfer starts a fresh watch and preserves earlier notes."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R10 (D4), R5 and R12 (D5), R6, R7, R14: Release cures end condition reopening; aggregate transfer starts a fresh watch and preserves earlier notes."
+      },
+      {
+        "event": {
+          "type": "retire",
+          "ruling": "person"
+        },
+        "reading": "retired",
+        "state": "retired",
+        "rule": "R10 (D4), R5 and R12 (D5), R6, R7, R14: Release cures end condition reopening; aggregate transfer starts a fresh watch and preserves earlier notes."
+      },
+      {
+        "event": {
+          "type": "condition",
+          "name": "path",
+          "holds": false
+        },
+        "reading": "retired",
+        "state": "retired",
+        "rule": "R10 (D4), R5 and R12 (D5), R6, R7, R14: Release cures end condition reopening; aggregate transfer starts a fresh watch and preserves earlier notes."
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": null,
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "reopened",
+        "state": "reopened",
+        "rule": "R10 (D4), R5 and R12 (D5), R6, R7, R14: Release cures end condition reopening; aggregate transfer starts a fresh watch and preserves earlier notes."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R10 (D4), R5 and R12 (D5), R6, R7, R14: Release cures end condition reopening; aggregate transfer starts a fresh watch and preserves earlier notes."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R10 (D4), R5 and R12 (D5), R6, R7, R14: Release cures end condition reopening; aggregate transfer starts a fresh watch and preserves earlier notes.",
+        "stock": {
+          "current": "release:1",
+          "notes": [
+            {
+              "cure": "condition:2",
+              "at": 4
+            }
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "c-false-retired-if-decision-10-lets-the-machine-close",
+    "about": "Pending decision 10 (section 16): alternative posture permits D5 to move aggregates despite the standing report; earlier notes keep their own cure.",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R16, R1, R10"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R12, R4"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R13, R5, R7, R8"
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "newSession": true
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R13, R4, R6"
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "reading": "retired",
+        "state": "cured",
+        "rule": "R14, R6"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "retired",
+        "state": "retired",
+        "rule": "R14, R5, R7, R8"
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 1,
+          "participant": "p",
+          "record": "kept",
+          "afterHead": false
+        },
+        "reading": "reopened",
+        "state": "reopened",
+        "rule": "R10, R1, R10"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 2,
+          "entries": [
+            [
+              1,
+              "cured"
+            ],
+            [
+              2,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R5, R12 (D5), R6, R10, R13, R14, R18: The new cure permits aggregate transfer; its watch requires a pass in a session after the selecting retire. Earlier notes remain with their own cure."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R5, R12 (D5), R6, R10, R13, R14, R18: The new cure permits aggregate transfer; its watch requires a pass in a session after the selecting retire. Earlier notes remain with their own cure."
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "newSession": true
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R5, R6, R12 (D5), R14: Watch and note under the later cure."
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "reading": "retired",
+        "state": "cured",
+        "rule": "R5, R6, R12 (D5), R14: Watch and note under the later cure."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "retired",
+        "state": "retired",
+        "rule": "R5, R6, R12 (D5), R14: Watch and note under the later cure.",
+        "stock": {
+          "current": "release:2",
+          "notes": [
+            {
+              "cure": "release:1",
+              "at": 6
+            },
+            {
+              "cure": "release:2",
+              "at": 12
+            }
+          ]
+        }
+      }
+    ],
+    "decision10": "machine-may-close"
+  },
+  {
+    "name": "reviewer-B5-kept-during-watch-from-head-if-decision-10-lets-the-machine-close",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "newSession": true
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 1,
+          "participant": "p",
+          "record": "kept",
+          "afterHead": false
+        },
+        "reading": "reopened",
+        "state": "reopened",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 2,
+          "entries": [
+            [
+              1,
+              "cured"
+            ],
+            [
+              2,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R5, R12 (D5), R6, R10, R13, R14, R18: The new cure permits aggregate transfer; its watch requires a pass in a session after the selecting retire. Earlier notes remain with their own cure."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R5, R12 (D5), R6, R10, R13, R14, R18: The new cure permits aggregate transfer; its watch requires a pass in a session after the selecting retire. Earlier notes remain with their own cure."
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "newSession": true
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R5, R6, R12 (D5), R14: Watch and note under the later cure."
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "reading": "retired",
+        "state": "cured",
+        "rule": "R5, R6, R12 (D5), R14: Watch and note under the later cure."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "retired",
+        "state": "retired",
+        "rule": "R5, R6, R12 (D5), R14: Watch and note under the later cure.",
+        "stock": {
+          "current": "release:2",
+          "notes": [
+            {
+              "cure": "release:2",
+              "at": 10
+            }
+          ]
+        }
+      }
+    ],
+    "decision10": "machine-may-close",
+    "about": "Pending decision 10 (section 16): alternative posture permits D5 to move aggregates despite the standing report; earlier notes keep their own cure."
+  },
+  {
+    "name": "reviewer-C1-kept-reopen-during-watch-then-watch-met-if-decision-10-lets-the-machine-close",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": false
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "newSession": true
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 1,
+          "participant": "p",
+          "record": "kept",
+          "afterHead": false
+        },
+        "reading": "reopened",
+        "state": "reopened",
+        "rule": "R1–R17: Revised lifecycle rules; R4/R10 count only the applicable release cure; R13/R14 block the invalidated current cure; R17 suppresses unknown-emitter summaries."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 2,
+          "entries": [
+            [
+              1,
+              "cured"
+            ],
+            [
+              2,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R5, R12 (D5), R6, R10, R13, R14, R18: The new cure permits aggregate transfer; its watch requires a pass in a session after the selecting retire. Earlier notes remain with their own cure."
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "newSession": true
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R5, R12 (D5), R6, R10, R13, R14, R18: The new cure permits aggregate transfer; its watch requires a pass in a session after the selecting retire. Earlier notes remain with their own cure."
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R5, R12 (D5), R6, R10, R13, R14, R18: The new cure permits aggregate transfer; its watch requires a pass in a session after the selecting retire. Earlier notes remain with their own cure."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R5, R12 (D5), R6, R10, R13, R14, R18: The new cure permits aggregate transfer; its watch requires a pass in a session after the selecting retire. Earlier notes remain with their own cure."
+      },
+      {
+        "event": {
+          "type": "pass",
+          "participant": "p",
+          "newSession": true
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R5, R6, R12 (D5), R14: Watch and note under the later cure."
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "reading": "retired",
+        "state": "cured",
+        "rule": "R5, R6, R12 (D5), R14: Watch and note under the later cure."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "retired",
+        "state": "retired",
+        "rule": "R5, R6, R12 (D5), R14: Watch and note under the later cure.",
+        "stock": {
+          "current": "release:2",
+          "notes": [
+            {
+              "cure": "release:2",
+              "at": 12
+            }
+          ]
+        }
+      }
+    ],
+    "decision10": "machine-may-close",
+    "about": "Pending decision 10 (section 16): alternative posture permits D5 to move aggregates despite the standing report; earlier notes keep their own cure."
+  },
+  {
+    "name": "release-cure-qualifies-before-the-condition",
+    "about": "A qualifying release cure receives counter-evidence instead of the current condition cure.",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R10 (D4), R13: Release evidence takes precedence over the compacted condition cure."
+      },
+      {
+        "event": {
+          "type": "condition",
+          "name": "path",
+          "holds": true
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R10 (D4), R13: Release evidence takes precedence over the compacted condition cure."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R10 (D4), R13: Release evidence takes precedence over the compacted condition cure."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R10 (D4), R13: Release evidence takes precedence over the compacted condition cure."
+      },
+      {"event": {"type": "fail", "release": 1, "participant": "p", "record": "kept"}, "reading": "reopened", "state": "reopened", "rule": "R10 (D4): a failure from release 1 counts against the release cure that qualifies, release 1, and not against the condition cure that is the unit's current cure; it reads `reopened` until a later release cures the claim again."},
+      {
+        "event": {
+          "type": "release",
+          "release": 2,
+          "entries": [
+            [
+              1,
+              "cured"
+            ],
+            [
+              2,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R10 (D4), R13: Release evidence takes precedence over the compacted condition cure.",
+        "stock": {
+          "current": "condition:2"
+        }
+      }
+    ]
+  },
+  {
+    "name": "entries-newer-than-the-head-are-ignored",
+    "about": "A declaration cannot supply a cure newer than its own head release.",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R16"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              5,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R4: Ignore entries newer than their head.",
+        "stock": {
+          "declaration": []
+        }
+      }
+    ]
+  }
+]

@@ -19,7 +19,7 @@
     },
     "cures": {
       "type": "array",
-      "description": "Release declarations of handled claims; may be empty.",
+      "description": "Cumulative entries from this and every earlier release; at most one per claim and release. The latest entry by SemVer precedence declares each claim\u2019s state; may be empty.",
       "items": {
         "$ref": "#/$defs/cure"
       }
@@ -138,21 +138,39 @@
       "additionalProperties": false,
       "required": [
         "claim",
+        "release",
+        "state",
         "cite",
         "summary"
       ],
       "properties": {
         "claim": {
-          "description": "Declared id handled by this release.",
+          "description": "Declared claim id whose state this entry records.",
           "$ref": "#/$defs/claimId"
+        },
+        "release": {
+          "type": "string",
+          "description": "Producer version of the release that made this entry, ordered by SemVer precedence. Build metadata is not allowed: two versions that differ only in it have equal precedence, so they could not be ordered.",
+          "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-((?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\\.(?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?$"
+        },
+        "state": {
+          "type": "string",
+          "description": "Producer-declared state of this claim in the entry\u2019s release.",
+          "enum": [
+            "cured",
+            "withdrawn"
+          ],
+          "$comment": "reopened is a reading a device reaches, not a state written by a producer."
         },
         "cite": {
           "type": "string",
-          "description": "Commit, landing or flow-note citation holding the root-cause analysis."
+          "description": "Non-empty citation supporting the cure or its withdrawal.",
+          "minLength": 1
         },
         "summary": {
           "type": "string",
-          "description": "Release-reviewed plain-text sentence describing the cure."
+          "description": "Non-empty release-reviewed explanation of the cure or its withdrawal.",
+          "minLength": 1
         }
       }
     }

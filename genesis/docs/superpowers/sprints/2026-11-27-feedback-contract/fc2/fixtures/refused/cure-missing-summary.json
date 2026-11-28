@@ -39,7 +39,9 @@
   "cures": [
     {
       "claim": "demo/old",
-      "cite": "example:release-1"
+      "cite": "example:release-1",
+      "release": "1.0.0",
+      "state": "cured"
     }
   ]
 }

@@ -30,7 +30,24 @@ function declaredCureClaims(data) {
   return data.cures.flatMap((c, i) => ids.has(c.claim) ? [] :
     [{ keyword: 'declaredCureClaims', instancePath: `/cures/${i}/claim`, message: 'undeclared cure claim' }]);
 }
+function uniqueCureEntries(data) {
+  const seen = new Set();
+  return data.cures.flatMap((c, i) => {
+    const key = JSON.stringify([c.claim, c.release]);
+    const duplicate = seen.has(key); seen.add(key);
+    return duplicate ? [{ keyword: 'uniqueCureEntries', instancePath: `/cures/${i}`, message: 'duplicate claim and release' }] : [];
+  });
+}
 const expected = {
+  "cure-missing-release.json": {"keyword": "required", "instancePath": "/cures/0", "params": {"missingProperty": "release"}},
+  "cure-missing-state.json": {"keyword": "required", "instancePath": "/cures/0", "params": {"missingProperty": "state"}},
+  "cure-state-reopened.json": {"keyword": "enum", "instancePath": "/cures/0/state"},
+  "cure-release-not-a-version.json": {"keyword": "pattern", "instancePath": "/cures/0/release"},
+  "cure-release-build-metadata.json": {"keyword": "pattern", "instancePath": "/cures/0/release"},
+  "cure-empty-cite.json": {"keyword": "minLength", "instancePath": "/cures/0/cite"},
+  "cure-empty-summary.json": {"keyword": "minLength", "instancePath": "/cures/0/summary"},
+  "cure-duplicate-claim-release.json": {"keyword": "uniqueCureEntries", "instancePath": "/cures/1"},
+
   "unknown-claim-field.json": {"keyword": "additionalProperties", "instancePath": "/claims/0", "params": {"additionalProperty": "unknown"}},
   "unknown-top-level-field.json": {"keyword": "additionalProperties", "instancePath": "", "params": {"additionalProperty": "unknown"}},
   "severity-outside-list.json": {"keyword": "enum", "instancePath": "/claims/0/severity"},
@@ -57,7 +74,7 @@ const expected = {
   "cure-null.json": {"keyword": "type", "instancePath": "/claims/0/cure"},
 };
 
-const rules = [uniqueClaimIds, declaredSupersedes, declaredCureClaims];
+const rules = [uniqueClaimIds, declaredSupersedes, declaredCureClaims, uniqueCureEntries];
 function check(data, validate, checks = rules) {
   if (!validate(data)) return validate.errors;
   return checks.flatMap(rule => rule(data));
@@ -108,7 +125,7 @@ test('refused fixtures and expected reasons name exactly the same files', () => 
 
 test('each script rule refuses its fixture and runs only after schema acceptance', () => {
   const validate = compile();
-  const ownFixtures = ['duplicate-id.json', 'supersedes-undeclared-id.json', 'cure-undeclared-id.json'];
+  const ownFixtures = ['duplicate-id.json', 'supersedes-undeclared-id.json', 'cure-undeclared-id.json', 'cure-duplicate-claim-release.json'];
   for (const [i, rule] of rules.entries()) {
     const name = ownFixtures[i];
     const data = load(fixturePath('refused', name));

@@ -1,0 +1,59 @@
+{
+  "reopened": {
+    "state": "reopened",
+    "shownAs": "reopened",
+    "unknownEmitterState": null,
+    "rule": "R17: An unknown emitter sends no summary, whatever its reading."
+  },
+  "stale-emitter": {
+    "state": null,
+    "shownAs": "behind",
+    "unknownEmitterState": null,
+    "rule": "R17: An unknown emitter sends no summary, whatever its reading."
+  },
+  "cure-available": {
+    "state": "open",
+    "shownAs": "cure available",
+    "unknownEmitterState": null,
+    "rule": "R17: An unknown emitter sends no summary, whatever its reading."
+  },
+  "on-watch": {
+    "state": "cured",
+    "shownAs": "on watch",
+    "unknownEmitterState": null,
+    "rule": "R17: An unknown emitter sends no summary, whatever its reading."
+  },
+  "retired": {
+    "state": {
+      "untilNoteWritten": "cured",
+      "then": "retired"
+    },
+    "shownAs": "retired",
+    "unknownEmitterState": null,
+    "rule": "R17: An unknown emitter sends no summary, whatever its reading."
+  },
+  "superseded": {
+    "state": null,
+    "shownAs": "superseded",
+    "unknownEmitterState": null,
+    "rule": "R17: An unknown emitter sends no summary, whatever its reading."
+  },
+  "review-due": {
+    "state": "open",
+    "shownAs": "review-due",
+    "unknownEmitterState": null,
+    "rule": "R17: An unknown emitter sends no summary, whatever its reading."
+  },
+  "unrecorded": {
+    "state": null,
+    "shownAs": "unrecorded",
+    "unknownEmitterState": null,
+    "rule": "R17: An unknown emitter sends no summary, whatever its reading."
+  },
+  "open": {
+    "state": "open",
+    "shownAs": "open",
+    "unknownEmitterState": null,
+    "rule": "R17: An unknown emitter sends no summary, whatever its reading."
+  }
+}

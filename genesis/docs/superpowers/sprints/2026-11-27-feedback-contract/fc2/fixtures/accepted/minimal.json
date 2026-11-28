@@ -40,7 +40,23 @@
     {
       "claim": "demo/old",
       "cite": "example:release-1",
-      "summary": "The replacement handles the operation."
+      "summary": "The replacement handles the operation.",
+      "release": "1.0.0",
+      "state": "cured"
+    },
+    {
+      "claim": "demo/old",
+      "cite": "example:release-2",
+      "summary": "The producer withdraws the claimed cure.",
+      "release": "1.1.0",
+      "state": "withdrawn"
+    },
+    {
+      "claim": "demo/old",
+      "cite": "example:release-3",
+      "summary": "The replacement now handles the operation again.",
+      "release": "1.2.0",
+      "state": "cured"
     }
   ]
 }

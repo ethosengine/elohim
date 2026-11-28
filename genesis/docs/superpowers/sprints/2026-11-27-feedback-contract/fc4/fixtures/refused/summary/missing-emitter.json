@@ -1,0 +1,10 @@
+{
+  "claim": "ferry/capability-absent:list.since",
+  "polarity": "negative",
+  "severity": "warn",
+  "state": "open",
+  "class": "fixture",
+  "sessions": 4,
+  "first-day": "2026-11-01",
+  "last-day": "2026-11-27"
+}

@@ -52,6 +52,7 @@
       {"file": "gate-cost.test.mjs", "reads": []},
       {"file": "rust-toolchain-pin.test.mjs", "reads": ["elohim/epr/flake.nix", "elohim/epr/rust-toolchain.toml", "genesis/agentic/pool-policy.json"]},
       {"file": "producer-declaration-schema.test.mjs", "reads": ["genesis/docs/superpowers/sprints/2026-11-27-feedback-contract/fc2"]},
+      {"file": "reading-and-summary-schema.test.mjs", "reads": ["genesis/a2o/features/devflow/feedback-drains-when-cured.feature", "genesis/docs/superpowers/sprints/2026-11-27-feedback-contract/fc4"]},
       {"file": "c-baseline-pin.test.mjs", "tree": "git ls-files pathspec scans over every tracked Dockerfile, devfile and .cargo/config.toml, and the device cargo registry: the cc crate source and, for each isa_c_evidence.rs exception, the locked blake3, stacker, generator and iana-time-zone sources it holds the reason against"},
       {"file": "c-baseline.test.mjs", "tree": "probes this device's C compiler, a machine fact no commit key covers"},
       {"file": "gate-preflight.test.mjs", "reads": ["elohim/eprfs/device-runtime/tests/fixtures/release-recency"]},

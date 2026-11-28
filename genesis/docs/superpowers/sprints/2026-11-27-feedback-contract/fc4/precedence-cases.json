@@ -1,0 +1,720 @@
+[
+  {
+    "name": "only-reopened",
+    "facts": {
+      "failed": true,
+      "recurred": true,
+      "curePresent": true
+    },
+    "expect": "reopened",
+    "because": "R10: First matching reading in R9–R16 for these facts."
+  },
+  {
+    "name": "only-stale-emitter",
+    "facts": {
+      "failed": true,
+      "pinLag": true,
+      "curePresent": true
+    },
+    "expect": "stale-emitter",
+    "because": "R11: First matching reading in R9–R16 for these facts."
+  },
+  {
+    "name": "only-cure-available",
+    "facts": {
+      "failed": true,
+      "coveredRecords": true,
+      "curePresent": true
+    },
+    "expect": "cure-available",
+    "because": "R12: First matching reading in R9–R16 for these facts."
+  },
+  {
+    "name": "only-on-watch",
+    "facts": {
+      "failed": true,
+      "aggregates": true,
+      "curePresent": true
+    },
+    "expect": "on-watch",
+    "because": "R13: First matching reading in R9–R16 for these facts."
+  },
+  {
+    "name": "only-retired",
+    "facts": {
+      "failed": true,
+      "retireMet": true,
+      "curePresent": true
+    },
+    "expect": "retired",
+    "because": "R14: First matching reading in R9–R16 for these facts."
+  },
+  {
+    "name": "only-superseded",
+    "facts": {
+      "failed": true,
+      "superseded": true,
+      "curePresent": true
+    },
+    "expect": "superseded",
+    "because": "R15: First matching reading in R9–R16 for these facts."
+  },
+  {
+    "name": "only-review-due",
+    "facts": {
+      "failed": true,
+      "horizonNoCure": true
+    },
+    "expect": "review-due",
+    "because": "R15: First matching reading in R9–R16 for these facts."
+  },
+  {
+    "name": "only-unrecorded",
+    "facts": {
+      "failed": true,
+      "unknownRelease": true
+    },
+    "expect": "unrecorded",
+    "because": "R15: First matching reading in R9–R16 for these facts."
+  },
+  {
+    "name": "only-open",
+    "facts": {
+      "failed": true
+    },
+    "expect": "open",
+    "because": "R16: First matching reading in R9–R16 for these facts."
+  },
+  {
+    "name": "adjacent-reopened-stale-emitter",
+    "facts": {
+      "failed": true,
+      "recurred": true,
+      "curePresent": true,
+      "pinLag": true
+    },
+    "expect": "reopened",
+    "because": "R10: First matching reading in R9–R16 for these facts."
+  },
+  {
+    "name": "adjacent-stale-emitter-cure-available",
+    "facts": {
+      "failed": true,
+      "pinLag": true,
+      "curePresent": true,
+      "coveredRecords": true
+    },
+    "expect": "stale-emitter",
+    "because": "R11: First matching reading in R9–R16 for these facts."
+  },
+  {
+    "name": "adjacent-retired-superseded",
+    "facts": {
+      "failed": true,
+      "retireMet": true,
+      "curePresent": true,
+      "superseded": true
+    },
+    "expect": "retired",
+    "because": "R14: First matching reading in R9–R16 for these facts."
+  },
+  {
+    "name": "adjacent-superseded-review-due",
+    "facts": {
+      "failed": true,
+      "superseded": true,
+      "horizonNoCure": true
+    },
+    "expect": "superseded",
+    "because": "R15: First matching reading in R9–R16 for these facts."
+  },
+  {
+    "name": "adjacent-unrecorded-open",
+    "facts": {
+      "failed": true,
+      "unknownRelease": true
+    },
+    "expect": "unrecorded",
+    "because": "R15: First matching reading in R9–R16 for these facts."
+  },
+  {
+    "name": "exclusive-cure-available-on-watch-cure-available",
+    "facts": {
+      "failed": true,
+      "coveredRecords": true,
+      "curePresent": true
+    },
+    "expect": "cure-available",
+    "because": "R12: First matching reading in R9–R16 for these facts."
+  },
+  {
+    "name": "exclusive-cure-available-on-watch-on-watch",
+    "facts": {
+      "failed": true,
+      "aggregates": true,
+      "curePresent": true
+    },
+    "expect": "on-watch",
+    "because": "R13: First matching reading in R9–R16 for these facts."
+  },
+  {
+    "name": "exclusive-on-watch-retired-on-watch",
+    "facts": {
+      "failed": true,
+      "aggregates": true,
+      "curePresent": true
+    },
+    "expect": "on-watch",
+    "because": "R13: First matching reading in R9–R16 for these facts."
+  },
+  {
+    "name": "exclusive-on-watch-retired-retired",
+    "facts": {
+      "failed": true,
+      "retireMet": true,
+      "curePresent": true
+    },
+    "expect": "retired",
+    "because": "R14: First matching reading in R9–R16 for these facts."
+  },
+  {
+    "name": "exclusive-review-due-unrecorded-review-due",
+    "facts": {
+      "failed": true,
+      "horizonNoCure": true
+    },
+    "expect": "review-due",
+    "because": "R15: First matching reading in R9–R16 for these facts."
+  },
+  {
+    "name": "exclusive-review-due-unrecorded-unrecorded",
+    "facts": {
+      "failed": true,
+      "unknownRelease": true
+    },
+    "expect": "unrecorded",
+    "because": "R15: First matching reading in R9–R16 for these facts."
+  },
+  {
+    "name": "stale-gives-way",
+    "facts": {
+      "failed": true,
+      "pinLag": true,
+      "laterHead": true
+    },
+    "expect": "open",
+    "because": "R16: First matching reading in R9–R16 for these facts."
+  },
+  {
+    "name": "reopening-ends",
+    "facts": {
+      "failed": true,
+      "recurred": true,
+      "curePresent": true,
+      "coveredRecords": true,
+      "curedAgain": true
+    },
+    "expect": "cure-available",
+    "because": "R12: First matching reading in R9–R16 for these facts."
+  },
+  {
+    "name": "reopening-ends-still-lagging",
+    "facts": {
+      "failed": true,
+      "recurred": true,
+      "curePresent": true,
+      "coveredRecords": true,
+      "pinLag": true,
+      "curedAgain": true
+    },
+    "expect": "stale-emitter",
+    "because": "R11: First matching reading in R9–R16 for these facts."
+  },
+  {
+    "name": "never-recorded",
+    "facts": {
+      "failed": false
+    },
+    "expect": null,
+    "because": "R9: First matching reading in R9–R16 for these facts."
+  },
+  {
+    "name": "only-passed",
+    "facts": {
+      "failed": false
+    },
+    "expect": null,
+    "because": "R9: First matching reading in R9–R16 for these facts."
+  },
+  {
+    "name": "life-first-failure",
+    "facts": {
+      "failed": true
+    },
+    "expect": "open",
+    "because": "R16: First matching reading in R9–R16 for these facts.",
+    "sequence": "one-unit",
+    "step": 1
+  },
+  {
+    "name": "life-cure-arrives",
+    "facts": {
+      "failed": true,
+      "coveredRecords": true,
+      "curePresent": true
+    },
+    "expect": "cure-available",
+    "because": "R12: First matching reading in R9–R16 for these facts.",
+    "sequence": "one-unit",
+    "step": 2
+  },
+  {
+    "name": "life-compacted",
+    "facts": {
+      "failed": true,
+      "aggregates": true,
+      "curePresent": true
+    },
+    "expect": "on-watch",
+    "because": "R13: First matching reading in R9–R16 for these facts.",
+    "sequence": "one-unit",
+    "step": 3
+  },
+  {
+    "name": "life-watch-running",
+    "facts": {
+      "failed": true,
+      "aggregates": true,
+      "curePresent": true
+    },
+    "expect": "on-watch",
+    "because": "R13: First matching reading in R9–R16 for these facts.",
+    "sequence": "one-unit",
+    "step": 4
+  },
+  {
+    "name": "life-watch-met-no-note",
+    "facts": {
+      "failed": true,
+      "aggregates": true,
+      "curePresent": true,
+      "retireMet": true
+    },
+    "expect": "retired",
+    "because": "R14: First matching reading in R9–R16 for these facts.",
+    "sequence": "one-unit",
+    "step": 5
+  },
+  {
+    "name": "life-note-written",
+    "facts": {
+      "failed": true,
+      "note": true,
+      "curePresent": true
+    },
+    "expect": "retired",
+    "because": "R14: First matching reading in R9–R16 for these facts.",
+    "sequence": "one-unit",
+    "step": 6
+  },
+  {
+    "name": "life-observed-again",
+    "facts": {
+      "failed": true,
+      "note": true,
+      "curePresent": true,
+      "recurred": true
+    },
+    "expect": "reopened",
+    "because": "R10: First matching reading in R9–R16 for these facts.",
+    "sequence": "one-unit",
+    "step": 7
+  },
+  {
+    "name": "life-later-release-cures",
+    "facts": {
+      "failed": true,
+      "note": true,
+      "recurred": true,
+      "coveredRecords": true,
+      "curePresent": true,
+      "curedAgain": true
+    },
+    "expect": "cure-available",
+    "because": "R12: First matching reading in R9–R16 for these facts.",
+    "sequence": "one-unit",
+    "step": 8
+  },
+  {
+    "name": "life-compacted-again",
+    "facts": {
+      "failed": true,
+      "recurred": true,
+      "aggregates": true,
+      "curePresent": true,
+      "curedAgain": true
+    },
+    "expect": "on-watch",
+    "because": "R13: First matching reading in R9–R16 for these facts.",
+    "sequence": "one-unit",
+    "step": 9
+  },
+  {
+    "name": "life-second-watch-met-note-written",
+    "facts": {
+      "failed": true,
+      "note": true,
+      "retireMet": true,
+      "recurred": true,
+      "curePresent": true,
+      "curedAgain": true
+    },
+    "expect": "retired",
+    "because": "R14: First matching reading in R9–R16 for these facts.",
+    "sequence": "one-unit",
+    "step": 10
+  },
+  {
+    "name": "reopened-before-first-compaction",
+    "facts": {
+      "failed": true,
+      "coveredRecords": true,
+      "curePresent": true,
+      "recurred": true
+    },
+    "expect": "reopened",
+    "because": "R10: First matching reading in R9–R16 for these facts."
+  },
+  {
+    "name": "reopened-during-watch",
+    "facts": {
+      "failed": true,
+      "aggregates": true,
+      "curePresent": true,
+      "recurred": true
+    },
+    "expect": "reopened",
+    "because": "R10: First matching reading in R9–R16 for these facts."
+  },
+  {
+    "name": "ruled-note-aggregates-remain",
+    "facts": {
+      "failed": true,
+      "aggregates": true,
+      "curePresent": true,
+      "note": true
+    },
+    "expect": "retired",
+    "because": "R14: First matching reading in R9–R16 for these facts."
+  },
+  {
+    "name": "ruled-note-then-failing-again",
+    "facts": {
+      "failed": true,
+      "aggregates": true,
+      "curePresent": true,
+      "note": true,
+      "recurred": true
+    },
+    "expect": "reopened",
+    "because": "R10: First matching reading in R9–R16 for these facts."
+  },
+  {
+    "name": "condition-cure-fails-after-compaction",
+    "facts": {
+      "failed": true,
+      "aggregates": true,
+      "recurred": true
+    },
+    "expect": "reopened",
+    "because": "R10: First matching reading in R9–R16 for these facts."
+  },
+  {
+    "name": "note-then-only-passing",
+    "facts": {
+      "failed": true,
+      "note": true
+    },
+    "expect": "retired",
+    "because": "R14: First matching reading in R9–R16 for these facts."
+  },
+  {
+    "name": "only-kept-records-cure-present",
+    "facts": {
+      "failed": true,
+      "curePresent": true
+    },
+    "expect": "open",
+    "because": "R16: First matching reading in R9–R16 for these facts."
+  },
+  {
+    "name": "late-old-release-failure-after-note",
+    "facts": {
+      "failed": true,
+      "note": true,
+      "curePresent": true,
+      "coveredRecords": true
+    },
+    "expect": "cure-available",
+    "because": "R12: First matching reading in R9–R16 for these facts."
+  },
+  {
+    "name": "late-old-release-failure-compacted",
+    "facts": {
+      "failed": true,
+      "note": true,
+      "curePresent": true,
+      "aggregates": true
+    },
+    "expect": "retired",
+    "because": "R14: First matching reading in R9–R16 for these facts."
+  },
+  {
+    "name": "kept-records-beside-aggregates",
+    "facts": {
+      "failed": true,
+      "curePresent": true,
+      "aggregates": true
+    },
+    "expect": "on-watch",
+    "because": "R13: First matching reading in R9–R16 for these facts."
+  },
+  {
+    "name": "old-note-invalidated-even-after-new-cure",
+    "facts": {
+      "failed": true,
+      "note": true,
+      "recurred": true,
+      "curedAgain": true,
+      "curePresent": true,
+      "currentCureCountedAgainst": true
+    },
+    "expect": "open",
+    "because": "R10, R14, R16: A new cure ends reopening but cannot restore the invalidated current-cure note."
+  },
+  {
+    "name": "watch-blocked",
+    "facts": {
+      "failed": true,
+      "currentCureCountedAgainst": true,
+      "aggregates": true
+    },
+    "expect": "open",
+    "because": "R13, R14, R16: Counter-evidence against the current cure blocks both terminal predicates."
+  },
+  {
+    "name": "met-blocked",
+    "facts": {
+      "failed": true,
+      "currentCureCountedAgainst": true,
+      "retireMet": true
+    },
+    "expect": "open",
+    "because": "R13, R14, R16: Counter-evidence against the current cure blocks both terminal predicates."
+  },
+  {
+    "name": "note-blocked",
+    "facts": {
+      "failed": true,
+      "currentCureCountedAgainst": true,
+      "note": true
+    },
+    "expect": "open",
+    "because": "R13, R14, R16: Counter-evidence against the current cure blocks both terminal predicates."
+  },
+  {
+    "name": "withdrawn-with-covered-record",
+    "facts": {
+      "failed": true,
+      "coveredRecords": true
+    },
+    "expect": "open",
+    "because": "R4, R18: No release cure and no current cure to count against."
+  },
+  {
+    "name": "withdrawn-current-cure",
+    "facts": {
+      "failed": true,
+      "aggregates": true,
+      "note": true,
+      "recurred": true,
+      "currentCureCountedAgainst": true
+    },
+    "expect": "reopened",
+    "because": "R18: Withdrawal takes precedence over the old note."
+  },
+  {
+    "name": "recured-after-withdrawal-without-record",
+    "facts": {
+      "failed": true,
+      "aggregates": true,
+      "curePresent": true,
+      "recurred": true,
+      "curedAgain": true,
+      "currentCureCountedAgainst": true,
+      "differentCure": true
+    },
+    "expect": "cure-available",
+    "because": "R12 (D5), R18: Aggregates and counter-evidence against the current cure permit moving to a different present cure."
+  },
+  {
+    "name": "condition-reopening-ended-by-release",
+    "facts": {
+      "failed": true,
+      "aggregates": true,
+      "curePresent": true,
+      "currentCureCountedAgainst": true,
+      "differentCure": true,
+      "recurred": true,
+      "curedAgain": true
+    },
+    "expect": "cure-available",
+    "because": "R10 (D4), R12 (D5): A release cure ends the condition reopening and enables moving aggregates."
+  },
+  {
+    "name": "aggregate-branch-same-cure",
+    "facts": {
+      "failed": true,
+      "aggregates": true,
+      "curePresent": true,
+      "currentCureCountedAgainst": true,
+      "differentCure": false,
+      "recurred": true,
+      "curedAgain": true
+    },
+    "expect": "open",
+    "because": "R12 (D5), R16: The counted-against current cure cannot supply the aggregate branch itself."
+  },
+  {
+    "name": "aggregate-branch-not-counted-against",
+    "facts": {
+      "failed": true,
+      "aggregates": true,
+      "curePresent": true,
+      "currentCureCountedAgainst": false,
+      "differentCure": true,
+      "recurred": true,
+      "curedAgain": true
+    },
+    "expect": "on-watch",
+    "because": "R12 (D5), R13: A different cure alone does not move an unchallenged watch."
+  },
+  {
+    "name": "aggregate-branch-no-present-cure",
+    "facts": {
+      "failed": true,
+      "aggregates": true,
+      "curePresent": false,
+      "currentCureCountedAgainst": true,
+      "differentCure": false,
+      "recurred": true,
+      "curedAgain": true
+    },
+    "expect": "open",
+    "because": "R12 (D5), R16: Aggregates cannot move without a present cure."
+  },
+  {
+    "name": "aggregate-branch-note-only",
+    "facts": {
+      "failed": true,
+      "aggregates": false,
+      "curePresent": true,
+      "currentCureCountedAgainst": true,
+      "differentCure": true,
+      "recurred": true,
+      "curedAgain": true,
+      "note": true
+    },
+    "expect": "open",
+    "because": "R12 (D5), R14, R16: An invalidated note alone cannot move to the new cure."
+  },
+  {
+    "name": "aggregate-branch-kept-only",
+    "facts": {
+      "failed": true,
+      "aggregates": false,
+      "curePresent": true,
+      "currentCureCountedAgainst": true,
+      "differentCure": true,
+      "recurred": true,
+      "curedAgain": true
+    },
+    "expect": "open",
+    "because": "R12 (D5), R16: Kept records supply neither covered records nor aggregates."
+  },
+  {
+    "name": "aggregate-branch-still-reopened",
+    "facts": {
+      "failed": true,
+      "aggregates": true,
+      "curePresent": true,
+      "currentCureCountedAgainst": true,
+      "differentCure": true,
+      "recurred": true,
+      "curedAgain": false
+    },
+    "expect": "reopened",
+    "because": "R10 (D4), R12 (D5): Reopening takes precedence."
+  },
+  {
+    "name": "aggregate-branch-still-lagging",
+    "facts": {
+      "failed": true,
+      "aggregates": true,
+      "curePresent": true,
+      "currentCureCountedAgainst": true,
+      "differentCure": true,
+      "recurred": true,
+      "curedAgain": true,
+      "pinLag": true
+    },
+    "expect": "stale-emitter",
+    "because": "R11, R12 (D5): Pin lag takes precedence."
+  },
+  {
+    "name": "kept-report-blocks-aggregate-transfer",
+    "facts": {
+      "failed": true,
+      "aggregates": true,
+      "curePresent": true,
+      "currentCureCountedAgainst": true,
+      "differentCure": true,
+      "recurred": true,
+      "curedAgain": true,
+      "keptReportBlocksMove": true
+    },
+    "expect": "open",
+    "because": "R12 (D5): Pending decision 10 blocks D5 while the report stands."
+  },
+  {
+    "name": "machine-may-close-aggregate-transfer",
+    "facts": {
+      "failed": true,
+      "aggregates": true,
+      "curePresent": true,
+      "currentCureCountedAgainst": true,
+      "differentCure": true,
+      "recurred": true,
+      "curedAgain": true,
+      "keptReportBlocksMove": false
+    },
+    "expect": "cure-available",
+    "because": "R12 (D5): The alternative posture permits D5."
+  },
+  {
+    "name": "kept-report-does-not-block-covered-branch",
+    "facts": {
+      "failed": true,
+      "aggregates": true,
+      "curePresent": true,
+      "currentCureCountedAgainst": true,
+      "differentCure": true,
+      "recurred": true,
+      "curedAgain": true,
+      "keptReportBlocksMove": true,
+      "coveredRecords": true
+    },
+    "expect": "cure-available",
+    "because": "R12 (D5): The covered-record branch remains available."
+  }
+]

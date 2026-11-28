@@ -40,7 +40,9 @@
     {
       "claim": "demo/missing",
       "cite": "example:release-1",
-      "summary": "The replacement handles the operation."
+      "summary": "The replacement handles the operation.",
+      "release": "1.0.0",
+      "state": "cured"
     }
   ]
 }

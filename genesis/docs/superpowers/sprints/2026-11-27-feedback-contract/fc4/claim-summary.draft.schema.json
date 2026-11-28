@@ -1,0 +1,216 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:manifest:claim-summary-draft",
+  "title": "ClaimSummaryDraft",
+  "description": "FC-4 draft; placement awaits steward ruling. Declaration membership requires contextual validation.",
+  "$comment": "Measured fields follow section 5.5; release lookup and provenance require device context.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "claim",
+    "emitter",
+    "polarity",
+    "severity",
+    "state",
+    "class",
+    "sessions",
+    "first-day",
+    "last-day"
+  ],
+  "properties": {
+    "claim": {
+      "$ref": "#/$defs/claimId"
+    },
+    "emitter": {
+      "$ref": "#/$defs/emitter"
+    },
+    "polarity": {
+      "type": "string",
+      "enum": [
+        "negative",
+        "positive"
+      ]
+    },
+    "severity": {
+      "type": "string",
+      "enum": [
+        "info",
+        "warn",
+        "critical"
+      ]
+    },
+    "state": {
+      "type": "string",
+      "enum": [
+        "open",
+        "cured",
+        "retired",
+        "reopened"
+      ]
+    },
+    "class": {
+      "type": "string",
+      "enum": [
+        "fixture",
+        "real"
+      ]
+    },
+    "cure": {
+      "type": "string",
+      "$comment": "Release address only (L:353); membership and release identity require contextual validation."
+    },
+    "sessions": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "dropped": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "bytes": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "first-day": {
+      "type": "string",
+      "format": "date"
+    },
+    "last-day": {
+      "type": "string",
+      "format": "date"
+    }
+  },
+  "$defs": {
+    "claimId": {
+      "type": "string",
+      "maxLength": 128,
+      "pattern": "^[a-z0-9-]+/[a-z0-9-]+(?::[a-z0-9.-]+)?$"
+    },
+    "emitter": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9._:+-]+$"
+    },
+    "duration": {
+      "type": "string",
+      "description": "ISO 8601 duration before unanswered validity needs review.",
+      "pattern": "^P(?:[0-9]+(?:[.,][0-9]+)?W|(?:[0-9]+(?:[.,][0-9]+)?Y|(?:[0-9]+Y)?[0-9]+(?:[.,][0-9]+)?M|(?:[0-9]+Y)?(?:[0-9]+M)?[0-9]+(?:[.,][0-9]+)?D)|(?:[0-9]+Y)?(?:[0-9]+M)?(?:[0-9]+D)?T(?:[0-9]+(?:[.,][0-9]+)?H|(?:[0-9]+H)?[0-9]+(?:[.,][0-9]+)?M|(?:[0-9]+H)?(?:[0-9]+M)?[0-9]+(?:[.,][0-9]+)?S))$"
+    }
+  },
+  "allOf": [
+    {
+      "not": {
+        "properties": {
+          "state": {
+            "const": "open"
+          },
+          "dropped": {}
+        },
+        "required": [
+          "state",
+          "dropped"
+        ]
+      }
+    },
+    {
+      "not": {
+        "properties": {
+          "state": {
+            "const": "open"
+          },
+          "bytes": {}
+        },
+        "required": [
+          "state",
+          "bytes"
+        ]
+      }
+    },
+    {
+      "not": {
+        "properties": {
+          "state": {
+            "const": "open"
+          },
+          "cure": {}
+        },
+        "required": [
+          "state",
+          "cure"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "enum": [
+              "cured",
+              "retired"
+            ]
+          }
+        },
+        "required": [
+          "state"
+        ]
+      },
+      "then": {
+        "properties": {
+          "dropped": {},
+          "bytes": {}
+        },
+        "required": [
+          "dropped",
+          "bytes"
+        ]
+      }
+    },
+    {
+      "not": {
+        "properties": {
+          "state": {
+            "const": "reopened"
+          },
+          "dropped": {},
+          "bytes": {}
+        },
+        "required": [
+          "state",
+          "dropped"
+        ],
+        "not": {
+          "properties": {
+            "bytes": {}
+          },
+          "required": [
+            "bytes"
+          ]
+        }
+      }
+    },
+    {
+      "not": {
+        "properties": {
+          "state": {
+            "const": "reopened"
+          },
+          "bytes": {},
+          "dropped": {}
+        },
+        "required": [
+          "state",
+          "bytes"
+        ],
+        "not": {
+          "properties": {
+            "dropped": {}
+          },
+          "required": [
+            "dropped"
+          ]
+        }
+      }
+    }
+  ]
+}

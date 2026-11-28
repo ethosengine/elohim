@@ -1,0 +1,14 @@
+{
+  "claim": "ferry/capability-absent:list.since",
+  "emitter": "ferry:1",
+  "polarity": "negative",
+  "severity": "warn",
+  "state": "cured",
+  "class": "fixture",
+  "sessions": 4,
+  "first-day": "2026-11-01T00:00:00Z",
+  "last-day": "2026-11-27",
+  "dropped": 4,
+  "bytes": 80,
+  "cure": "ferry:2"
+}
