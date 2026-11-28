@@ -7,8 +7,8 @@ steward: human:matthew
 author: shem session 3d494616 (Claude Fable 5.2), designing; shem session cacccb55 integrating
 serves: [private-feedback-loop, dev-system-equilibrium]
 cites:
-  - "feedback-loop-contract-plan | the plan whose FC stations are this sprint | sha256:a7d1d8a98839c206 | path: genesis/docs/superpowers/plans/2026-11-27-feedback-loop-contract-plan.md"
-  - "feedback-as-a-lifecycle-item-design | the spec the sprint takes into a contract | sha256:4f57fdff063a4d6c | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
+  - "feedback-loop-contract-plan | the plan whose FC stations are this sprint | sha256:6a2ac59f7325a637 | path: genesis/docs/superpowers/plans/2026-11-27-feedback-loop-contract-plan.md"
+  - "feedback-as-a-lifecycle-item-design | the spec the sprint takes into a contract | sha256:cf3dd75b4c907dc7 | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
   - "one-loop-for-every-producer-design | the companion that sketches the contract and the producers it must serve | sha256:e7361b750b95dce3 | path: genesis/docs/superpowers/specs/2026-11-27-one-loop-for-every-producer-design.md"
 ---
 
@@ -491,3 +491,28 @@ The same batch removed a guard the reader had shown to be redundant, replaced th
 in the lives' notes with the design's rule numbers and made the test refuse such names, and
 settled three points of wording. Nothing of it has been read by anyone but the designing
 session. 66 lives, 465 steps, 85 tests across the two files.
+
+### 2026-11-28, a kept record comes about in two ways, and FC-8
+
+A fresh blind reader of the lifecycle spec, asked about the four sentences the last entry
+changed, found that the corrected first rule disagreed with section 5.2 and with the table of
+section 7, which both still said one record per session. Codex (astra) then read the store,
+read-only, and the designing session checked the lines it quoted. The same-source rule compares
+the whole source: a repeat that differs only in its time returns the record already held, and
+different evidence under one source is refused. A record a person writes carries the source its
+author gives it. A commitment link names one occurrence and protects every record joined to it by
+reference. So a kept record comes about in two ways, and the rule had stated one. The model
+gained the event `commit`, three lives and two checked changes; a commitment tied where the unit
+holds no covered record is refused as not modelled, and the spec lists it as the eighth thing the
+model does not handle. The designing session added one life by hand, a person's report made
+before the cure beside a covered record. It showed something the spec had not said: such a unit
+closes on its covered record while the person's record stands, under either value of the
+constant that holds decision 10. The spec now says so and says that whether it should is part of
+that decision. 70 lives, 488 steps, 91 tests across the two files.
+
+Station FC-8. Codex (astra) read the edit-time resolver, read-only; a Claude Haiku agent opened
+all 54 of its citations (50 supported, 4 in part); a Claude scribe wrote the note,
+`fc8-pointer-rule.md`; a fresh blind reader read it as intended and five of its points were
+taken. The ledger case already had an advisory rule in `.claude/data/.epr-meta`, and one point
+was added to it, in a commit of its own. The failure-list case cannot be written as a rule
+today. The station stays open, with five missing nodes named and none proposed as work.

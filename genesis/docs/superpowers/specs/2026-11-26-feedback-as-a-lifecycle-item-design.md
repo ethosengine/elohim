@@ -262,14 +262,16 @@ section 12 names the station that builds each part.
 
 ### 5.2 What the device stores
 
-One `Occurrence` per producer, claim, outcome and emitter per session, in the existing store, with
-no field added to the type.
+For what a producer captures: one `Occurrence` per producer, claim, outcome and emitter per
+session, in the existing store, with no field added to the type. A record a person writes through
+`epr feedback record` carries the source its author gives it, so it is a record of its own beside
+any captured one (section 6, `[R1]`).
 
 | `Occurrence` field | Holds | Kind of field |
 |---|---|---|
 | `source.producer` | The producer's name, which the policy's `producers` list must admit | Closed |
 | `source.run` | The session key, defined below, so one session is one run. The two records section 7 writes use the fixed words `compacted` and `retired` here | Closed (a hash, or one of those two words) |
-| `source.item` | The claim id, the outcome and the emitter, as `<claim id> <outcome> <emitter>`; the emitter is left off when none was given. The store's same-source rule then keeps one record per producer, claim, outcome and emitter per session | Closed |
+| `source.item` | The claim id, the outcome and the emitter, as `<claim id> <outcome> <emitter>`; the emitter is left off when none was given. The store's same-source rule then keeps one captured record per producer, claim, outcome and emitter per session. The rule compares the whole source (producer, run and item): a repeat that differs only in its time returns the record already held, and different evidence under the same source is refused | Closed |
 | `subject` | The claim id. Distinct runs and recovery are already computed per producer and subject | Closed |
 | `outcome` | The existing enum: `reported`, `passed`, `failed`, `skipped`, `unmeasured`, `refused`, `bridge-declared`, `fallback-declared`, `unsupported`. `passed` is an observation against a negative claim | Closed |
 | `participant` | The participant the repository's feedback policy names, as today. Reading it from the session, or from a steward's grant for a service that runs unattended, waits on the read named in section 7a, node 1 | Closed (an actor id) |
@@ -379,7 +381,7 @@ aggregates: `sessions`, `bytes` and `dropped` (their `count`) are summed, `first
 earliest and `last-day` the latest; for `retired`, all five are the archival note's, with
 `dropped` its `count`; for `reopened`, they are the note's when one exists, the aggregates'
 as for `cured` when the claim reopened during its watch, and the view's as for `open` when it
-reopened before compaction, while the device still held per-session records. Where a unit that was cured twice holds two notes, "the note" is the later one. A `reopened` summary
+reopened before compaction, while the device still held per-session records. Where a unit (one claim as one failing emitter reported it on this device; section 6) that was cured twice holds two notes, "the note" is the later one. A `reopened` summary
 keeps the unit's own emitter, so that a receiver can match it to the summaries that came before
 it; the release in which the claim was observed again is at or after the `cure` it names. Where the reopening was caused by a withdrawal and not by an observation, there is no such release: the `cure` it names is the one the producer withdrew. A
 summary reports what the device has done and not what the judge proposes. That is why three
@@ -400,7 +402,7 @@ claim" in this section and in sections 5.5 and 7 means that unit.
 
 **What the device holds for a unit:**
 
-- Session records, of two kinds. A covered record is one captured automatically and not tied to a commitment: at most one per session in which the claim did not pass, however many times that session captures it. A kept record is one a person wrote, or one tied to a commitment: every kept failure is its own record whenever it is written. It does not change or replace the session's covered record, it is held whether or not that covered record has already been compacted, and two in one session are two records. Compaction replaces covered records and touches no kept one. `[R1]`
+- Session records, of two kinds. A covered record is one captured automatically that no commitment is tied to: at most one per session in which the claim did not pass, however many times that session captures it. A kept record comes about in two ways. A person writes one: every such record is its own record whenever it is written, it does not change or replace the session's covered record, and it is held whether or not that covered record has already been compacted. Two in one session are two records, since the store folds only an exact repeat of one source (section 5.2). Or a commitment is tied to a covered record: it is the same record, kept from then on, and the tie adds no record and no observation. Compaction (section 7) replaces covered records and touches no kept one. `[R1]`
 - Aggregates: what compaction leaves in place of covered records, one for each participant among the records it replaces and one that names none for records with no participant. Each aggregate belongs to the cure the compaction acted on. `[R2]`
 - Notes: an archival note belongs to one cure. The unit's current cure is the cure its latest compaction, move or ruling acted on; before any, it has none. `[R3]`
 
@@ -414,7 +416,7 @@ has an observation that did not pass has exactly one reading `[R16]`.
 
 | Reading | Meaning | What it proposes | Summary state |
 |---|---|---|---|
-| `reopened` | Something counts against a cure and the claim has not been cured again with respect to that cure. An observation that did not pass, from emitter release *e*, counts against the latest `cured` entry in the head's declaration whose release is at or before *e*, whether or not the device has compacted, and whatever the unit's current cure is. Only if no such entry qualifies, and the observation was recorded after the device compacted under a condition cure, does it count against a condition cure the device compacted under. A withdrawal counts as `[R18]` says. Cured again: for a release cure, the head's declaration holds a later `cured` entry; for a condition cure, the condition has come to hold again after the observation, or a release cure is present. A later release cure ends a reopening against a release cure, and any release cure ends a reopening against a condition cure `[R10]` | Counter-evidence to the cure | `reopened` |
+| `reopened` | Something counts against a cure and the claim has not been cured again with respect to that cure. An observation that did not pass, from emitter release *e*, counts against the latest `cured` entry in the head's declaration whose release is at or before *e*, whether or not the device has compacted, and whatever the unit's current cure is. Only if no such entry qualifies, and the observation was recorded after the device compacted under a condition cure, does it count against every condition cure the device compacted under before it, each taken in turn for what follows. A withdrawal counts as `[R18]` says. Cured again: for a release cure, the head's declaration holds a later `cured` entry; for a condition cure, the condition has come to hold again after the observation, or a release cure is present. A later release cure ends a reopening against a release cure, and any release cure ends a reopening against a condition cure `[R10]` | Counter-evidence to the cure | `reopened` |
 | `stale-emitter` | The newest observation that did not pass came from a release behind the device's head for that tool and was made after the head landed, and the device holds no later observation from the head release `[R11]` | The local cure: restart the session, or `epr device arrive` | None: the lag is the device's own |
 | `cure-available` | A cure is present, and either the unit holds at least one covered session record, or the unit holds aggregates, its current cure has been counted against, and the present cure is a different cure from its current cure. The second branch is subject to the open decision of section 16, decision 10 `[R12]` | Compaction (section 7) | `open` |
 | `on-watch` | The unit holds aggregates, `retireWhen` is not met, it holds no note for its current cure, and nothing has counted against its current cure `[R13]` | Nothing | `cured` |
@@ -454,7 +456,7 @@ The aggregates a ruling leaves carry no recovery link, so today's retention keep
 that lets them go belongs to the new version of the retention policy, which is the steward's to
 establish (section 16, decision 1).
 
-**A decision this section does not make.** Section 16, decision 10, asks whether a record a person wrote can close without its author. `[R12]` makes a sharper case of it. A person's own kept report reopens a claim that the device had already compacted; a later release then cures it; the same participant passes in a later session and a quiet watch elapses. May the machine close that claim while the person's report stands? The model holds this behind one named constant, `KEPT_REPORT_HOLDS_A_CLAIM_OPEN`, which is `true` until the steward rules. With it true, a kept record that has counted against the unit's current cure blocks the second branch of `[R12]`, and the claim reads `open` until its author acts. A withdrawal or a covered record counting against the cure does not block. With it false, the claim is moved to the later cure, watched and noted under it, and the person's record is still kept. Both outcomes are scripted. With the constant true: the lives `c-false-retired`, `reviewer-B5-kept-during-watch-from-head` and `reviewer-C1-kept-reopen-during-watch-then-watch-met`. With it false: the same three with the suffix `-if-decision-10-lets-the-machine-close`. The life `f-only-kept`, a claim reported only by kept records, reads `open` under both: the decision does not reach it, which is the inconsistency a reviewer pointed out. Under "the machine may close", whether a person's word holds a claim open would depend on whether automatic records happened to exist beside it. See section 16, decision 10.
+**A decision this section does not make.** Section 16, decision 10, asks whether a record a person wrote can close without its author. `[R12]` makes a sharper case of it. A person's own kept report reopens a claim that the device had already compacted; a later release then cures it; the same participant passes in a later session and a quiet watch elapses. May the machine close that claim while the person's report stands? The model holds this behind one named constant, `KEPT_REPORT_HOLDS_A_CLAIM_OPEN`, which is `true` until the steward rules. With it true, a kept record that has counted against the unit's current cure blocks the second branch of `[R12]`, and the claim reads `open` until its author acts. A withdrawal or a covered record counting against the cure does not block. The constant covers only a report that has counted against the current cure. A person's report made before the cure, in a unit that also holds a covered record, holds nothing open under either value: the unit is compacted, watched and noted on its covered record, and the person's record stays (life `a-persons-report-before-the-cure-beside-a-covered-record`). Whether it should is part of the same decision. With it false, the claim is moved to the later cure, watched and noted under it, and the person's record is still kept. Both outcomes are scripted. With the constant true: the lives `c-false-retired`, `reviewer-B5-kept-during-watch-from-head` and `reviewer-C1-kept-reopen-during-watch-then-watch-met`. With it false: the same three with the suffix `-if-decision-10-lets-the-machine-close`. The life `f-only-kept`, a claim reported only by kept records, reads `open` under both: the decision does not reach it, which is the inconsistency a reviewer pointed out. Under "the machine may close", whether a person's word holds a claim open would depend on whether automatic records happened to exist beside it. See section 16, decision 10.
 
 **What follows from the rules:**
 
@@ -473,6 +475,9 @@ establish (section 16, decision 1).
 - Going back to an earlier head reads the shorter list (lives `downgrade-reads-the-shorter-list`, `downgrade-below-the-cure`). `[R4]`
 - Entries later than the head are ignored (life `entries-newer-than-the-head-are-ignored`). `[R4]`
 - An unknown emitter's unit sends no summary (life `reviewer-B3-unrecorded-then-cure`). `[R17]`
+- A commitment tied to a unit's only covered record leaves nothing to compact: a cure that arrives, or one already waiting, reads `open`, and the retire command changes nothing (lives `a-commitment-makes-the-only-record-kept`, `a-commitment-tied-while-the-cure-waits`). `[R1, R12]`
+- A unit that holds a covered record beside a kept one is compacted, watched and noted on its covered record. The kept record stays, and the note does not speak for it (lives `a-commitment-keeps-one-of-two-records`, `a-persons-report-before-the-cure-beside-a-covered-record`). A unit that holds only kept records is closed by no rule here (section 7a, node 8). `[R5, R12, R14]`
+- A person's report written in a session that already holds a covered record leaves that record as it is, and one written after that record was compacted is still held (lives `same-session-covered-then-kept`, `kept-failure-in-an-already-compacted-session`, `two-kept-reports-in-one-session`). `[R1]`
 - A watch must elapse with no failure after the pass, even a failure that counts against an earlier cure (life `watch-needs-quiet-after-the-pass`). `[R6]`
 
 **Also true of a unit**, and carried by the model and the lives:
@@ -482,7 +487,7 @@ establish (section 16, decision 1).
 - A person rules with `--as`, as sense rulings do (`flow/sense.rs`). A ruling writes no recovery link for the aggregates it closes over, and the note it writes names that person as its participant (life `d-ruling`).
 - Records that name no participant, which are nearly all of today's, can be closed only by a person's ruling.
 
-The model does not handle seven things:
+The model does not handle eight things:
 
 - Two entries for one claim and release: the model takes the later in input order; the draft schema's test refuses such a declaration.
 - Build metadata in a version: `1.0.0` and `1.0.0+build` have equal precedence; the draft schema forbids build metadata in an entry's `release`.
@@ -491,6 +496,7 @@ The model does not handle seven things:
 - The model holds one unit: a failure from a different, older emitter is another unit, and how two units of one claim stand beside each other for a person is not designed.
 - An unknown emitter is ordered as the earliest release, where a real unknown build has no place in the order of releases.
 - After a device goes back to a head whose list no longer holds the cure of a claim it has already compacted, a new failure counts against nothing, and the claim can retire with that record never compacted.
+- A commitment tied where the unit holds no covered record, none yet or all of them compacted: what a commitment tied to an aggregate means is not designed, and the model refuses the event.
 
 The rules are run. `genesis/orchestrator/reading-and-summary-schema.test.mjs` carries a small
 model of one unit's life and checks every step of the lives in
@@ -502,7 +508,7 @@ reading. A change to a rule here is made in the lives first.
 
 | Step | What the device holds for the claim (one claim and failing emitter: the unit of section 6) | What moves it on |
 |---|---|---|
-| Open | One occurrence per session | The judge reads `cure-available` |
+| Open | One captured occurrence per session, and each record a person wrote | The judge reads `cure-available` |
 | Cured, on watch | One aggregate occurrence carrying the count, sessions and days; one `Interpretation` whose summary is the release's own sentence; one `AvailableRelease` link whose evidence is the release, named by producer and version as the declaration's entry names it | The claim's `retireWhen` is met, or a person's ruling (section 6, R8) |
 | Archival | One protected occurrence: the claim, the cure as the declaration names it (the producer's release by version, or the condition as written), what was dropped and over how long | Nothing. A recurrence reads `reopened` |
 
