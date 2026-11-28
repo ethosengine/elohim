@@ -7,8 +7,8 @@ steward: human:matthew
 author: shem session 3d494616 (Claude Fable 5.2), called the designing session below, orchestrating and checking; schemas, cases, fixtures and the check by Codex (astra) in two rounds
 serves: [private-feedback-loop]
 cites:
-  - "feedback-loop-contract-plan | the plan whose station FC-4 this draft answers | sha256:abae7be43a4c8fcf | path: genesis/docs/superpowers/plans/2026-11-27-feedback-loop-contract-plan.md"
-  - "feedback-as-a-lifecycle-item-design | the design whose sections 5.5 and 6 these schemas and cases put into a form that can be run | sha256:0190422f60b73c07 | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
+  - "feedback-loop-contract-plan | the plan whose station FC-4 this draft answers | sha256:d29a95ac372adc78 | path: genesis/docs/superpowers/plans/2026-11-27-feedback-loop-contract-plan.md"
+  - "feedback-as-a-lifecycle-item-design | the design whose sections 5.5 and 6 these schemas and cases put into a form that can be run | sha256:a9cc251c6e355063 | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
   - "feedback-contract-fc2-declaration-draft | the sibling draft whose claim-id pattern and test conventions this one reuses | sha256:4f0f5246e0b18034 | path: genesis/docs/superpowers/sprints/2026-11-27-feedback-contract/fc2-declaration-draft.md"
 ---
 

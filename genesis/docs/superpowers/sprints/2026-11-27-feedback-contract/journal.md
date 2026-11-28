@@ -7,8 +7,8 @@ steward: human:matthew
 author: shem session 3d494616 (Claude Fable 5.2), designing; shem session cacccb55 integrating
 serves: [private-feedback-loop, dev-system-equilibrium]
 cites:
-  - "feedback-loop-contract-plan | the plan whose FC stations are this sprint | sha256:abae7be43a4c8fcf | path: genesis/docs/superpowers/plans/2026-11-27-feedback-loop-contract-plan.md"
-  - "feedback-as-a-lifecycle-item-design | the spec the sprint takes into a contract | sha256:0190422f60b73c07 | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
+  - "feedback-loop-contract-plan | the plan whose FC stations are this sprint | sha256:d29a95ac372adc78 | path: genesis/docs/superpowers/plans/2026-11-27-feedback-loop-contract-plan.md"
+  - "feedback-as-a-lifecycle-item-design | the spec the sprint takes into a contract | sha256:a9cc251c6e355063 | path: genesis/docs/superpowers/specs/2026-11-26-feedback-as-a-lifecycle-item-design.md"
   - "one-loop-for-every-producer-design | the companion that sketches the contract and the producers it must serve | sha256:e7361b750b95dce3 | path: genesis/docs/superpowers/specs/2026-11-27-one-loop-for-every-producer-design.md"
 ---
 
@@ -444,3 +444,15 @@ change. The draft declaration schema follows brit's five fields and refuses buil
 version; brit 0.3.10's own file is byte-identical and still accepted.
 
 Counts: 61 lives, 432 steps, 63 cases, 16 facts, 80 tests across the two test files.
+
+### 2026-11-28, two sentences where the prose and the model differed
+
+The integrator's fresh reader walked twenty lives through the prose alone and then compared the
+result with the model. Everything agreed except two sentences, and the model was right in both.
+The spec said a watch starts at the compaction that made an aggregate; the model starts it at
+the retire that made the unit's current cure current, so a claim moved to a later cure is watched
+again, and it also requires at least one aggregate, without which "every aggregate" is true of
+nothing. And the spec said a withdrawal counts only while it is the latest entry; the model
+counts every withdrawn entry in the head's declaration, which is what lets a unit move to the
+cure that follows it. Both sentences are corrected, with three statements of what brit "does"
+changed to what brit has said it will do.
