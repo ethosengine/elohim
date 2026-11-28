@@ -101,7 +101,9 @@ pub fn run(args: &[String]) -> Result<()> {
         "migrate" => {
             serde_json::to_value(store.migrate(options.contains_key("legacy-writers-quiesced"))?)?
         }
-        "policy" => json!({"policy":policy,"source":root.join(".epr-meta/feedback-policy.json"),
+        // A path is printed as text: one that is not UTF-8 cannot be a JSON string.
+        "policy" => json!({"policy":policy,
+            "source":root.join(".epr-meta/feedback-policy.json").display().to_string(),
             "retention":"private retained evidence; summaries rebuildable; only policy-eligible groups may be reclaimed",
             "coverage":"native adapters only; unsupported shell adapters are unmeasured"}),
         "capture" => {

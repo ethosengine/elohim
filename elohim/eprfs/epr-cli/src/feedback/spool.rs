@@ -20,6 +20,10 @@ pub(crate) const FILE_BYTES: u64 = 1024;
 /// The most `*.json` entries one read considers (brit never keeps more); the rest wait for the
 /// next drain.
 pub(crate) const BATCH: usize = 256;
+/// The most directory entries one read walks, whatever their names. Brit keeps at most
+/// [`BATCH`] notes here, so a directory holding more than this is someone else's files: the
+/// read stops and says that more wait, rather than walk them all.
+pub(crate) const WALK: usize = 16 * BATCH;
 /// The causes brit names, each paired with the claim `epr/recorder-unavailable:<cause>`.
 pub(crate) const CAUSES: [&str; 4] = ["not-found", "timeout", "refused", "spawn-failed"];
 
@@ -53,17 +57,20 @@ pub(crate) struct Gap {
 }
 
 /// What a read of the spool found: valid gaps, oldest first (by `at`, then file name), the
-/// counts of unreadable notes and other entries, and whether more than [`BATCH`] notes waited.
+/// counts of unreadable notes and other entries, whether more than [`BATCH`] notes waited, and
+/// whether the directory held more than [`WALK`] entries, so that it was not read to its end.
 #[derive(Debug, Default)]
 pub(crate) struct Scan {
     pub(crate) gaps: Vec<Gap>,
     pub(crate) skipped: usize,
     pub(crate) other: usize,
     pub(crate) bounded: bool,
+    pub(crate) unwalked: bool,
 }
 
 impl Scan {
-    /// How many entries were read: a count, or `256 or more` when the bound was reached.
+    /// How many notes were read: a count, or `256 or more` when the bound on notes was reached.
+    /// When the walk stopped first ([`Scan::unwalked`]) the count is of the notes reached.
     pub(crate) fn read(&self) -> Value {
         if self.bounded {
             json!(format!("{BATCH} or more"))
@@ -73,8 +80,9 @@ impl Scan {
     }
 }
 
-/// Read at most [`BATCH`] `*.json` entries in `dir`. An absent directory is an empty spool. The
-/// directory itself may be a symbolic link: it is the person's own configuration.
+/// Read at most [`BATCH`] `*.json` entries in `dir`, walking at most [`WALK`] entries of any
+/// name. An absent directory is an empty spool. The directory itself may be a symbolic link: it
+/// is the person's own configuration.
 pub(crate) fn scan(dir: &Path) -> std::io::Result<Scan> {
     let entries = match std::fs::read_dir(dir) {
         Ok(entries) => entries,
@@ -83,7 +91,11 @@ pub(crate) fn scan(dir: &Path) -> std::io::Result<Scan> {
     };
     let mut scan = Scan::default();
     let mut read = 0;
-    for entry in entries {
+    for (walked, entry) in entries.enumerate() {
+        if walked == WALK {
+            scan.unwalked = true;
+            break;
+        }
         let path = entry?.path();
         // Brit writes a note by renaming a temporary file it makes in this directory, named
         // `.tmp` and random letters, so such a name may exist for a moment; it is neither read
@@ -248,7 +260,8 @@ fn drain_with_remove(
     }
     Ok(
         json!({"drained": drained, "skipped": skipped, "other": scan.other,
-        "unremoved": unremoved, "read": scan.read(), "dir": dir.display().to_string()}),
+        "unremoved": unremoved, "read": scan.read(), "unwalked": scan.unwalked,
+        "dir": dir.display().to_string()}),
     )
 }
 
@@ -364,7 +377,19 @@ mod tests {
         use std::os::unix::ffi::OsStrExt;
         let temp = tempfile::tempdir().unwrap();
         let spool = temp.path().join(std::ffi::OsStr::from_bytes(b"sp\xffool"));
-        std::fs::create_dir(&spool).unwrap();
+        // Some filesystems refuse a name that is not UTF-8 (ZFS with utf8only, APFS). There
+        // the fixture cannot be made and the case cannot arise.
+        if std::fs::create_dir(&spool).is_err() {
+            // Written to the handle itself, which the test harness does not capture, so a
+            // skip shows in the log of a passing run.
+            use std::io::Write;
+            let _ = writeln!(
+                std::io::stderr(),
+                "skipped a_spool_path_that_is_not_utf8_is_reported_as_text: this filesystem \
+                 refuses a name that is not UTF-8"
+            );
+            return;
+        }
         std::fs::write(
             spool.join("note.json"),
             gap("2026-11-27T09:00:00Z", &"a".repeat(64)),
@@ -503,6 +528,56 @@ mod tests {
         assert_eq!(found.skipped, 0);
         assert!(!found.bounded);
         assert_eq!(found.read(), json!(1));
+    }
+
+    #[test]
+    fn a_directory_of_other_files_is_not_walked_past_the_bound() {
+        let temp = tempfile::tempdir().unwrap();
+        for n in 0..=WALK {
+            std::fs::write(temp.path().join(format!("n{n:05}.txt")), b"").unwrap();
+        }
+        let found = scan(temp.path()).unwrap();
+        assert!(found.unwalked);
+        assert!(!found.bounded);
+        assert_eq!(found.other, WALK);
+        assert_eq!(found.read(), json!(0));
+    }
+
+    #[test]
+    fn a_drain_past_the_walk_bound_drains_the_notes_it_reached() {
+        let temp = tempfile::tempdir().unwrap();
+        let spool = temp.path().join("spool");
+        std::fs::create_dir(&spool).unwrap();
+        for n in 0..10 {
+            std::fs::write(
+                spool.join(format!("{n:032}.json")),
+                gap("2026-11-27T09:00:00Z", &format!("{n:064}")),
+            )
+            .unwrap();
+        }
+        for n in 0..=WALK {
+            std::fs::write(spool.join(format!("n{n:05}.txt")), b"").unwrap();
+        }
+        let policy = serde_json::from_value(json!({
+            "id":"fixture@1", "authority":"human:fixture", "producers":["brit"],
+            "automaticCapture":true, "deliberateEvidence":true,
+            "maxBytes":1000000, "maxRecordBytes":65536,
+            "response":"report", "sharing":"separately-authorized"
+        }))
+        .unwrap();
+        let store = FeedbackStore::new(temp.path(), policy).unwrap();
+        // Which entries a walk reaches first is the filesystem's order, so the test asks only
+        // that every note the read reached is drained and that the report says it stopped.
+        let reached = scan(&spool).unwrap();
+        assert!(reached.unwalked);
+        assert!(!reached.bounded);
+        let report = drain(&store, &spool).unwrap();
+        assert_eq!(report["unwalked"], true);
+        assert_eq!(report["drained"], reached.gaps.len());
+        assert_eq!(report["read"], json!(reached.gaps.len()));
+        for gap in &reached.gaps {
+            assert!(!gap.path.exists());
+        }
     }
 
     #[test]

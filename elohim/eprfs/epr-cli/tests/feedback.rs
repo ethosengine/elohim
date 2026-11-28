@@ -1021,6 +1021,49 @@ fn drain_spool_reads_at_most_256_notes_and_says_so() {
 }
 
 #[test]
+fn policy_prints_a_root_that_is_not_utf8_as_text() {
+    use std::os::unix::ffi::OsStrExt;
+    let dir = tempfile::tempdir().expect("fixture");
+    let root = dir.path().join(std::ffi::OsStr::from_bytes(b"r\xffoot"));
+    // Some filesystems refuse a name that is not UTF-8 (ZFS with utf8only, APFS). There the
+    // fixture cannot be made and the case cannot arise.
+    if std::fs::create_dir(&root).is_err() {
+        // Written to the handle itself, which the test harness does not capture, so a skip
+        // shows in the log of a passing run.
+        use std::io::Write;
+        let _ = writeln!(
+            std::io::stderr(),
+            "skipped policy_prints_a_root_that_is_not_utf8_as_text: this filesystem refuses a \
+             name that is not UTF-8"
+        );
+        return;
+    }
+    std::fs::create_dir(root.join(".epr-meta")).expect("policy directory");
+    std::fs::copy(
+        fixture().path().join(".epr-meta/feedback-policy.json"),
+        root.join(".epr-meta/feedback-policy.json"),
+    )
+    .expect("policy");
+    let output = Command::new(env!("CARGO_BIN_EXE_epr"))
+        .args(["feedback", "policy", "--json"])
+        .current_dir(dir.path())
+        .env("EPR_FEEDBACK_ROOT", &root)
+        .env("EPR_SESSION_LAZY", "1")
+        .output()
+        .expect("epr");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let printed: Value = serde_json::from_slice(&output.stdout).expect("json");
+    assert!(printed["source"]
+        .as_str()
+        .expect("source")
+        .ends_with(".epr-meta/feedback-policy.json"));
+}
+
+#[test]
 fn trailing_option_requires_value_and_names_the_option() {
     let dir = fixture();
     for option in ["--dir", "--root"] {

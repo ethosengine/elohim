@@ -918,6 +918,8 @@ struct SpoolReading {
     invalid: usize,
     /// The read stopped at the spool bound; more notes wait.
     bounded: bool,
+    /// The directory held more entries than one read walks; it was not read to its end.
+    unwalked: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -963,6 +965,7 @@ fn feedback_recorder_fact(
                     .collect(),
                 invalid: scan.skipped + scan.other,
                 bounded: scan.bounded,
+                unwalked: scan.unwalked,
                 dir,
             })
             .map_err(|error| SpoolError::Unreadable(error.kind().to_string())),
@@ -1031,6 +1034,20 @@ fn feedback_recorder_check(fact: &FeedbackRecorderFact) -> Check {
             crate::feedback::spool::BATCH
         )),
     };
+    // Past the walk bound the directory was not read to its end: say what was counted, which
+    // is entries of any name, not notes.
+    let unreadable = if reading.unwalked {
+        let walk = format!(
+            "{} or more entries in the spool directory, not all examined",
+            crate::feedback::spool::WALK
+        );
+        Some(match unreadable {
+            Some(unreadable) => format!("{unreadable}; {walk}"),
+            None => walk,
+        })
+    } else {
+        unreadable
+    };
     let Some((oldest, _)) = reading.gaps.first() else {
         return match unreadable {
             None => check(
@@ -1078,10 +1095,15 @@ fn feedback_recorder_check(fact: &FeedbackRecorderFact) -> Check {
 
 /// A path as one word of a POSIX shell command, so a printed cure can be pasted: bare when
 /// every byte is plain, otherwise in single quotes with an embedded quote written `'\''`.
-/// Non-UTF-8 paths and control characters cannot be printed safely.
+/// A path that is not UTF-8, or holds a control character or a character that reorders the
+/// text around it (U+202A to U+202E, U+2066 to U+2069), cannot be printed safely: what a
+/// person reads would not be what a paste runs.
 fn shell_word(path: &Path) -> Option<String> {
     let text = path.to_str()?;
-    if text.chars().any(char::is_control) {
+    if text
+        .chars()
+        .any(|c| c.is_control() || matches!(c, '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}'))
+    {
         return None;
     }
     let plain = !text.is_empty()
@@ -3782,6 +3804,7 @@ mod tests {
                     .collect(),
                 invalid,
                 bounded: false,
+                unwalked: false,
             }),
         };
         let well = feedback_recorder_check(&read(vec![], 0));
@@ -3839,6 +3862,7 @@ mod tests {
                 gaps: vec![("2026-11-26T09:00:00Z".into(), "timeout".into()); 256],
                 invalid: 0,
                 bounded: true,
+                unwalked: false,
             }),
         });
         assert_eq!(bounded.state, State::Degraded);
@@ -3903,6 +3927,7 @@ mod tests {
                 gaps,
                 invalid,
                 bounded: false,
+                unwalked: false,
             }),
         };
         assert_eq!(feedback_recorder_fact(&nested, &env), reading(vec![], 0));
@@ -3940,6 +3965,31 @@ mod tests {
     }
 
     #[test]
+    fn a_spool_directory_not_read_to_its_end_says_entries_not_notes() {
+        let check = feedback_recorder_check(&FeedbackRecorderFact::Spool {
+            root: PathBuf::from("/repo"),
+            spool: Ok(SpoolReading {
+                dir: PathBuf::from("/state/brit/feedback-spool"),
+                gaps: vec![],
+                invalid: 4096,
+                bounded: false,
+                unwalked: true,
+            }),
+        });
+        assert_eq!(check.state, State::Degraded);
+        assert_eq!(
+            check.detail,
+            "4096 files not readable as gap notes; 4096 or more entries in the spool \
+             directory, not all examined"
+        );
+        assert!(!check.detail.contains("256 or more"));
+        assert_eq!(
+            check.cure.as_deref(),
+            Some("inspect or remove the files in /state/brit/feedback-spool")
+        );
+    }
+
+    #[test]
     fn a_cure_root_with_a_space_or_a_quote_is_one_shell_word() {
         assert_eq!(shell_word(Path::new("/repo")).as_deref(), Some("/repo"));
         assert_eq!(
@@ -3953,6 +4003,8 @@ mod tests {
         assert_eq!(shell_word(Path::new("")).as_deref(), Some("''"));
         assert_eq!(shell_word(Path::new("/r\n")), None);
         assert_eq!(shell_word(Path::new("/r\x1b")), None);
+        assert_eq!(shell_word(Path::new("/r\u{202E}gnp.exe")), None);
+        assert_eq!(shell_word(Path::new("/r\u{2066}x\u{2069}")), None);
         use std::os::unix::ffi::OsStrExt;
         assert_eq!(
             shell_word(Path::new(std::ffi::OsStr::from_bytes(b"/r\xff"))),
@@ -3984,6 +4036,7 @@ mod tests {
                         gaps,
                         invalid: 1,
                         bounded: false,
+                        unwalked: false,
                     }),
                 });
                 assert_eq!(check.cure.as_deref(), Some(expected));
