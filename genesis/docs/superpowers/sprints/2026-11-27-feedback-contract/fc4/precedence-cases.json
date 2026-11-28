@@ -701,7 +701,7 @@
       "keptRecordHolds": false
     },
     "expect": "cure-available",
-    "because": "R12, R5: The alternative posture permits the R12, R5 transfer."
+    "because": "R1, R10–R17: This step reads cure-available; kept records hold nothing, so covered records and aggregates govern compaction, movement and closure."
   },
   {
     "name": "kept-report-blocks-covered-branch",

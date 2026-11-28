@@ -250,7 +250,7 @@
   },
   {
     "name": "c-false-retired",
-    "about": "R10, R14, R16: cure 2 cannot rehabilitate cure 1’s invalidated note; kept records stay open. Pending decision 10 (section 16): with a person's report standing, the claim stays open.",
+    "about": "R1, R10, R12–R14: Any kept record excludes cure-available, on-watch and retired; reopening and the other readings retain their precedence.",
     "steps": [
       {
         "event": {
@@ -342,7 +342,7 @@
         },
         "reading": "open",
         "state": "open",
-        "rule": "R12, R5, R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
+        "rule": "R1, R10–R17: This step reads open; the kept record excludes cure-available, on-watch and retired, while other readings retain their precedence."
       },
       {
         "event": {
@@ -350,7 +350,7 @@
         },
         "reading": "open",
         "state": "open",
-        "rule": "R12, R5, R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
+        "rule": "R1, R10–R17: This step reads open; the kept record excludes cure-available, on-watch and retired, while other readings retain their precedence."
       },
       {
         "event": {
@@ -360,7 +360,7 @@
         },
         "reading": "open",
         "state": "open",
-        "rule": "R12, R5, R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
+        "rule": "R1, R10–R17: This step reads open; the kept record excludes cure-available, on-watch and retired, while other readings retain their precedence."
       },
       {
         "event": {
@@ -368,7 +368,7 @@
         },
         "reading": "open",
         "state": "open",
-        "rule": "R12, R5, R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
+        "rule": "R1, R10–R17: This step reads open; the kept record excludes cure-available, on-watch and retired, while other readings retain their precedence."
       },
       {
         "event": {
@@ -376,7 +376,7 @@
         },
         "reading": "open",
         "state": "open",
-        "rule": "R12, R5, R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
+        "rule": "R1, R10–R17: This step reads open; the kept record excludes cure-available, on-watch and retired, while other readings retain their precedence."
       }
     ]
   },
@@ -2373,7 +2373,7 @@
         },
         "reading": "open",
         "state": "open",
-        "rule": "R12, R5, R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
+        "rule": "R1, R10–R17: This step reads open; the kept record excludes cure-available, on-watch and retired, while other readings retain their precedence."
       },
       {
         "event": {
@@ -2381,7 +2381,7 @@
         },
         "reading": "open",
         "state": "open",
-        "rule": "R12, R5, R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
+        "rule": "R1, R10–R17: This step reads open; the kept record excludes cure-available, on-watch and retired, while other readings retain their precedence."
       },
       {
         "event": {
@@ -2391,7 +2391,7 @@
         },
         "reading": "open",
         "state": "open",
-        "rule": "R12, R5, R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
+        "rule": "R1, R10–R17: This step reads open; the kept record excludes cure-available, on-watch and retired, while other readings retain their precedence."
       },
       {
         "event": {
@@ -2399,7 +2399,7 @@
         },
         "reading": "open",
         "state": "open",
-        "rule": "R12, R5, R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
+        "rule": "R1, R10–R17: This step reads open; the kept record excludes cure-available, on-watch and retired, while other readings retain their precedence."
       },
       {
         "event": {
@@ -2407,10 +2407,10 @@
         },
         "reading": "open",
         "state": "open",
-        "rule": "R12, R5, R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
+        "rule": "R1, R10–R17: This step reads open; the kept record excludes cure-available, on-watch and retired, while other readings retain their precedence."
       }
     ],
-    "about": " Pending decision 10 (section 16): with a person's report standing, the claim stays open."
+    "about": "R1, R10, R12–R14: Any kept record excludes cure-available, on-watch and retired; reopening and the other readings retain their precedence."
   },
   {
     "name": "reviewer-B6-passes-only-then-ruling",
@@ -2890,7 +2890,7 @@
         },
         "reading": "open",
         "state": "open",
-        "rule": "R12, R5, R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
+        "rule": "R1, R10–R17: This step reads open; the kept record excludes cure-available, on-watch and retired, while other readings retain their precedence."
       },
       {
         "event": {
@@ -2900,7 +2900,7 @@
         },
         "reading": "open",
         "state": "open",
-        "rule": "R12, R5, R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
+        "rule": "R1, R10–R17: This step reads open; the kept record excludes cure-available, on-watch and retired, while other readings retain their precedence."
       },
       {
         "event": {
@@ -2908,7 +2908,7 @@
         },
         "reading": "open",
         "state": "open",
-        "rule": "R12, R5, R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
+        "rule": "R1, R10–R17: This step reads open; the kept record excludes cure-available, on-watch and retired, while other readings retain their precedence."
       },
       {
         "event": {
@@ -2916,7 +2916,7 @@
         },
         "reading": "open",
         "state": "open",
-        "rule": "R12, R5, R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
+        "rule": "R1, R10–R17: This step reads open; the kept record excludes cure-available, on-watch and retired, while other readings retain their precedence."
       },
       {
         "event": {
@@ -2926,7 +2926,7 @@
         },
         "reading": "open",
         "state": "open",
-        "rule": "R12, R5, R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
+        "rule": "R1, R10–R17: This step reads open; the kept record excludes cure-available, on-watch and retired, while other readings retain their precedence."
       },
       {
         "event": {
@@ -2934,7 +2934,7 @@
         },
         "reading": "open",
         "state": "open",
-        "rule": "R12, R5, R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
+        "rule": "R1, R10–R17: This step reads open; the kept record excludes cure-available, on-watch and retired, while other readings retain their precedence."
       },
       {
         "event": {
@@ -2942,10 +2942,10 @@
         },
         "reading": "open",
         "state": "open",
-        "rule": "R12, R5, R13, R14, R16: Pending decision 10 blocks aggregate transfer while the kept report stands."
+        "rule": "R1, R10–R17: This step reads open; the kept record excludes cure-available, on-watch and retired, while other readings retain their precedence."
       }
     ],
-    "about": " Pending decision 10 (section 16): with a person's report standing, the claim stays open."
+    "about": "R1, R10, R12–R14: Any kept record excludes cure-available, on-watch and retired; reopening and the other readings retain their precedence."
   },
   {
     "name": "reviewer-C2-covered-reopen-during-watch-control",
@@ -5020,7 +5020,7 @@
   },
   {
     "name": "c-false-retired-if-decision-10-lets-the-machine-close",
-    "about": "Pending decision 10 (section 16): alternative posture permits the R12, R5 transfer to move aggregates despite the standing report; earlier notes keep their own cure.",
+    "about": "R1, R10, R12–R14: Kept records hold nothing; covered records and aggregates permit compaction, movement to a later cure, watch and closure; earlier notes keep their own cure.",
     "steps": [
       {
         "event": {
@@ -5288,7 +5288,7 @@
       }
     ],
     "decision10": "machine-may-close",
-    "about": "Pending decision 10 (section 16): alternative posture permits the R12, R5 transfer to move aggregates despite the standing report; earlier notes keep their own cure."
+    "about": "R1, R10, R12–R14: Kept records hold nothing; covered records and aggregates permit compaction, movement to a later cure, watch and closure; earlier notes keep their own cure."
   },
   {
     "name": "reviewer-C1-kept-reopen-during-watch-then-watch-met-if-decision-10-lets-the-machine-close",
@@ -5432,7 +5432,7 @@
       }
     ],
     "decision10": "machine-may-close",
-    "about": "Pending decision 10 (section 16): alternative posture permits the R12, R5 transfer to move aggregates despite the standing report; earlier notes keep their own cure."
+    "about": "R1, R10, R12–R14: Kept records hold nothing; covered records and aggregates permit compaction, movement to a later cure, watch and closure; earlier notes keep their own cure."
   },
   {
     "name": "release-cure-qualifies-before-the-condition-if-decision-10-lets-the-machine-close",
@@ -6010,7 +6010,7 @@
   },
   {
     "name": "two-kept-reports-in-one-session",
-    "about": "R1, R10, R12: Each kept report survives separately; decision 10 controls aggregate transfer after the later cure. No second retire has been requested.",
+    "about": "R1, R10, R12–R14: Any kept record excludes cure-available, on-watch and retired; reopening and the other readings retain their precedence.",
     "steps": [
       {
         "event": {
@@ -6387,7 +6387,7 @@
   },
   {
     "name": "a-commitment-makes-the-only-record-kept",
-    "about": "R1: A commitment keeps the newest covered session record in place, adding no observation. Both values of KEPT_REPORT_HOLDS_A_CLAIM_OPEN give identical readings; decision 10 needs no twin.",
+    "about": "R1: A commitment keeps the covered record of the newest session holding a record in place, adding no observation. Both values of KEPT_REPORT_HOLDS_A_CLAIM_OPEN give identical readings; decision 10 needs no twin.",
     "steps": [
       {
         "event": {
@@ -6446,7 +6446,7 @@
   },
   {
     "name": "a-commitment-tied-while-the-cure-waits",
-    "about": "R1: A commitment keeps the newest covered session record in place, adding no observation. Both values of KEPT_REPORT_HOLDS_A_CLAIM_OPEN give identical readings; decision 10 needs no twin.",
+    "about": "R1: A commitment keeps the covered record of the newest session holding a record in place, adding no observation. Both values of KEPT_REPORT_HOLDS_A_CLAIM_OPEN give identical readings; decision 10 needs no twin.",
     "steps": [
       {
         "event": {
@@ -9588,5 +9588,773 @@
       }
     ],
     "decision10": "machine-may-close"
+  },
+  {
+    "name": "reviewer4-N1-note-then-kept-counting-against-nothing",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R10–R17: After fail, the unit reads open; any kept record excludes cure-available, on-watch and retired, without masking other readings."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R1, R10–R17: After release, the unit reads cure-available; any kept record excludes cure-available, on-watch and retired, without masking other readings."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1, R10–R17: After retire, the unit reads on-watch; any kept record excludes cure-available, on-watch and retired, without masking other readings."
+      },
+      {
+        "event": {
+          "type": "pass",
+          "release": 1,
+          "participant": "p",
+          "newSession": true
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1, R10–R17: After pass, the unit reads on-watch; any kept record excludes cure-available, on-watch and retired, without masking other readings."
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "reading": "retired",
+        "state": "cured",
+        "rule": "R1, R10–R17: After watch, the unit reads retired; any kept record excludes cure-available, on-watch and retired, without masking other readings."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "retired",
+        "state": "retired",
+        "rule": "R1, R10–R17: After retire, the unit reads retired; any kept record excludes cure-available, on-watch and retired, without masking other readings."
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "kept"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R10–R17: After fail, the unit reads open; any kept record excludes cure-available, on-watch and retired, without masking other readings."
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R10–R17: After watch, the unit reads open; any kept record excludes cure-available, on-watch and retired, without masking other readings."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R10–R17: After retire, the unit reads open; any kept record excludes cure-available, on-watch and retired, without masking other readings."
+      },
+      {
+        "event": {
+          "type": "retire",
+          "ruling": true
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R10–R17: After retire, the unit reads open; any kept record excludes cure-available, on-watch and retired, without masking other readings."
+      }
+    ]
+  },
+  {
+    "name": "reviewer4-N1-note-then-kept-counting-against-nothing-if-decision-10-lets-the-machine-close",
+    "decision10": "machine-may-close",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R10–R17: After fail, the unit reads open; kept records hold nothing, and covered records and aggregates govern compaction, watch and closure."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R1, R10–R17: After release, the unit reads cure-available; kept records hold nothing, and covered records and aggregates govern compaction, watch and closure."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1, R10–R17: After retire, the unit reads on-watch; kept records hold nothing, and covered records and aggregates govern compaction, watch and closure."
+      },
+      {
+        "event": {
+          "type": "pass",
+          "release": 1,
+          "participant": "p",
+          "newSession": true
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1, R10–R17: After pass, the unit reads on-watch; kept records hold nothing, and covered records and aggregates govern compaction, watch and closure."
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "reading": "retired",
+        "state": "cured",
+        "rule": "R1, R10–R17: After watch, the unit reads retired; kept records hold nothing, and covered records and aggregates govern compaction, watch and closure."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "retired",
+        "state": "retired",
+        "rule": "R1, R10–R17: After retire, the unit reads retired; kept records hold nothing, and covered records and aggregates govern compaction, watch and closure."
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "kept"
+        },
+        "reading": "retired",
+        "state": "retired",
+        "rule": "R1, R10–R17: After fail, the unit reads retired; kept records hold nothing, and covered records and aggregates govern compaction, watch and closure."
+      },
+      {
+        "event": {
+          "type": "watch"
+        },
+        "reading": "retired",
+        "state": "retired",
+        "rule": "R1, R10–R17: After watch, the unit reads retired; kept records hold nothing, and covered records and aggregates govern compaction, watch and closure."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "retired",
+        "state": "retired",
+        "rule": "R1, R10–R17: After retire, the unit reads retired; kept records hold nothing, and covered records and aggregates govern compaction, watch and closure."
+      },
+      {
+        "event": {
+          "type": "retire",
+          "ruling": true
+        },
+        "reading": "retired",
+        "state": "retired",
+        "rule": "R1, R10–R17: After retire, the unit reads retired; kept records hold nothing, and covered records and aggregates govern compaction, watch and closure."
+      }
+    ]
+  },
+  {
+    "name": "reviewer4-N2-held-then-superseded",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R10–R17: After fail, the unit reads open; any kept record excludes cure-available, on-watch and retired, without masking other readings."
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "kept"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R10–R17: After fail, the unit reads open; any kept record excludes cure-available, on-watch and retired, without masking other readings."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R10–R17: After release, the unit reads open; any kept record excludes cure-available, on-watch and retired, without masking other readings."
+      },
+      {
+        "event": {
+          "type": "supersede"
+        },
+        "reading": "superseded",
+        "state": null,
+        "rule": "R1, R10–R17: After supersede, the unit reads superseded; any kept record excludes cure-available, on-watch and retired, without masking other readings."
+      }
+    ]
+  },
+  {
+    "name": "reviewer4-N2-held-then-superseded-if-decision-10-lets-the-machine-close",
+    "decision10": "machine-may-close",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R10–R17: After fail, the unit reads open; kept records hold nothing, and covered records and aggregates govern compaction, watch and closure."
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "kept"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R10–R17: After fail, the unit reads open; kept records hold nothing, and covered records and aggregates govern compaction, watch and closure."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R1, R10–R17: After release, the unit reads cure-available; kept records hold nothing, and covered records and aggregates govern compaction, watch and closure."
+      },
+      {
+        "event": {
+          "type": "supersede"
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R1, R10–R17: After supersede, the unit reads cure-available; kept records hold nothing, and covered records and aggregates govern compaction, watch and closure."
+      }
+    ]
+  },
+  {
+    "name": "reviewer4-N3-held-then-stale-emitter",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "kept"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R10–R17: After fail, the unit reads open; any kept record excludes cure-available, on-watch and retired, without masking other readings."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R10–R17: After release, the unit reads open; any kept record excludes cure-available, on-watch and retired, without masking other readings."
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": true
+        },
+        "reading": "stale-emitter",
+        "state": null,
+        "rule": "R1, R10–R17: After fail, the unit reads stale-emitter; any kept record excludes cure-available, on-watch and retired, without masking other readings."
+      },
+      {
+        "event": {
+          "type": "pass",
+          "release": 1,
+          "participant": "p",
+          "newSession": true
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R10–R17: After pass, the unit reads open; any kept record excludes cure-available, on-watch and retired, without masking other readings."
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 1,
+          "participant": "p",
+          "record": "kept"
+        },
+        "reading": "reopened",
+        "state": "reopened",
+        "rule": "R1, R10–R17: After fail, the unit reads reopened; any kept record excludes cure-available, on-watch and retired, without masking other readings."
+      }
+    ]
+  },
+  {
+    "name": "reviewer4-N3-held-then-stale-emitter-if-decision-10-lets-the-machine-close",
+    "decision10": "machine-may-close",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "kept"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R10–R17: After fail, the unit reads open; kept records hold nothing, and covered records and aggregates govern compaction, watch and closure."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R10–R17: After release, the unit reads open; kept records hold nothing, and covered records and aggregates govern compaction, watch and closure."
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered",
+          "afterHead": true
+        },
+        "reading": "stale-emitter",
+        "state": null,
+        "rule": "R1, R10–R17: After fail, the unit reads stale-emitter; kept records hold nothing, and covered records and aggregates govern compaction, watch and closure."
+      },
+      {
+        "event": {
+          "type": "pass",
+          "release": 1,
+          "participant": "p",
+          "newSession": true
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R1, R10–R17: After pass, the unit reads cure-available; kept records hold nothing, and covered records and aggregates govern compaction, watch and closure."
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 1,
+          "participant": "p",
+          "record": "kept"
+        },
+        "reading": "reopened",
+        "state": "reopened",
+        "rule": "R1, R10–R17: After fail, the unit reads reopened; kept records hold nothing, and covered records and aggregates govern compaction, watch and closure."
+      }
+    ]
+  },
+  {
+    "name": "reviewer4-N4-held-review-due-no-cure",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "kept"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R10–R17: After fail, the unit reads open; any kept record excludes cure-available, on-watch and retired, without masking other readings."
+      },
+      {
+        "event": {
+          "type": "horizon"
+        },
+        "reading": "review-due",
+        "state": "open",
+        "rule": "R1, R10–R17: After horizon, the unit reads review-due; any kept record excludes cure-available, on-watch and retired, without masking other readings."
+      }
+    ]
+  },
+  {
+    "name": "reviewer4-N5-held-unrecorded",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "kept"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R10–R17: After fail, the unit reads open; any kept record excludes cure-available, on-watch and retired, without masking other readings."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R10–R17: After release, the unit reads open; any kept record excludes cure-available, on-watch and retired, without masking other readings."
+      },
+      {
+        "event": {
+          "type": "known",
+          "value": false
+        },
+        "reading": "unrecorded",
+        "state": null,
+        "rule": "R1, R10–R17: After known, the unit reads unrecorded; any kept record excludes cure-available, on-watch and retired, without masking other readings."
+      }
+    ]
+  },
+  {
+    "name": "reviewer4-N9-summary-held-during-watch",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R10–R17: After fail, the unit reads open; any kept record excludes cure-available, on-watch and retired, without masking other readings."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R1, R10–R17: After release, the unit reads cure-available; any kept record excludes cure-available, on-watch and retired, without masking other readings."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1, R10–R17: After retire, the unit reads on-watch; any kept record excludes cure-available, on-watch and retired, without masking other readings."
+      },
+      {
+        "event": {
+          "type": "pass",
+          "release": 1,
+          "participant": "p",
+          "newSession": true
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1, R10–R17: After pass, the unit reads on-watch; any kept record excludes cure-available, on-watch and retired, without masking other readings."
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "kept"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R10–R17: After fail, the unit reads open; any kept record excludes cure-available, on-watch and retired, without masking other readings."
+      }
+    ]
+  },
+  {
+    "name": "reviewer4-N9-summary-held-during-watch-if-decision-10-lets-the-machine-close",
+    "decision10": "machine-may-close",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R10–R17: After fail, the unit reads open; kept records hold nothing, and covered records and aggregates govern compaction, watch and closure."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R1, R10–R17: After release, the unit reads cure-available; kept records hold nothing, and covered records and aggregates govern compaction, watch and closure."
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1, R10–R17: After retire, the unit reads on-watch; kept records hold nothing, and covered records and aggregates govern compaction, watch and closure."
+      },
+      {
+        "event": {
+          "type": "pass",
+          "release": 1,
+          "participant": "p",
+          "newSession": true
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1, R10–R17: After pass, the unit reads on-watch; kept records hold nothing, and covered records and aggregates govern compaction, watch and closure."
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "kept"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R1, R10–R17: After fail, the unit reads on-watch; kept records hold nothing, and covered records and aggregates govern compaction, watch and closure."
+      }
+    ]
+  },
+  {
+    "name": "commit-on-a-session-with-a-persons-record-and-a-covered-one",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "record": "kept",
+          "participant": "p"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R10–R17: After fail, the unit reads open; any kept record excludes cure-available, on-watch and retired, without masking other readings."
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "record": "covered",
+          "participant": "p",
+          "newSession": false
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R10–R17: After fail, the unit reads open; any kept record excludes cure-available, on-watch and retired, without masking other readings."
+      },
+      {
+        "event": {
+          "type": "commit",
+          "session": 1
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R10–R17: After commit, the unit reads open; any kept record excludes cure-available, on-watch and retired, without masking other readings."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R10–R17: After release, the unit reads open; any kept record excludes cure-available, on-watch and retired, without masking other readings."
+      }
+    ]
+  },
+  {
+    "name": "commit-on-a-session-with-a-persons-record-and-a-covered-one-if-decision-10-lets-the-machine-close",
+    "decision10": "machine-may-close",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "record": "kept",
+          "participant": "p"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R10–R17: After fail, the unit reads open; kept records hold nothing, and covered records and aggregates govern compaction, watch and closure."
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "record": "covered",
+          "participant": "p",
+          "newSession": false
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R10–R17: After fail, the unit reads open; kept records hold nothing, and covered records and aggregates govern compaction, watch and closure."
+      },
+      {
+        "event": {
+          "type": "commit",
+          "session": 1
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R10–R17: After commit, the unit reads open; kept records hold nothing, and covered records and aggregates govern compaction, watch and closure."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R10–R17: After release, the unit reads open; kept records hold nothing, and covered records and aggregates govern compaction, watch and closure."
+      }
+    ]
+  },
+  {
+    "name": "unnamed-commit-on-only-kept-records-changes-nothing",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "record": "kept",
+          "participant": "p"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R10–R17: After fail, the unit reads open; any kept record excludes cure-available, on-watch and retired, without masking other readings."
+      },
+      {
+        "event": {
+          "type": "commit"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R10–R17: After commit, the unit reads open; any kept record excludes cure-available, on-watch and retired, without masking other readings."
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R10–R17: After release, the unit reads open; any kept record excludes cure-available, on-watch and retired, without masking other readings."
+      }
+    ]
   }
 ]
