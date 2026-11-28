@@ -152,6 +152,10 @@ station, with its roll.
 
 ## The grant: his quoted words, traceable to the act that said them
 
+This is the interim stage. A grant's authority here rests on his quoted words being traceable to the session
+that recorded them; station F4-portal-consent replaces it with his own approval in the consent portal (his rulings
+of ~18:40Z, ~20:00Z and ~22:20Z, quoted above, set that order).
+
 His call 1: a grant needs no act only he can perform, provided the words are traceable to his own act. His call
 of ~22:20Z ("go with option 2 then") sets the first stage: a **same-device covenant clause asked through the main
 conversation**, with portal consent as a later upgrade (station F4-portal-consent, below).
@@ -160,7 +164,8 @@ conversation**, with portal consent as a later upgrade (station F4-portal-consen
 `grantsCarry` kind exists in brit 0.3.13, pinned in f07f678d8; epr's side of it is slice 1, not built): `epr covenant
 record --kind grantsCarry --party human:matthew --quote "<his words>" --valid-until <RFC3339>` (covenant.rs:993-1060:
 quote, validity, revocation, the prior steward affirmation; the clause is a brit-signed note and stays on the
-device). The **grant itself is a native REA `Commitment`** in the same device's flow store (epr-rea
+device). The **grant itself is a native REA `Commitment`** (in REA, a Commitment is a promise of a future economic
+event: here, his promise that the runner may use his standing to carry, until the expiry) in the same device's flow store (epr-rea
 model.rs:352-371), minted by the same command: slice 1 extends `epr covenant record` so that, for
 `grantsCarry` only, it stores the clause and then writes the Commitment naming it. The carrier reads the
 Commitment, so a clause whose Commitment was not written grants nothing: a failure between the two fails
@@ -389,14 +394,14 @@ independent reader). It is cited here, not fixed here.
   the grant, on his own devices, with the device user's rights. Bounded by steps 1-6, the 24-hour expiry and the
   audit trail.
 - It yields to any held cargo lease that is not its own, to `dev-integration`, and to an open interactive gate
-  run (`gate-live`). Yielding is what slice 2 built into `held-tool-watch carry` (landed in 59725bf2c): before
+  run (`gate-live`). Yielding is what slice 2a built into `held-tool-watch carry` (landed in 59725bf2c): before
   claiming, and repeatedly during the run, it reads `berth who cargo` and the open gate-live runs
   (held-tool-watch:1430-1514); if a foreign holder or an interactive gate appears it stops the gate with
   `gate-live stop --now`, which records no verdict, and releases its claim unrecorded (so a stop is not yet
   recorded once: see the known gaps below). A gate-live run left open by a killed `just gate` reads as live until its
   6-hour staleness window passes (`STALE_MS`, gate-live.mjs:25). The lander sets `GATE_LANDING_INTENT` in
   pre-push.
-- **`GATE_CARRY_WAIT=on` waits for the lander's grant check.** Slice 2 (landed in 59725bf2c) gives every dev
+- **`GATE_CARRY_WAIT=on` waits for the lander's grant check.** Slice 2a (landed in 59725bf2c) gives every dev
   gate its landing intent, but `GATE_CARRY_WAIT` stays `shadow` until the lander checks the grant: turned on
   before that, a matched intent could hold a landing up to the wait's hard cap (1800 s) on a carry no grant
   vouches for. It is turned on by a later commit that flips its default, made by the integrator once every
@@ -492,35 +497,53 @@ is not established (above, "Three cases a stranger asks about").
    (b) Now, in parallel. Cost: the portal work, which also rolls the fleet, competes with slices 1 to 5 for the
    same hands. Recommended: (a).
 
-## Known gaps in slice 2, from its review
+## Known gaps in slice 2a, from its review
 
-The integrator's reader passed slice 2 (`self/ethosengine-lander-intent`, 982f1830d) as safe to land and named
-these, to cure in the carry-watch slice (3) or later: a `just gate` killed by SIGKILL or power loss leaves an open
-run, and the carrier declines for up to its 6-hour staleness window; any other cargo claim, a rust-analyzer check
-among them, stops a carry each time, and a stopped carry is not recorded once, so the watcher may retry and stop
-again until the miss's wait ends; one failed `berth who cargo` read mid-gate stops the gate; the mid-gate check
-spawns two berth reads a second for the gate's life; untested are main and `self/*` pushes skipping the lookup,
-`LANDING_INTENT=off`, a preset `GATE_LANDING_INTENT` winning, two live intents sharing a Change-Id, and a malformed
-Change-Id.
+The integrator's reader passed slice 2a (`self/ethosengine-lander-intent`, 982f1830d, landed in 59725bf2c) as safe
+to land and named these; each says where it is to be cured:
+
+- A `just gate` killed by SIGKILL or power loss leaves an open run, and the carrier declines for up to its 6-hour
+  staleness window. Deferred: a gate-live change of its own.
+- Any other cargo claim, a rust-analyzer check among them, stops a carry each time, and a stopped carry is not
+  recorded once, so the watcher may retry and stop again until the miss's wait ends. Slice 3, proposed:
+  carry-watch records a stop once, as a declined claim.
+- One failed `berth who cargo` read mid-gate stops the gate. Slice 3, proposed: one failed read is retried before
+  it stops.
+- The mid-gate check spawns two berth reads a second for the gate's life. Slice 3, proposed: carry-watch reads
+  berth's state at a slower cadence.
+- Untested: main and `self/*` pushes skipping the lookup, `LANDING_INTENT=off`, a preset `GATE_LANDING_INTENT`
+  winning, two live intents sharing a Change-Id, and a malformed Change-Id. Slice 2b, beside the lander's grant
+  check, in the integrator's code.
 
 ## Story first, then slices, and what rolls
 
-Slice 0 is the scenario, before any code: `genesis/a2o/features/devflow/carry-under-steward-grant.feature`,
-through the blind-reader loop. Its scenarios: the graduation trigger above; a carry declined with no acknowledged
-answering session; a miss declined at each of steps 2, 4 and 5; a grant recorded outside the runner's main
-conversation refused; and a grant that does not verify voided and traced to the session that wrote it. Then, each
-its own commit: (1) the attribution case, the `grantsCarry` clause kind with its required expiry and new-words
-renewal, the grant Commitment and its signed `Cite` event of kind `grant`, and `carry verify-grant`; (2) the
-lander's intent and the yields, LANDED in 59725bf2c; (2b) the lander's grant check, NOT built: the lander calls
-`verify-grant` before reusing a carried verdict, in the lander's reuse code that the integrator owns
-(`gate-carry.mjs`), so it is the integrator's change, after slice 1 exists; (3) carry-watch under the supervisor with steps
-1-6, the grant-held cargo lease, the acknowledged answering agent and the three measures with their registry
-declarations and headline slot, together, so no carrier ships without an answering agent; (4) carry show; (5)
-the `carrier@<device>` berth address. device-runtime/** is an Edge watch glob (holochain build-manifest.json:126),
-so slices that touch it ride an authorised roll bundle; so does slice 3's entry in `processes[]` of
-`genesis/orchestrator/manifests/runtime/workspace-device.manifest.json`, an Edge watch glob too (holochain
-build-manifest.json:127); epr-cli is the eprfs gate; berth is agentic tools; epr-rea is untouched. Slice 1 started in brit, and that part is landed: brit refuses a clause kind it does not know (covenant.rs:14-52,
-the closed kind enum and its `FromStr`) and validates each kind's payload (`validate_payload`, :94-115), so the
-`grantsCarry` kind, its payload, the body's 24-hour check and the cross-session list came first, in brit 0.3.13,
-pinned in f07f678d8. Slice 1's epr work is next. An older brit decodes the clause as unverifiable and lists it so,
-which fails closed. Station F4-portal-consent rolls the fleet on its own.
+Each slice is its own commit. What each needs first, and what it costs to land:
+
+0. **The story and this page.** `genesis/a2o/features/devflow/carry-under-steward-grant.feature`, through the
+   blind-reader loop, with this design. No code. Status: ready to land.
+1. **The grant, in epr** (epr-cli, the eprfs gate). Needs brit 0.3.13, which is landed (f07f678d8): brit refuses a
+   clause kind it does not know (covenant.rs:14-52, the closed kind enum and its `FromStr`) and validates each
+   kind's payload (`validate_payload`, :94-115), so the `grantsCarry` kind, its payload, the body's 24-hour check
+   and the cross-session list came first. An older brit decodes the clause as unverifiable and lists it so, which
+   fails closed. Built in two parts: **1a**, `covenant record --kind grantsCarry` with bound 0's checks, the
+   Commitment and its orphan repair, and a read-only `carry verify-grant`; **1b**, the signed `Cite` of kind
+   `grant` (with `KINDS` and the policy's `berth.channel.crosses` entry), the attribution case, and verify-grant's
+   void, measure and feedback. Status: 1a in progress. Rolls nothing.
+2. **The lander.** **2a**, the lander's intent and the carrier's yields: LANDED in 59725bf2c. **2b**, the lander's
+   grant check: the lander calls `verify-grant` before reusing a carried verdict, in the lander's reuse code that
+   the integrator owns (`gate-carry.mjs`). Needs slice 1. Status: not built; the integrator's change.
+3. **carry-watch.** Under the supervisor, with steps 1-6, the grant-held cargo lease, the acknowledged answering
+   agent and the three measures with their registry declarations and headline slot, together, so no carrier ships
+   without an answering agent. Needs slice 1 (verify-grant) and, before `GATE_CARRY_WAIT` turns on, slice 2b. Its
+   `processes[]` entry in `genesis/orchestrator/manifests/runtime/workspace-device.manifest.json` is an Edge watch
+   glob (holochain build-manifest.json:127), and anything under `device-runtime/**` is one too (:126), so it rides
+   an authorised roll bundle. The grant-held cargo holder is a berth change in this slice (berth is the agentic
+   tools gate). berth runs from each device's own checkout, so a device whose checkout predates the slice does
+   not know the holder kind: slice 3 confirms that an older berth reads an unknown holder as held, which is the
+   safe reading (it then takes no seat that holder has). Status: not built.
+4. **carry show.** Needs slices 1 and 3. Status: not built. Rolls nothing.
+5. **The `carrier@<device>` berth address.** Routing a note to the acknowledged answering session needs a
+   resolution rule this page does not give (which session, when several are moored or none is); slice 5 gets its
+   own short design. Needs slice 3. Status: not designed.
+
+Station F4-portal-consent rolls the fleet on its own.
