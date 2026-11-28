@@ -9,8 +9,9 @@
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
-use elohim_epr_cli::actor;
-use elohim_epr_cli::device_key::DEVICE_KEY_ENV;
+use chrono::{TimeDelta, Utc};
+use elohim_epr_cli::device_key::{DeviceKey, DEVICE_KEY_ENV};
+use elohim_epr_rea::{CommitmentState, FlowRecord, FlowStore, ReaVerb, SidecarFlowStore};
 use serde_json::{json, Value};
 use tempfile::TempDir;
 
@@ -63,16 +64,41 @@ if verb == "put":
     json.dump(rows, open(path(opts["session"]), "w"))
     print(json.dumps({"cid": cid, "clause": clause}) if opts.get("output-json") else cid)
 elif verb == "list":
-    print(json.dumps(load(opts["session"])))
+    if "kind" in opts:
+        rows = []
+        for name in os.listdir(store):
+            if not name.endswith(".json"):
+                continue
+            rows.extend(row for row in load(name[:-5]) if row["clause"]["kind"] == opts["kind"])
+        print(json.dumps(rows))
+    else:
+        print(json.dumps(load(opts["session"])))
 elif verb == "show":
     for name in os.listdir(store):
         for row in json.load(open(os.path.join(store, name))):
             if row["cid"] == opts["cid"]:
                 print(json.dumps(row))
                 sys.exit(0)
+    print("no covenant clause with cid " + opts["cid"], file=sys.stderr)
     sys.exit(1)
 else:
     sys.exit(2)
+"#;
+
+const BERTH_STUB: &str = r#"#!/usr/bin/env python3
+# status-json@1
+import json, os, sys
+
+assert sys.argv[1:] == ["status", "--json"], sys.argv
+if os.environ.get("BERTH_STUB_FAIL"):
+    print("fixture berth unavailable", file=sys.stderr)
+    sys.exit(1)
+runtime = os.environ.get("BERTH_STUB_RUNTIME", "claude-code")
+moorings = [] if runtime == "absent" else [{
+    "session": "covenant-session", "runtime": runtime, "model": "fixture",
+    "task": "grant fixture", "writes": [], "seenS": 0,
+}]
+print(json.dumps({"moorings": moorings, "siblings": [], "devices": [], "unavailable": []}))
 "#;
 
 const MANIFEST_TEXT: &str = "---
@@ -123,6 +149,7 @@ fn write(root: &Path, rel: &str, text: &str) {
 struct Fixture {
     repo: TempDir,
     tools: TempDir,
+    did: String,
 }
 
 impl Fixture {
@@ -153,12 +180,17 @@ impl Fixture {
         let tools = TempDir::new().unwrap();
         let stub = tools.path().join("brit-build-ref");
         std::fs::write(&stub, STUB).unwrap();
+        let berth = tools.path().join("berth");
+        std::fs::write(&berth, BERTH_STUB).unwrap();
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
             std::fs::set_permissions(&stub, std::fs::Permissions::from_mode(0o755)).unwrap();
+            std::fs::set_permissions(&berth, std::fs::Permissions::from_mode(0o755)).unwrap();
         }
-        Self { repo, tools }
+        let key_file = tools.path().join("config/elohim/device/ed25519.seed");
+        let did = DeviceKey::load_or_generate(&key_file).unwrap().did_key();
+        Self { repo, tools, did }
     }
 
     fn root(&self) -> &Path {
@@ -166,7 +198,24 @@ impl Fixture {
     }
 
     fn stand(&self, human: &str) {
-        actor::claim(self.root(), human, SESSION).expect("claim");
+        let out = Command::new(env!("CARGO_BIN_EXE_epr"))
+            .args(["actor", "claim", "--as", human, "--session", SESSION])
+            .arg("--root")
+            .arg(self.root())
+            .env_remove(DEVICE_KEY_ENV)
+            .env("XDG_CONFIG_HOME", self.tools.path().join("config"))
+            .env("EPR_STORE", self.root().join(".eprfs"))
+            .env_remove("CLAUDE_CODE_SESSION_ID")
+            .env_remove("CLAUDE_SESSION_ID")
+            .env_remove("ELOHIM_SESSION_ID")
+            .output()
+            .expect("epr actor claim runs");
+        assert!(
+            out.status.success(),
+            "claim {human}: {}{}",
+            String::from_utf8_lossy(&out.stdout),
+            String::from_utf8_lossy(&out.stderr)
+        );
     }
 
     fn cmd(&self, verb: &str, extra: &[&str]) -> Command {
@@ -183,10 +232,10 @@ impl Fixture {
                 self.tools.path().join("brit-build-ref"),
             )
             .env("COVENANT_STUB_STORE", self.tools.path().join("store"))
-            .env(
-                DEVICE_KEY_ENV,
-                self.tools.path().join("no-device/ed25519.seed"),
-            )
+            .env_remove(DEVICE_KEY_ENV)
+            .env("BERTH_BIN", self.tools.path().join("berth"))
+            .env("XDG_CONFIG_HOME", self.tools.path().join("config"))
+            .env("EPR_STORE", self.root().join(".eprfs"))
             .env_remove("CLAUDE_CODE_SESSION_ID")
             .env_remove("CLAUDE_SESSION_ID")
             .env_remove("ELOHIM_SESSION_ID");
@@ -195,6 +244,26 @@ impl Fixture {
 
     fn run(&self, verb: &str, extra: &[&str]) -> Output {
         self.cmd(verb, extra).output().expect("epr runs")
+    }
+
+    fn flow(&self, extra: &[&str]) -> Output {
+        Command::new(env!("CARGO_BIN_EXE_epr"))
+            .arg("flow")
+            .args(extra)
+            .env(
+                "BRIT_BUILD_REF_BIN",
+                self.tools.path().join("brit-build-ref"),
+            )
+            .env("COVENANT_STUB_STORE", self.tools.path().join("store"))
+            .env_remove(DEVICE_KEY_ENV)
+            .env("BERTH_BIN", self.tools.path().join("berth"))
+            .env("XDG_CONFIG_HOME", self.tools.path().join("config"))
+            .env("EPR_STORE", self.root().join(".eprfs"))
+            .env_remove("CLAUDE_CODE_SESSION_ID")
+            .env_remove("CLAUDE_SESSION_ID")
+            .env_remove("ELOHIM_SESSION_ID")
+            .output()
+            .expect("epr flow runs")
     }
 
     fn json(&self, verb: &str, extra: &[&str]) -> Value {
@@ -267,6 +336,10 @@ impl Fixture {
     fn check(&self, path: &str) -> Value {
         self.json("check", &["--rule", RULE, "--path", path])
     }
+}
+
+fn grant_until(delta: TimeDelta) -> String {
+    (Utc::now() + delta).to_rfc3339()
 }
 
 // ── record: refusals ────────────────────────────────────────────────────────────────────────────
@@ -574,6 +647,289 @@ fn record_succeeds_for_every_kind_and_builds_the_variance_payload_itself() {
     assert_eq!(revoked["clause"]["payload"], json!({"revokes": varied_cid}));
     println!("record revokes: {revoked}");
     assert_eq!(f.stored(), 4);
+}
+
+#[test]
+fn grants_carry_refuses_too_long_past_and_shared_branch_bounds() {
+    let f = Fixture::new();
+    f.stand(MATTHEW);
+    f.affirm();
+
+    for until in [
+        grant_until(TimeDelta::hours(25)),
+        grant_until(TimeDelta::minutes(-1)),
+    ] {
+        let why = f.refusal(
+            "record",
+            &[
+                "--kind",
+                "grantsCarry",
+                "--party",
+                MATTHEW,
+                "--quote",
+                "bounded carrier words",
+                "--valid-until",
+                &until,
+                "--project",
+                "eprfs",
+                "--ref",
+                "self/*",
+            ],
+        );
+        assert!(why.contains("too long"), "{why}");
+    }
+    let until = grant_until(TimeDelta::hours(1));
+    for branch in ["dev", "main", "*", "d*"] {
+        let why = f.refusal(
+            "record",
+            &[
+                "--kind",
+                "grantsCarry",
+                "--party",
+                MATTHEW,
+                "--quote",
+                "bounded carrier words",
+                "--valid-until",
+                &until,
+                "--project",
+                "eprfs",
+                "--ref",
+                branch,
+            ],
+        );
+        assert!(why.contains("shared branch"), "{branch}: {why}");
+    }
+    assert_eq!(f.stored(), 1, "only the prerequisite affirmation is stored");
+}
+
+#[test]
+fn grants_carry_refuses_without_a_readable_claude_code_mooring() {
+    let f = Fixture::new();
+    f.stand(MATTHEW);
+    f.affirm();
+    let until = grant_until(TimeDelta::hours(1));
+    let args = [
+        "--kind",
+        "grantsCarry",
+        "--party",
+        MATTHEW,
+        "--quote",
+        "bounded carrier words",
+        "--valid-until",
+        &until,
+        "--project",
+        "eprfs",
+        "--ref",
+        "self/*",
+    ];
+    for (name, value) in [
+        ("BERTH_STUB_RUNTIME", "codex"),
+        ("BERTH_STUB_RUNTIME", "absent"),
+    ] {
+        let out = f.cmd("record", &args).env(name, value).output().unwrap();
+        assert!(!out.status.success());
+        let why = String::from_utf8_lossy(&out.stderr);
+        assert!(why.contains("not moored here as claude-code"), "{why}");
+    }
+    let out = f
+        .cmd("record", &args)
+        .env("BERTH_STUB_FAIL", "1")
+        .output()
+        .unwrap();
+    assert!(!out.status.success());
+    let why = String::from_utf8_lossy(&out.stderr);
+    assert!(why.contains("not moored here as claude-code"), "{why}");
+    assert!(why.contains("could not be read"), "{why}");
+    assert_eq!(f.stored(), 1);
+}
+
+#[test]
+fn grants_carry_writes_the_exact_commitment_and_refuses_same_words() {
+    let f = Fixture::new();
+    f.stand(MATTHEW);
+    f.affirm();
+    let until = grant_until(TimeDelta::hours(1));
+    let recorded = f.json(
+        "record",
+        &[
+            "--kind",
+            "grantsCarry",
+            "--party",
+            MATTHEW,
+            "--quote",
+            "  bounded carrier words  ",
+            "--valid-until",
+            &until,
+            "--project",
+            "eprfs",
+            "--project",
+            "orchestrator",
+            "--ref",
+            "self/*",
+        ],
+    );
+    assert_eq!(recorded["status"], "recorded");
+    let clause = recorded["cid"].as_str().unwrap();
+    let commitment_cid = recorded["commitment"].as_str().unwrap();
+    assert_eq!(recorded["clause"]["payload"]["runner"], f.did);
+    assert_eq!(
+        recorded["clause"]["payload"]["projects"],
+        json!(["eprfs", "orchestrator"])
+    );
+    assert_eq!(recorded["clause"]["payload"]["refs"], json!(["self/*"]));
+
+    let store = SidecarFlowStore::open(f.root()).unwrap();
+    let records = store.records().unwrap();
+    let (cid, commitment) = records
+        .iter()
+        .find_map(|(cid, record)| match record {
+            FlowRecord::Commitment(commitment) => Some((cid, commitment)),
+            _ => None,
+        })
+        .expect("grant Commitment");
+    assert_eq!(cid.to_string(), commitment_cid);
+    assert_eq!(commitment.action, ReaVerb::Use);
+    assert_eq!(commitment.provider.0, MATTHEW);
+    assert_eq!(commitment.receiver.0, "repo:ethosengine/elohim");
+    assert_eq!(commitment.state, CommitmentState::Active);
+    assert_eq!(commitment.valid_until.as_deref(), Some(until.as_str()));
+    assert_eq!(
+        commitment.resource_spec.classified_as,
+        vec![
+            "carry-grant@1",
+            &format!("runner:{}", f.did),
+            "project:eprfs",
+            "project:orchestrator",
+            "ref:self/*",
+            &format!("words:{clause}"),
+        ]
+    );
+
+    let current_store = f.tools.path().join("store").join(format!("{SESSION}.json"));
+    let mut rows: Vec<Value> =
+        serde_json::from_str(&std::fs::read_to_string(&current_store).unwrap()).unwrap();
+    let earlier_grant = rows.pop().expect("stored grant row");
+    std::fs::write(&current_store, serde_json::to_string(&rows).unwrap()).unwrap();
+    std::fs::write(
+        f.tools.path().join("store/earlier-session.json"),
+        serde_json::to_string(&vec![earlier_grant]).unwrap(),
+    )
+    .unwrap();
+
+    let why = f.refusal(
+        "record",
+        &[
+            "--kind",
+            "grantsCarry",
+            "--party",
+            MATTHEW,
+            "--quote",
+            "bounded carrier words",
+            "--valid-until",
+            &until,
+            "--project",
+            "eprfs",
+            "--ref",
+            "self/*",
+        ],
+    );
+    assert!(why.contains("same words"), "{why}");
+    assert_eq!(
+        f.stored(),
+        1,
+        "the cross-session duplicate leaves only the current affirmation"
+    );
+}
+
+#[test]
+fn grants_carry_names_a_stored_clause_when_commitment_write_fails() {
+    let f = Fixture::new();
+    f.stand(MATTHEW);
+    f.affirm();
+    std::fs::create_dir_all(f.root().join(".eprfs/status/flows.jsonl")).unwrap();
+    let until = grant_until(TimeDelta::hours(1));
+    let why = f.refusal(
+        "record",
+        &[
+            "--kind",
+            "grantsCarry",
+            "--party",
+            MATTHEW,
+            "--quote",
+            "commitment failure words",
+            "--valid-until",
+            &until,
+            "--project",
+            "eprfs",
+            "--ref",
+            "self/*",
+        ],
+    );
+    assert!(why.contains("stored grantsCarry clause"), "{why}");
+    let store = f.tools.path().join("store").join(format!("{SESSION}.json"));
+    let rows: Vec<Value> = serde_json::from_str(&std::fs::read_to_string(store).unwrap()).unwrap();
+    let clause = rows.last().unwrap()["cid"].as_str().unwrap();
+    assert!(why.contains(clause), "{why}");
+    assert_eq!(f.stored(), 2, "the signed clause remains stored");
+}
+
+#[test]
+fn grants_carry_orphan_is_reported_and_repaired_once() {
+    let f = Fixture::new();
+    f.stand(MATTHEW);
+    f.affirm();
+    let until = grant_until(TimeDelta::hours(1));
+    let recorded = f.json(
+        "record",
+        &[
+            "--kind",
+            "grantsCarry",
+            "--party",
+            MATTHEW,
+            "--quote",
+            "orphan repair words",
+            "--valid-until",
+            &until,
+            "--project",
+            "eprfs",
+            "--ref",
+            "self/*",
+        ],
+    );
+    let clause = recorded["cid"].as_str().unwrap();
+    std::fs::remove_file(f.root().join(".eprfs/status/flows.jsonl")).unwrap();
+
+    let out = f.flow(&[
+        "carry",
+        "verify-grant",
+        "--clause",
+        clause,
+        "--root",
+        f.root().to_str().unwrap(),
+        "--json",
+    ]);
+    assert!(!out.status.success(), "an orphan is not verified");
+    let orphan: Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(orphan["status"], "orphan");
+    assert_eq!(orphan["clause"], clause);
+    assert!(
+        !f.root().join(".eprfs/status/flows.jsonl").exists(),
+        "verify-grant must not recreate or cache the flow store"
+    );
+
+    let repaired = f.json(
+        "record",
+        &["--kind", "grantsCarry", "--commitment-for", clause],
+    );
+    assert_eq!(repaired["status"], "commitment-recorded");
+    assert_eq!(repaired["cid"], clause);
+    assert!(repaired["commitment"].as_str().is_some());
+
+    let why = f.refusal(
+        "record",
+        &["--kind", "grantsCarry", "--commitment-for", clause],
+    );
+    assert!(why.contains("already has Commitment"), "{why}");
 }
 
 // ── check ───────────────────────────────────────────────────────────────────────────────────────

@@ -36,6 +36,8 @@
 //! After the exchange the claim with the lowest commitment CID keeps it and the other carrier
 //! reads `AlreadyCarried`.
 
+pub(crate) mod grant;
+
 use std::collections::BTreeMap;
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};

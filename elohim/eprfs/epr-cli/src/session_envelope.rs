@@ -404,6 +404,32 @@ pub fn covenant_scope(id: &str) -> Result<(String, Option<Store>)> {
     Ok((scope, Some(store)))
 }
 
+/// The declared runtime of `id` in this device's persistent envelope store, live or closed.
+///
+/// Carry grants deliberately outlive the recording session. This read therefore checks durable
+/// existence and device identity without applying [`Store::require_live`], and preserves the
+/// recording runtime after berth no longer lists the ended session.
+pub(crate) fn envelope_runtime_on_this_device(id: &str) -> Result<Option<String>> {
+    if !envelope::is_envelope_id(id) {
+        return Ok(None);
+    }
+    let key_path = home()?;
+    if !key_path
+        .parent()
+        .is_some_and(|parent| parent.join("sessions").is_dir())
+    {
+        return Ok(None);
+    }
+    let device = device_key::DeviceKey::load(&key_path)
+        .map_err(err)?
+        .did_key();
+    let store = Store::shared(&key_path).map_err(err)?;
+    Ok(store
+        .read(id)
+        .map_err(err)?
+        .and_then(|record| (record.device == device).then_some(record.identity.runtime)))
+}
+
 /// Resolve once, validate that destination, and retain it for the facet writer.
 /// Existing standalone facet stores remain usable without an envelope.
 pub fn live_guard(id: Option<&str>, destination: &Path) -> Result<FacetGuard> {

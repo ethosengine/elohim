@@ -10,12 +10,16 @@
 
 use std::collections::BTreeSet;
 use std::path::{Component, Path, PathBuf};
-use std::process::{Command, ExitCode};
+use std::process::{Command, ExitCode, Output};
 
 use chrono::{DateTime, FixedOffset, Utc};
 use serde_json::{json, Map, Value};
 
 use crate::{actor, device_key, flow::memory, git};
+
+mod grant;
+
+pub(crate) use grant::{grant_clause_status, grant_is_revoked, GrantClause, GrantClauseStatus};
 
 /// Environment override naming the `brit-build-ref` binary.
 pub const BRIT_BIN_ENV: &str = "BRIT_BUILD_REF_BIN";
@@ -24,14 +28,16 @@ const AFFIRMS: &str = "affirmsStewardOfRecord";
 const PURPOSE: &str = "declaresPurpose";
 const VARIES: &str = "variesRule";
 const REVOKES: &str = "revokesClause";
-const KINDS: [&str; 4] = [AFFIRMS, PURPOSE, VARIES, REVOKES];
+const GRANTS: &str = "grantsCarry";
+const KINDS: [&str; 5] = [AFFIRMS, PURPOSE, VARIES, REVOKES, GRANTS];
 
 type CovResult<T> = Result<T, String>;
 
 pub fn usage() -> String {
     "usage: epr covenant <offer|show|check --rule ID --path P|record --kind K --party human:<h> \
      --quote Q [--purpose T --write-set GLOB…] [--rule ID --paths GLOB…] [--revokes CID] \
-     [--valid-until RFC3339]> --repo R --session S [--json]"
+     [--valid-until RFC3339] [--project NAME]… [--ref GLOB]… \
+     [--commitment-for CLAUSE-CID]> --repo R --session S [--json]"
         .into()
 }
 
@@ -52,6 +58,9 @@ struct Args {
     paths: Vec<String>,
     revokes: Option<String>,
     valid_until: Option<String>,
+    projects: Vec<String>,
+    refs: Vec<String>,
+    commitment_for: Option<String>,
     path: Option<String>,
 }
 
@@ -61,7 +70,7 @@ fn parse_args(args: &[String]) -> CovResult<Args> {
     while index < args.len() {
         let flag = args[index].as_str();
         index += 1;
-        let multi = matches!(flag, "--write-set" | "--paths");
+        let multi = matches!(flag, "--write-set" | "--paths" | "--project" | "--ref");
         if flag == "--json" {
             continue;
         }
@@ -89,6 +98,9 @@ fn parse_args(args: &[String]) -> CovResult<Args> {
             "--paths" => out.paths.extend(values),
             "--revokes" => out.revokes = Some(single()),
             "--valid-until" => out.valid_until = Some(single()),
+            "--project" => out.projects.extend(values),
+            "--ref" => out.refs.extend(values),
+            "--commitment-for" => out.commitment_for = Some(single()),
             "--path" => out.path = Some(single()),
             other => return Err(format!("unknown argument `{other}`\n{}", usage())),
         }
@@ -175,7 +187,7 @@ impl Brit {
         })
     }
 
-    fn call(&self, args: &[&str]) -> CovResult<Value> {
+    fn output(&self, args: &[&str]) -> CovResult<Output> {
         // brit runs git itself, so it gets the device's declared trust as config variables, and
         // never a hook's GIT_DIR pointing it at another repository than `--repo`.
         let mut command = Command::new(&self.bin);
@@ -187,10 +199,14 @@ impl Brit {
         for key in crate::process::GIT_LOCATION_ENV {
             command.env_remove(key);
         }
-        let output = command
+        command
             .envs(git::trust_env(&self.repo))
             .output()
-            .map_err(|e| format!("cannot run {}: {e}", self.bin.display()))?;
+            .map_err(|e| format!("cannot run {}: {e}", self.bin.display()))
+    }
+
+    fn call(&self, args: &[&str]) -> CovResult<Value> {
+        let output = self.output(args)?;
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             let first = stderr.lines().next().unwrap_or("").trim();
@@ -209,6 +225,32 @@ impl Brit {
             .map_err(|e| format!("brit-build-ref covenant output is not JSON: {e}"))
     }
 
+    fn strict_call(&self, args: &[&str]) -> CovResult<Value> {
+        let output = self.output(args)?;
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(format!(
+                "brit-build-ref covenant {} failed ({}): {}",
+                args.first().copied().unwrap_or(""),
+                output.status,
+                stderr.lines().next().unwrap_or("").trim()
+            ));
+        }
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if let Some(line) = stderr
+            .lines()
+            .find(|line| line.contains("unverifiable:") || line.contains("held:"))
+        {
+            return Err(format!(
+                "brit-build-ref covenant {} could not verify every clause: {}",
+                args.first().copied().unwrap_or(""),
+                line.trim()
+            ));
+        }
+        serde_json::from_slice(&output.stdout)
+            .map_err(|e| format!("brit-build-ref covenant output is not JSON: {e}"))
+    }
+
     fn list(&self) -> CovResult<Vec<Clause>> {
         let value = self.call(&["list", "--session", &self.session, "--output-json"])?;
         let rows = value
@@ -220,6 +262,23 @@ impl Brit {
             .collect::<CovResult<Vec<_>>>()?;
         clauses.sort_by_key(|c| c.valid_from);
         Ok(clauses)
+    }
+
+    fn list_kind(&self, kind: &str) -> CovResult<Vec<Clause>> {
+        let value = self.strict_call(&["list", "--kind", kind, "--output-json"])?;
+        let rows = value
+            .as_array()
+            .ok_or("brit-build-ref covenant list did not return an array")?;
+        let mut clauses = rows
+            .iter()
+            .map(Clause::parse)
+            .collect::<CovResult<Vec<_>>>()?;
+        clauses.sort_by_key(|clause| clause.valid_from);
+        Ok(clauses)
+    }
+
+    fn show(&self, cid: &str) -> CovResult<Clause> {
+        Clause::parse(&self.call(&["show", "--cid", cid, "--output-json"])?)
     }
 
     fn put(&self, put: &Put) -> CovResult<Value> {
@@ -261,6 +320,7 @@ struct Put {
 struct Clause {
     cid: String,
     kind: String,
+    session: String,
     party: String,
     quote: String,
     payload: Value,
@@ -291,6 +351,7 @@ impl Clause {
         Ok(Self {
             cid: text(row, "cid")?,
             kind: text(clause, "kind")?,
+            session: text(clause, "session")?,
             party: text(clause, "party")?,
             quote: text(clause, "quote")?,
             payload: clause.get("payload").cloned().unwrap_or(Value::Null),
@@ -998,6 +1059,15 @@ fn record(root: &Path, session: &str, facet_session: &str, args: &Args) -> CovRe
         .copied()
         .find(|k| *k == kind)
         .ok_or_else(|| format!("unknown --kind `{kind}`; one of {}", KINDS.join(", ")))?;
+    if kind != GRANTS && (!args.projects.is_empty() || !args.refs.is_empty()) {
+        return Err("--project and --ref are only valid with --kind grantsCarry".into());
+    }
+    if let Some(clause) = args.commitment_for.as_deref() {
+        if kind != GRANTS {
+            return Err("--commitment-for is only valid with --kind grantsCarry".into());
+        }
+        return grant::repair(root, &brit, clause);
+    }
     let party = args
         .party
         .clone()
@@ -1053,7 +1123,9 @@ fn record(root: &Path, session: &str, facet_session: &str, args: &Args) -> CovRe
                 json!({ "purpose": purpose, "writeSet": args.write_set })
             }
             VARIES => varies_payload(root, args)?,
-            _ => revokes_payload(&covenant, &party, args)?,
+            REVOKES => revokes_payload(&covenant, &party, args)?,
+            GRANTS => grant::payload(root, session, &brit, &party, &quote, args)?,
+            _ => unreachable!("the closed kind list was matched above"),
         }
     };
 
@@ -1065,6 +1137,9 @@ fn record(root: &Path, session: &str, facet_session: &str, args: &Args) -> CovRe
         valid_until: args.valid_until.clone(),
     };
     let stored = brit.put(&put)?;
+    if kind == GRANTS {
+        return grant::recorded(root, &stored);
+    }
     let cid = stored
         .get("cid")
         .cloned()

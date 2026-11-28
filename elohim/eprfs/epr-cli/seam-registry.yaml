@@ -2672,3 +2672,32 @@ decisionPoints:
   - { path: elohim/eprfs/epr-cli/tests/support/artifact_requires.rs, testName: requires_answers_unknown_unmeasured_and_self_from_the_device_key, kind: integration }
   - { path: elohim/eprfs/epr-cli/tests/support/artifact_requires.rs, testName: requires_hands_on_one_document_byte_for_byte_and_merges_several, kind: integration }
   - { path: elohim/eprfs/epr-cli/tests/support/artifact_requires.rs, testName: requires_refuses_conflicting_documents_as_a_merge_error, kind: integration }
+- name: carry_grant_audit
+  kind: pure-decision-predicate
+  sourceLocation: { file: src/flow/carry/grant.rs, modulePath: elohim_epr_cli::flow::carry::grant::audit }
+  summary: "Slice 1a's read-only carrier-grant decision: the named REA Commitment, Brit-verified grantsCarry clause, recording-session envelope and its durable claude-code runtime, current device, coverage sets, validity and absence of revocation must agree. It returns every named check and the first failure; slice 1b may consume this result but does not replace these checks."
+  concernIds:
+  - { id: C0, status: answered, justification: "Reads the existing local flow log, signed covenant notes and durable session envelope; it creates no second authority record or head." }
+  - { id: C1, status: answered, justification: "Authority is admitted only when one carry-grant@1 Commitment (its state is not read in 1a) and its words clause agree on provider, runner, projects, refs and validity." }
+  - { id: C2, status: answered, justification: "The Commitment names exactly one clause CID; projects and refs compare as sets, so append and declaration order do not elect a winner." }
+  - { id: C3, status: answered, justification: "The pure audit is a fixed pass over one Commitment and clause; source acquisition is device-local and bounded by those finite stores." }
+  - { id: C4, status: answered, justification: "Absent, unverifiable and unavailable clauses remain distinct inputs; every check has a result and the text form names the first failure." }
+  - { id: C5, status: answered, justification: "Brit verifies the signed clause; the audit independently re-derives every duplicated Commitment field and the current device identity." }
+  - { id: C6a, status: answered, justification: "Seventeen fixed checks plus linear set construction over the one grant's project and ref slots." }
+  - { id: C6b, status: answered, justification: "The audit is pure and verify-grant decodes the flow log bytes directly; it opens no writer, advances no cache, voids nothing and emits no measure or feedback." }
+  - { id: C7, status: n-a, justification: "No route, service advertisement or availability claim." }
+  - { id: C8, status: answered, justification: "JSON reports every named check with passed and detail; plain output is verified, orphan, or the first failing check." }
+  - { id: C9, status: answered, justification: "Provider must equal the signed party; clause, Commitment and current device must name the same runner; the recording session must have this device's envelope." }
+  - { id: C10, status: answered, justification: "The exact carry-grant@1, runner:, project:, ref: and words: spellings plus Brit's closed grantsCarry kind are checked explicitly." }
+  - { id: C11, status: n-a, justification: "One device-local command; it sends no traffic and enqueues no work." }
+  - { id: C12, status: answered, justification: "The decision reveals the local grant only to its local caller and grants no disclosure or custody authority." }
+  - { id: C13, status: partial, justification: "This is the ruled interim same-device covenant authority; portal consent remains the named successor station and is not claimed here." }
+  - { id: C14, status: partial, justification: "Structured failures preserve all check details for slice 1b, but slice 1a deliberately writes no witnessed void, observation or feedback." }
+  contractTests:
+  - { path: elohim/eprfs/epr-cli/src/flow/carry/grant/tests.rs, testName: verify_grant_accepts_a_fully_consistent_grant, kind: unit }
+  - { path: elohim/eprfs/epr-cli/src/flow/carry/grant/tests.rs, testName: verify_grant_checks_commitment_exists, kind: unit }
+  - { path: elohim/eprfs/epr-cli/src/flow/carry/grant/tests.rs, testName: verify_grant_checks_clause_verifies, kind: unit }
+  - { path: elohim/eprfs/epr-cli/src/flow/carry/grant/tests.rs, testName: verify_grant_checks_claude_code_mooring, kind: unit }
+  - { path: elohim/eprfs/epr-cli/src/flow/carry/grant/tests.rs, testName: verify_grant_checks_twenty_four_hour_window, kind: unit }
+  - { path: elohim/eprfs/epr-cli/src/flow/carry/grant/tests.rs, testName: verify_grant_checks_revocation, kind: unit }
+  - { path: elohim/eprfs/epr-cli/tests/covenant.rs, testName: grants_carry_orphan_is_reported_and_repaired_once, kind: integration }

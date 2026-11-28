@@ -1561,6 +1561,19 @@ fn presence(root: &Path, probes: &Probes) -> Result<BerthStatus, String> {
         .map_err(|error| format!("berth status --json printed no answer in its contract ({error})"))
 }
 
+/// The runtime of one live local mooring, read through berth's read-only status contract.
+///
+/// `Ok(None)` means the status was readable but did not list the session. A caller deciding
+/// authority can therefore distinguish absence from an unavailable presence read and fail closed.
+pub(crate) fn local_session_runtime(root: &Path, session: &str) -> Result<Option<String>, String> {
+    let status = presence(root, &Probes::default())?;
+    Ok(status
+        .moorings
+        .iter()
+        .find(|mooring| mooring.session == session)
+        .and_then(|mooring| mooring.runtime.clone()))
+}
+
 /// One Presence item per live session whose declared writes meet the scope directory.
 fn presence_items(status: &BerthStatus, scope: &Scoper, base: &ItemBase) -> Vec<Item> {
     let local = status.moorings.iter().map(|m| {

@@ -133,10 +133,10 @@ fn flag_hint(word: &str, own: &[&str]) -> String {
 }
 
 /// Every flow subcommand, as a person types it.
-const SUBCOMMANDS: [&str; 22] = [
+const SUBCOMMANDS: [&str; 23] = [
     "project", "walk", "status", "seal", "reseal", "hold", "claim", "context", "ledger", "fulfill",
     "intend", "note", "enrich", "report", "stocks", "concerns", "memory", "cites", "retract",
-    "sense", "habit", "reading",
+    "sense", "habit", "reading", "carry",
 ];
 
 /// Entry point invoked by `main` for `epr flow …`.
@@ -262,6 +262,7 @@ pub fn run(args: &[String]) -> FlowResult<ExitCode> {
         "hold" => run_hold(&args[1..]),
         "claim" => run_claim(&args[1..]),
         "intend" => run_intend(&args[1..]),
+        "carry" => run_carry(&args[1..]),
         "context" => run_context(&args[1..]),
         "ledger" => run_ledger(&args[1..]),
         "fulfill" => run_fulfill(&args[1..]),
@@ -676,6 +677,39 @@ fn run_claim(args: &[String]) -> FlowResult<ExitCode> {
         outcome.render();
     }
     Ok(ExitCode::SUCCESS)
+}
+
+/// `epr flow carry verify-grant` — read the complete local grant audit without side effects.
+fn run_carry(args: &[String]) -> FlowResult<ExitCode> {
+    if args.first().map(String::as_str) != Some("verify-grant") {
+        return Err(FlowError::InvalidArguments(
+            "usage: epr flow carry verify-grant <commitment-cid> [--json] [--root DIR]\n       epr flow carry verify-grant --clause <clause-cid> [--json] [--root DIR]"
+                .into(),
+        ));
+    }
+    let (opts, rest) = parse_global(&args[1..])?;
+    let target = if rest.first().map(String::as_str) == Some("--clause") {
+        if rest.len() != 2 {
+            return Err(FlowError::InvalidArguments(
+                "verify-grant --clause needs exactly one clause CID".into(),
+            ));
+        }
+        carry::grant::VerifyTarget::Clause(&rest[1])
+    } else {
+        if rest.len() != 1 || rest[0].starts_with("--") {
+            return Err(FlowError::InvalidArguments(
+                "verify-grant needs one Commitment CID or --clause <clause-cid>".into(),
+            ));
+        }
+        carry::grant::VerifyTarget::Commitment(&rest[0])
+    };
+    let result = carry::grant::verify_grant(&opts.root, target)?;
+    if opts.json {
+        println!("{}", serde_json::to_string_pretty(&result)?);
+    } else {
+        result.render();
+    }
+    Ok(result.exit_code())
 }
 
 /// `epr flow intend` — author one landing-queue act.
@@ -2529,6 +2563,10 @@ fn usage() -> String {
      | ledger <path|cid> [--json] [--root DIR] \
      (the FORWARD read — claims, fulfilments and notes oldest first, rendered as markdown a \
      status section is pasted from rather than retyped)\n  \
+     | carry verify-grant <commitment-cid> [--json] [--root DIR]\n  \
+     | carry verify-grant --clause <clause-cid> [--json] [--root DIR] \
+     (read-only: audits the local Commitment, signed covenant clause, session envelope and \
+     runtime, device, coverage, validity and revocation; writes no measure, feedback or void)\n  \
      | claim --on <intent-cid|gap-id|path> [--as agent:<role>@<model>] [--brief <path>] \
      [--serves <habit-id|gitlink-path#habit-id>] [--session <id>] [--supersede] [--json] [--root DIR] \
      (--serves checks the local declaration or the explicitly named committed gitlink's pinned \
