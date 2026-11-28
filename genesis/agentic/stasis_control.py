@@ -67,7 +67,11 @@ def bounded(argv, *, cwd, timeout, payload=None, env=None):
             os.killpg(process.pid, signal.SIGKILL)
         except ProcessLookupError:
             pass
-        process.communicate()
+        try:
+            # Bounded: a grandchild that left the group could hold a pipe open past the hook's limit.
+            process.communicate(timeout=0.5)
+        except subprocess.TimeoutExpired:
+            pass
 
 
 def native(repo, args, payload=None, timeout=2):

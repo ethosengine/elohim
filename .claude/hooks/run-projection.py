@@ -190,8 +190,11 @@ def _breaker_skip(root: Path, now: float) -> str | None:
     if state is None:
         return None
     try:
-        retry_at = float(state["overrunAtEpoch"]) + float(state["backoffSeconds"])
-        if now >= retry_at:
+        overrun_at = float(state["overrunAtEpoch"])
+        retry_at = overrun_at + float(state["backoffSeconds"])
+        # A wall clock set back before the overrun would hold the breaker open for as long as the
+        # jump: read that as expired, and make the call.
+        if now >= retry_at or now < overrun_at:
             return None
         retry = datetime.fromtimestamp(retry_at, timezone.utc).isoformat().replace("+00:00", "Z")
         return ("bootstrap: skipped — breaker open after overrun at "

@@ -88,6 +88,15 @@ class RunProjectionBreakerTest(unittest.TestCase):
         popen.assert_called_once()
         self.assertEqual(lines, ["one", "two"])
 
+    def test_a_wall_clock_set_back_before_the_overrun_does_not_hold_the_breaker_open(self):
+        self.project(Process(timeout=True))
+        state = json.loads(self.breaker.read_text())
+        state["overrunAtEpoch"] += 3600  # the clock now reads an hour before the overrun
+        self.breaker.write_text(json.dumps(state))
+        lines, popen = self.project(Process(stdout="one\n"))
+        popen.assert_called_once()
+        self.assertEqual(lines, ["one"])
+
     def test_consecutive_overrun_doubles_backoff(self):
         self.project(Process(timeout=True))
         state = json.loads(self.breaker.read_text())
