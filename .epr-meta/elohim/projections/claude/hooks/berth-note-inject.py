@@ -36,7 +36,7 @@ output there is lost.
 berth is asked at most once per POLL_S unless a backlog or a busy reader
 is waiting; every child runs under a deadline, its output capped. Fail-open: a missing, slow or broken
 berth is silence, and no error ever reaches the tool call. An idle agent has no tool call: its
-Monitor form is `berth inbox --session <S> --reader main --follow`.
+background wake is `berth inbox --session <S> --reader main --wait`; re-arm it after each wake.
 """
 import hashlib
 import json
@@ -308,7 +308,7 @@ def deliver(session, reader, emit, now=None, started=None, transcripts=None):
     if more:
         tail.append("[berth-note] More addressed notes are waiting; the next arrive at your next tool call.")
     tail.append(f"[berth-note] Read them all: `berth inbox --session {session}`; to be woken while idle, "
-                f"arm Monitor on `berth inbox --session {session} --reader {reader} --follow`.")
+                f"run `berth inbox --session {session} --reader {reader} --wait` as a background command and re-arm it after each wake.")
     repeat = []
     if unreceipted >= 1:
         repeat.append(f"[berth-note] Shown again (repeat {unreceipted}): the earlier delivery was not "

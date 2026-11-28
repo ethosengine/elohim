@@ -274,7 +274,7 @@ class DeclaredWrites(unittest.TestCase):
             with self.subTest(failure=failure), mock.patch.object(subprocess, "run", side_effect=run), \
                     mock.patch.dict(function.__globals__, {"owner_pid": lambda: 123}):
                 out = function(session)
-            monitor = f"berth inbox --session {session} --reader main --follow"
+            monitor = f"berth inbox --session {session} --reader main --wait"
             declare = f"berth moor --session {session} --writes <globs> --task <text>"
             if failure is None:
                 self.assertIn(monitor, out)
@@ -2129,6 +2129,38 @@ class BerthInboxTest(unittest.TestCase):
         # Nothing to hand out writes nothing.
         self.berth.reader_claim(self.SESSION, "main")
         self.assertEqual(len(open(path).readlines()), 2)
+
+    def test_wait_says_once_on_stderr_when_its_session_is_not_moored_here(self):
+        out, err = io.StringIO(), io.StringIO()
+
+        def sleep(_s):
+            self.append(self.folded("u-1", 1001, to="unmoored-session", text="late"))
+
+        self.berth.sleep = sleep
+        main = _NS["main"]
+        with mock.patch.dict(main.__globals__, {"Berth": lambda: self.berth}), \
+                contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            rc = main(["berth", "inbox", "--session", "unmoored-session", "--reader", "mon", "--wait"])
+        self.assertEqual(rc, 0)
+        self.assertEqual(err.getvalue().count("is not moored on this device"), 1, err.getvalue())
+        self.assertIn("«late»", out.getvalue())
+
+    def test_the_claims_log_keeps_an_assignment_name_and_drops_its_value(self):
+        self.append(self.folded("r-1", 1001, to=self.SESSION, text="one"))
+        cmdline = b"env\0GH_TOKEN=ghp_secretvalue\0berth\0inbox\0"
+        real_open = open
+
+        def fake_open(path, *a, **k):
+            if isinstance(path, str) and path.startswith("/proc/") and path.endswith("/cmdline"):
+                return io.BytesIO(cmdline)
+            return real_open(path, *a, **k)
+
+        with mock.patch("builtins.open", fake_open):
+            self.berth.reader_claim(self.SESSION, "main")
+        path = os.path.join(self.berth._inbox_dir(), "readers", "claims.log")
+        line = json.loads(real_open(path).read().splitlines()[-1])
+        self.assertIn("GH_TOKEN=…", line["parent"])
+        self.assertNotIn("ghp_secretvalue", line["parent"])
 
     def test_wait_is_refused_without_a_reader_or_beside_another_mode(self):
         self.append(self.folded("guard", 1001, to=self.SESSION))
