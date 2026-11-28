@@ -483,7 +483,7 @@ test('rule mutations are killed by scripted lives', () => {
     ['r1-kept-replaces-covered', "if (e.record === 'kept')", "if (e.record === 'kept' && u.records.some(r => r.kind === 'covered' && r.session === u.session)) u.records.splice(u.records.findIndex(r => r.kind === 'covered' && r.session === u.session), 1); if (e.record === 'kept')",
       ['same-session-covered-then-kept']],
     ['r1-kept-dropped-after-compaction', "if (e.record === 'kept')", "if (e.record === 'kept' && coveredBefore && !u.records.some(r => r.kind === 'covered' && r.session === u.session)) return u; else if (e.record === 'kept')",
-      ['kept-failure-in-an-already-compacted-session']],
+      ['witness-r1-kept-dropped-after-compaction-under-the-default']],
     ['decision10-machine-closes-ordinary-lives', 'const KEPT_REPORT_HOLDS_A_CLAIM_OPEN = true;',
       'const KEPT_REPORT_HOLDS_A_CLAIM_OPEN = false;',
       ['c-false-retired', 'reviewer-B5-kept-during-watch-from-head', 'reviewer-C1-kept-reopen-during-watch-then-watch-met']],
@@ -499,7 +499,7 @@ test('rule mutations are killed by scripted lives', () => {
     ['b', 'last.afterHead && last.at > u.landed', 'true'],
     ['c', 'u.known && u.horizon && !present(u)', 'u.known && u.horizon'],
     ['d', "u.records.filter(r => r.kind === 'covered').map", 'u.records.map'],
-    ['e', "!(reading === 'on-watch' && e.ruling)", '!e.ruling'],
+    ['e', "!(reading === 'on-watch' && e.ruling)", '!e.ruling', ['witness-e-under-the-default']],
     ['f-current-cure-only', 'recurrence.some(({ c }) => c.id === u.current)', 'recurrence.length > 0'],
     ['h-head-bound', 'u.declaration = e.entries.filter(([release]) => compareRelease(release, e.release) <= 0).map',
       'u.declaration = (e.entries.length ? e.entries.filter(([release]) => compareRelease(release, e.release) <= 0) : u.declaration.map(c => [c.release, c.state])).map'],
@@ -518,7 +518,7 @@ test('rule mutations are killed by scripted lives', () => {
       ['reviewer5-U3-named-after-compaction-with-kept-if-decision-10-lets-the-machine-close']],
   ];
   const expectedKinds = Object.fromEntries(mutations.map(([name]) => [name, 'reading']));
-  for (const name of ['r1-commit-adds-record', 'r1-kept-replaces-covered', 'r1-kept-dropped-after-compaction', 'd', 'e']) expectedKinds[name] = 'stock check';
+  for (const name of ['r1-commit-adds-record', 'r1-kept-replaces-covered', 'd']) expectedKinds[name] = 'stock check';
   for (const name of ['decision10-n-commit-only-kept-throws', 'commit-compacted-with-person-throws']) expectedKinds[name] = 'throw';
   for (const [name, from, to, required = []] of mutations) {
     assert.ok(model.includes(from), `mutation ${name}: missing target`);
@@ -542,15 +542,16 @@ test('rule mutations are killed by scripted lives', () => {
       return hits;
     });
     assert.ok(killed.length, `mutation ${name} survived`);
-    const retained = { 'r1-second-failure-adds-record': 'mutation-g-one-record-per-session', 'r1-two-kept-collapse': 'two-kept-reports-in-one-session', 'd4-condition-also-counted-against': 'release-cure-qualifies-before-the-condition-if-decision-10-lets-the-machine-close' };
+    const retained = { 'r1-kept-dropped-after-compaction': 'kept-failure-in-an-already-compacted-session', 'e': 'mutation-e-ruling-on-open', 'r1-second-failure-adds-record': 'mutation-g-one-record-per-session', 'r1-two-kept-collapse': 'two-kept-reports-in-one-session', 'd4-condition-also-counted-against': 'release-cure-qualifies-before-the-condition-if-decision-10-lets-the-machine-close' };
     if (retained[name]) assert.ok(killed.some(k => k.life === retained[name]), `mutation ${name}: original witness survived`);
+    if (['e', 'r1-kept-dropped-after-compaction'].includes(name)) assert.ok(killed.some(k => k.life === retained[name] && k.kind === 'stock check'), `mutation ${name}: original stock check survived`);
     const kind = expectedKinds[name];
     assert.ok(kind, `mutation ${name}: expected kill kind missing`);
     const witnesses = required.length ? required : [killed.find(k => k.kind === kind)?.life];
     for (const life of witnesses) {
       const hit = killed.find(k => k.life === life && k.kind === kind);
       assert.ok(hit, `mutation ${name} must die by ${kind} in ${life}`);
-      if (life.startsWith('reviewer5-default-')) assert.equal(lives.find(l => l.name === life).decision10, undefined);
+      if (life.startsWith('reviewer5-default-') || life.startsWith('witness-')) assert.equal(lives.find(l => l.name === life).decision10, undefined);
       console.log(`${name}: ${hit.kind} killed by ${hit.life} step ${hit.step}`);
     }
   }

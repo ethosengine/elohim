@@ -11193,5 +11193,361 @@
         "rule": "R1, R4, R6, R10, R12–R18: Named occurrences, recurrence precedence and the declared kept-record posture."
       }
     ]
+  },
+  {
+    "name": "reviewer6-W1-condition-reopening-cured-by-a-release-then-withdrawn",
+    "about": "R4, R10, R18: reopening, another cure and its counter-evidence; both constant values give the same projections.",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R10, R16"
+      },
+      {
+        "event": {
+          "type": "condition",
+          "name": "path",
+          "holds": true
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R4, R10, R12, R13"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R5, R7, R8, R13"
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered"
+        },
+        "reading": "reopened",
+        "state": "reopened",
+        "rule": "R1, R10, R16"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R4, R10, R12, R18"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 2,
+          "entries": [
+            [
+              1,
+              "cured"
+            ],
+            [
+              2,
+              "withdrawn"
+            ]
+          ]
+        },
+        "reading": "reopened",
+        "state": "reopened",
+        "rule": "R4, R10, R12, R18"
+      }
+    ]
+  },
+  {
+    "name": "reviewer6-W2-two-condition-cures-counted-against",
+    "about": "R4, R10, R18: reopening, another cure and its counter-evidence; both constant values give the same projections.",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R10, R16"
+      },
+      {
+        "event": {
+          "type": "condition",
+          "name": "path",
+          "holds": true
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R4, R10, R12, R13"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R5, R7, R8, R13"
+      },
+      {
+        "event": {
+          "type": "condition",
+          "name": "path",
+          "holds": false
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R4, R10, R12, R13"
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered"
+        },
+        "reading": "reopened",
+        "state": "reopened",
+        "rule": "R1, R10, R16"
+      },
+      {
+        "event": {
+          "type": "condition",
+          "name": "path",
+          "holds": true
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R4, R10, R12, R13"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R5, R7, R8, R13"
+      },
+      {
+        "event": {
+          "type": "condition",
+          "name": "path",
+          "holds": false
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R4, R10, R12, R13"
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered"
+        },
+        "reading": "reopened",
+        "state": "reopened",
+        "rule": "R1, R10, R16"
+      },
+      {
+        "event": {
+          "type": "condition",
+          "name": "path",
+          "holds": true
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R4, R10, R12, R13"
+      }
+    ]
+  },
+  {
+    "name": "reviewer6-W3-release-reopening-cured-again-then-withdrawn",
+    "about": "R4, R10, R18: reopening, another cure and its counter-evidence; both constant values give the same projections.",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R10, R16"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R4, R10, R12, R18"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R5, R7, R8, R13"
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 1,
+          "participant": "p",
+          "record": "covered"
+        },
+        "reading": "reopened",
+        "state": "reopened",
+        "rule": "R1, R10, R16"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 2,
+          "entries": [
+            [
+              1,
+              "cured"
+            ],
+            [
+              2,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R4, R10, R12, R18"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 3,
+          "entries": [
+            [
+              1,
+              "cured"
+            ],
+            [
+              2,
+              "cured"
+            ],
+            [
+              3,
+              "withdrawn"
+            ]
+          ]
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R4, R10, R12, R18"
+      }
+    ]
+  },
+  {
+    "name": "witness-r1-kept-dropped-after-compaction-under-the-default",
+    "about": "R1, R7, R8: default reading witness for r1-kept-dropped-after-compaction.",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R10, R16"
+      },
+      {
+        "event": {
+          "type": "release",
+          "release": 1,
+          "entries": [
+            [
+              1,
+              "cured"
+            ]
+          ]
+        },
+        "reading": "cure-available",
+        "state": "open",
+        "rule": "R4, R10, R12, R18"
+      },
+      {
+        "event": {
+          "type": "retire"
+        },
+        "reading": "on-watch",
+        "state": "cured",
+        "rule": "R5, R7, R8, R13"
+      },
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "kept",
+          "newSession": false
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R10, R16"
+      }
+    ]
+  },
+  {
+    "name": "witness-e-under-the-default",
+    "about": "R1, R7, R8: default reading witness for e.",
+    "steps": [
+      {
+        "event": {
+          "type": "fail",
+          "release": 0,
+          "participant": "p",
+          "record": "covered"
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R1, R10, R16"
+      },
+      {
+        "event": {
+          "type": "retire",
+          "ruling": true
+        },
+        "reading": "open",
+        "state": "open",
+        "rule": "R5, R7, R8, R13"
+      }
+    ]
   }
 ]
