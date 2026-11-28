@@ -914,10 +914,16 @@ struct SpoolReading {
     dir: PathBuf,
     /// Each valid gap note's `(at, cause)`, oldest first.
     gaps: Vec<(String, String)>,
-    /// `*.json` files that could not be read as gap notes.
+    /// Unreadable `*.json` notes and other entries, excluding the writer's temporary files.
     invalid: usize,
     /// The read stopped at the spool bound; more notes wait.
     bounded: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum SpoolError {
+    NoDirectory,
+    Unreadable(String),
 }
 
 /// What the status reads about the feedback recorder: whether a feedback policy stands above the
@@ -930,7 +936,7 @@ enum FeedbackRecorderFact {
     /// A policy stands at `root`; `spool` is what the spool holds, or why it could not be read.
     Spool {
         root: PathBuf,
-        spool: std::result::Result<SpoolReading, String>,
+        spool: std::result::Result<SpoolReading, SpoolError>,
     },
 }
 
@@ -947,7 +953,7 @@ fn feedback_recorder_fact(
         return FeedbackRecorderFact::NoPolicy;
     };
     let spool = match crate::feedback::spool::dir(env) {
-        None => Err("no state directory (XDG_STATE_HOME and HOME are unset)".to_owned()),
+        None => Err(SpoolError::NoDirectory),
         Some(dir) => crate::feedback::spool::scan(&dir)
             .map(|scan| SpoolReading {
                 gaps: scan
@@ -955,11 +961,11 @@ fn feedback_recorder_fact(
                     .into_iter()
                     .map(|gap| (gap.at, gap.cause))
                     .collect(),
-                invalid: scan.skipped,
+                invalid: scan.skipped + scan.other,
                 bounded: scan.bounded,
                 dir,
             })
-            .map_err(|error| error.kind().to_string()),
+            .map_err(|error| SpoolError::Unreadable(error.kind().to_string())),
     };
     FeedbackRecorderFact::Spool {
         root: policy_root.to_path_buf(),
@@ -981,7 +987,18 @@ fn feedback_recorder_check(fact: &FeedbackRecorderFact) -> Check {
             )
         }
         FeedbackRecorderFact::Spool {
-            spool: Err(kind), ..
+            spool: Err(SpoolError::NoDirectory),
+            ..
+        } => {
+            return check(
+                State::Degraded,
+                "no spool directory: neither XDG_STATE_HOME nor HOME is an absolute path".into(),
+                Some("set XDG_STATE_HOME or HOME to an absolute path".into()),
+            )
+        }
+        FeedbackRecorderFact::Spool {
+            spool: Err(SpoolError::Unreadable(kind)),
+            ..
         } => {
             return check(
                 State::Degraded,
@@ -1024,10 +1041,10 @@ fn feedback_recorder_check(fact: &FeedbackRecorderFact) -> Check {
             Some(unreadable) => check(
                 State::Degraded,
                 unreadable,
-                Some(format!(
-                    "inspect or remove the files in {}",
-                    reading.dir.display()
-                )),
+                Some(match shell_word(&reading.dir) {
+                    Some(_) => format!("inspect or remove the files in {}", reading.dir.display()),
+                    None => "inspect or remove the files in the spool directory".into(),
+                }),
             ),
         };
     };
@@ -1052,25 +1069,30 @@ fn feedback_recorder_check(fact: &FeedbackRecorderFact) -> Check {
     check(
         State::Degraded,
         detail,
-        Some(format!(
-            "epr feedback drain-spool --root {}",
-            shell_word(&root.display().to_string())
-        )),
+        Some(match shell_word(root) {
+            Some(word) => format!("epr feedback drain-spool --root {word}"),
+            None => "run epr feedback drain-spool from the repository root (its path cannot be printed safely)".into(),
+        }),
     )
 }
 
 /// A path as one word of a POSIX shell command, so a printed cure can be pasted: bare when
 /// every byte is plain, otherwise in single quotes with an embedded quote written `'\''`.
-fn shell_word(text: &str) -> String {
+/// Non-UTF-8 paths and control characters cannot be printed safely.
+fn shell_word(path: &Path) -> Option<String> {
+    let text = path.to_str()?;
+    if text.chars().any(char::is_control) {
+        return None;
+    }
     let plain = !text.is_empty()
         && text
             .bytes()
             .all(|b| b.is_ascii_alphanumeric() || b"_./-+:=@%,".contains(&b));
-    if plain {
+    Some(if plain {
         text.to_owned()
     } else {
         format!("'{}'", text.replace('\'', "'\\''"))
-    }
+    })
 }
 
 #[path = "arrival_sysroot.rs"]
@@ -3830,9 +3852,23 @@ mod tests {
             Some("epr feedback drain-spool --root /repo")
         );
 
+        let absent = feedback_recorder_check(&FeedbackRecorderFact::Spool {
+            root: root.clone(),
+            spool: Err(SpoolError::NoDirectory),
+        });
+        assert_eq!(absent.state, State::Degraded);
+        assert_eq!(
+            absent.detail,
+            "no spool directory: neither XDG_STATE_HOME nor HOME is an absolute path"
+        );
+        assert_eq!(
+            absent.cure.as_deref(),
+            Some("set XDG_STATE_HOME or HOME to an absolute path")
+        );
+
         let unreadable = feedback_recorder_check(&FeedbackRecorderFact::Spool {
             root,
-            spool: Err("permission denied".into()),
+            spool: Err(SpoolError::Unreadable("permission denied".into())),
         });
         assert_eq!(unreadable.state, State::Degraded);
         assert_eq!(unreadable.detail, "spool unreadable: permission denied");
@@ -3892,13 +3928,66 @@ mod tests {
             reading(vec![("2026-11-27T10:00:00Z".into(), "timeout".into())], 2)
         );
         assert_eq!(fs::read(spool.join("note.txt")).unwrap(), b"untouched");
+        let relative_home =
+            |name: &str| (name == "HOME").then(|| std::ffi::OsString::from("relative/home"));
+        assert_eq!(
+            feedback_recorder_fact(&nested, &relative_home),
+            FeedbackRecorderFact::Spool {
+                root: temp.path().join("repo"),
+                spool: Err(SpoolError::NoDirectory),
+            }
+        );
     }
 
     #[test]
     fn a_cure_root_with_a_space_or_a_quote_is_one_shell_word() {
-        assert_eq!(shell_word("/repo"), "/repo");
-        assert_eq!(shell_word("/my repo"), "'/my repo'");
-        assert_eq!(shell_word("/it's"), "'/it'\\''s'");
-        assert_eq!(shell_word(""), "''");
+        assert_eq!(shell_word(Path::new("/repo")).as_deref(), Some("/repo"));
+        assert_eq!(
+            shell_word(Path::new("/my repo")).as_deref(),
+            Some("'/my repo'")
+        );
+        assert_eq!(
+            shell_word(Path::new("/it's")).as_deref(),
+            Some("'/it'\\''s'")
+        );
+        assert_eq!(shell_word(Path::new("")).as_deref(), Some("''"));
+        assert_eq!(shell_word(Path::new("/r\n")), None);
+        assert_eq!(shell_word(Path::new("/r\x1b")), None);
+        use std::os::unix::ffi::OsStrExt;
+        assert_eq!(
+            shell_word(Path::new(std::ffi::OsStr::from_bytes(b"/r\xff"))),
+            None
+        );
+    }
+
+    #[test]
+    fn feedback_recorder_cures_do_not_print_unsafe_paths() {
+        use std::os::unix::ffi::OsStrExt;
+        for path in [
+            Path::new("/r\n"),
+            Path::new("/r\x1b"),
+            Path::new(std::ffi::OsStr::from_bytes(b"/r\xff")),
+        ] {
+            for gaps in [
+                vec![],
+                vec![("2026-11-27T10:00:00Z".into(), "timeout".into())],
+            ] {
+                let expected = if gaps.is_empty() {
+                    "inspect or remove the files in the spool directory"
+                } else {
+                    "run epr feedback drain-spool from the repository root (its path cannot be printed safely)"
+                };
+                let check = feedback_recorder_check(&FeedbackRecorderFact::Spool {
+                    root: path.to_path_buf(),
+                    spool: Ok(SpoolReading {
+                        dir: path.to_path_buf(),
+                        gaps,
+                        invalid: 1,
+                        bounded: false,
+                    }),
+                });
+                assert_eq!(check.cure.as_deref(), Some(expected));
+            }
+        }
     }
 }

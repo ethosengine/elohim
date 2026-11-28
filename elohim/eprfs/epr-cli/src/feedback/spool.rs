@@ -53,11 +53,12 @@ pub(crate) struct Gap {
 }
 
 /// What a read of the spool found: valid gaps, oldest first (by `at`, then file name), the
-/// count of entries left in place as unreadable notes, and whether more than [`BATCH`] waited.
+/// counts of unreadable notes and other entries, and whether more than [`BATCH`] notes waited.
 #[derive(Debug, Default)]
 pub(crate) struct Scan {
     pub(crate) gaps: Vec<Gap>,
     pub(crate) skipped: usize,
+    pub(crate) other: usize,
     pub(crate) bounded: bool,
 }
 
@@ -95,7 +96,7 @@ pub(crate) fn scan(dir: &Path) -> std::io::Result<Scan> {
             continue;
         }
         if path.extension().and_then(|e| e.to_str()) != Some("json") {
-            scan.skipped += 1;
+            scan.other += 1;
             continue;
         }
         if read == BATCH {
@@ -212,7 +213,8 @@ pub(crate) fn occurrence(gap: &Gap) -> Occurrence {
 }
 
 /// Append each valid gap and remove its file. A store refusal stops the drain with that error
-/// and leaves the file in place; a replaced or unremovable file is kept and counted skipped.
+/// and leaves the file in place. `skipped` counts unreadable notes and replaced or unremovable
+/// files; `unremoved` lists each removal error with the note's path and the error's text.
 pub(crate) fn drain(store: &FeedbackStore, dir: &Path) -> Result<Value> {
     drain_with_remove(store, dir, remove_if_unchanged)
 }
@@ -226,19 +228,28 @@ fn drain_with_remove(
         scan(dir).map_err(|error| format!("spool unreadable: {}: {error}", dir.display()))?;
     let mut drained = 0;
     let mut skipped = scan.skipped;
+    let mut unremoved = Vec::new();
     for gap in &scan.gaps {
         store
             .append(Feedback::Occurrence(occurrence(gap)), false)
             .map_err(|error| format!("{}: {error}", gap.path.display()))?;
         // A removal failure is safe to retry: occurrence makes equal records for equal
         // notes, so the next drain returns the held address without recording it twice.
-        if matches!(remove(gap), Ok(true)) {
-            drained += 1;
-        } else {
-            skipped += 1;
+        match remove(gap) {
+            Ok(true) => drained += 1,
+            Ok(false) => skipped += 1,
+            Err(error) => {
+                skipped += 1;
+                // A path is printed as text: one that is not UTF-8 cannot be a JSON string.
+                unremoved.push(json!({"path": gap.path.display().to_string(),
+                    "error": error.to_string()}));
+            }
         }
     }
-    Ok(json!({"drained": drained, "skipped": skipped, "read": scan.read(), "dir": dir}))
+    Ok(
+        json!({"drained": drained, "skipped": skipped, "other": scan.other,
+        "unremoved": unremoved, "read": scan.read(), "dir": dir.display().to_string()}),
+    )
 }
 
 #[cfg(test)]
@@ -283,8 +294,9 @@ mod tests {
         }
         let found = scan(temp.path()).unwrap();
         assert!(found.gaps.is_empty());
-        assert_eq!(found.skipped, 2);
-        assert_eq!(found.read(), json!(2));
+        assert_eq!(found.skipped, 0);
+        assert_eq!(found.other, 2);
+        assert_eq!(found.read(), json!(0));
         for name in ["note.txt", "unknown", ".tmpAb12Cd"] {
             assert_eq!(std::fs::read(temp.path().join(name)).unwrap(), b"untouched");
         }
@@ -319,6 +331,11 @@ mod tests {
         .unwrap();
         assert_eq!(first["drained"], 1);
         assert_eq!(first["skipped"], 1);
+        assert_eq!(
+            first["unremoved"],
+            json!([{"path": spool.join("old.json"), "error":
+                std::io::Error::from(std::io::ErrorKind::PermissionDenied).to_string()}])
+        );
         assert!(spool.join("old.json").exists());
         assert!(!spool.join("new.json").exists());
         let held: Vec<_> = store
@@ -331,6 +348,7 @@ mod tests {
         let second = drain(&store, &spool).unwrap();
         assert_eq!(second["drained"], 1);
         assert_eq!(second["skipped"], 0);
+        assert_eq!(second["unremoved"], json!([]));
         let reread: Vec<_> = store
             .read()
             .unwrap()
@@ -339,6 +357,38 @@ mod tests {
             .collect();
         assert_eq!(reread, held);
         assert!(!spool.join("old.json").exists());
+    }
+
+    #[test]
+    fn a_spool_path_that_is_not_utf8_is_reported_as_text() {
+        use std::os::unix::ffi::OsStrExt;
+        let temp = tempfile::tempdir().unwrap();
+        let spool = temp.path().join(std::ffi::OsStr::from_bytes(b"sp\xffool"));
+        std::fs::create_dir(&spool).unwrap();
+        std::fs::write(
+            spool.join("note.json"),
+            gap("2026-11-27T09:00:00Z", &"a".repeat(64)),
+        )
+        .unwrap();
+        let policy = serde_json::from_value(json!({
+            "id":"fixture@1", "authority":"human:fixture", "producers":["brit"],
+            "automaticCapture":true, "deliberateEvidence":true,
+            "maxBytes":1000000, "maxRecordBytes":65536,
+            "response":"report", "sharing":"separately-authorized"
+        }))
+        .unwrap();
+        let store = FeedbackStore::new(temp.path(), policy).unwrap();
+        // A path that is not UTF-8 cannot be a JSON string as it stands; the report prints it.
+        let report = drain_with_remove(&store, &spool, |_| {
+            Err(std::io::Error::from(std::io::ErrorKind::PermissionDenied))
+        })
+        .unwrap();
+        assert_eq!(report["drained"], 0);
+        assert_eq!(report["dir"], json!(spool.display().to_string()));
+        assert_eq!(
+            report["unremoved"][0]["path"],
+            json!(spool.join("note.json").display().to_string())
+        );
     }
 
     #[test]
@@ -438,6 +488,24 @@ mod tests {
     }
 
     #[test]
+    fn other_entries_do_not_count_toward_the_note_batch() {
+        let temp = tempfile::tempdir().unwrap();
+        for n in 0..300 {
+            std::fs::write(temp.path().join(format!("n{n:03}.txt")), b"other").unwrap();
+        }
+        std::fs::write(
+            temp.path().join("note.json"),
+            gap("2026-11-27T10:00:00Z", &"a".repeat(64)),
+        )
+        .unwrap();
+        let found = scan(temp.path()).unwrap();
+        assert_eq!(found.other, 300);
+        assert_eq!(found.skipped, 0);
+        assert!(!found.bounded);
+        assert_eq!(found.read(), json!(1));
+    }
+
+    #[test]
     fn scan_orders_by_time_then_name_and_counts_the_invalid() {
         let temp = tempfile::tempdir().unwrap();
         let session = "b".repeat(64);
@@ -454,7 +522,8 @@ mod tests {
         std::fs::write(temp.path().join("b.json"), b"not json").unwrap();
         std::fs::write(temp.path().join("note.txt"), b"ignored").unwrap();
         let found = scan(temp.path()).unwrap();
-        assert_eq!(found.skipped, 2);
+        assert_eq!(found.skipped, 1);
+        assert_eq!(found.other, 1);
         let names: Vec<_> = found
             .gaps
             .iter()

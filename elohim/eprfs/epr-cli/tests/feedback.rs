@@ -766,6 +766,7 @@ fn drain_spool_records_each_valid_gap_once_and_keeps_the_invalid() {
     for (name, body) in &invalid {
         std::fs::write(spool.join(name), body).unwrap();
     }
+    std::fs::write(spool.join("note.txt"), "untouched").unwrap();
     let spool_arg = spool.to_str().unwrap();
     let first = value(run_env(
         dir.path(),
@@ -774,6 +775,8 @@ fn drain_spool_records_each_valid_gap_once_and_keeps_the_invalid() {
     ));
     assert_eq!(first["drained"], 1);
     assert_eq!(first["skipped"], 4);
+    assert_eq!(first["other"], 1);
+    assert_eq!(first["unremoved"], json!([]));
     assert_eq!(first["dir"], spool_arg);
     assert!(!spool.join("00000000000000000000000000000001.json").exists());
     for (name, _) in &invalid {
@@ -802,6 +805,8 @@ fn drain_spool_records_each_valid_gap_once_and_keeps_the_invalid() {
     ));
     assert_eq!(second["drained"], 1);
     assert_eq!(second["skipped"], 4);
+    assert_eq!(second["other"], 1);
+    assert_eq!(second["unremoved"], json!([]));
     assert!(!state
         .join("brit/feedback-spool/00000000000000000000000000000002.json")
         .exists());
@@ -810,6 +815,16 @@ fn drain_spool_records_each_valid_gap_once_and_keeps_the_invalid() {
         std::fs::read_to_string(dir.path().join(".eprfs/status/feedback.jsonl")).expect("store");
     assert!(!retained.contains("SECRET_STDERR"));
     assert!(!retained.contains("/secret/recorder"));
+}
+
+#[test]
+fn drain_spool_requires_an_absolute_state_or_home_directory() {
+    let dir = claim_fixture();
+    let output = run_env(dir.path(), &["drain-spool"], &[("HOME", "relative/home")]);
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains(
+        "no spool directory: set XDG_STATE_HOME or HOME to an absolute path, or pass --dir"
+    ));
 }
 
 #[test]

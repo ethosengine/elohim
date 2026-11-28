@@ -115,7 +115,7 @@ pub fn run(args: &[String]) -> Result<()> {
             let dir = match options.get("dir") {
                 Some(dir) => PathBuf::from(dir),
                 None => spool::dir(&|name: &str| std::env::var_os(name))
-                    .ok_or("no spool directory: set XDG_STATE_HOME or HOME, or pass --dir")?,
+                    .ok_or("no spool directory: set XDG_STATE_HOME or HOME to an absolute path, or pass --dir")?,
             };
             spool::drain(&store, &dir)?
         }
