@@ -516,7 +516,7 @@ def io_guard_and_berth_lines(session, budget=None, run=None):
         out.append(f"BERTH: moored as {session} (claude-code; complete it: `berth moor --model <id> --lab <vendor> --task '<lane>'`)"
                    + lease_note
                    + " · claim before mesh/cargo/disk-heavy work: `berth claim <resource>`; `berth status|ledger`")
-        out.append(f"Arm Monitor before the first long wait: `berth inbox --session {session} --reader main --follow`")
+        out.append(f"Arm a background wake before the first long wait: `berth inbox --session {session} --reader main --wait`; re-arm it after each wake.")
         out.append(f"Once work is named: `berth moor --session {session} --writes <globs> --task <text>`; run `berth holds <paths>` before the first write.")
     except DeadlineSkipped:
         skipped.append("berth moor/status")
