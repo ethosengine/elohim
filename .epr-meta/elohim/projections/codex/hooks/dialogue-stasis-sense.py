@@ -43,7 +43,18 @@ class InnerDeadlineExceeded(Exception):
     pass
 
 
+_DISARMED = False
+
+
+def disarm():
+    """After a decision is recorded its output must reach the harness: no later check raises."""
+    global _DISARMED
+    _DISARMED = True
+
+
 def deadline_remaining():
+    if _DISARMED:
+        return 3600.0
     remaining = DEADLINE_AT - time.monotonic()
     if remaining <= 0:
         raise InnerDeadlineExceeded()
@@ -52,6 +63,11 @@ def deadline_remaining():
 
 def deadline_check():
     deadline_remaining()
+
+
+def say_deadline(phase):
+    print(f"dialogue-stasis-sense: inner deadline ({DEADLINE_S:g} s) reached {phase}; nothing more "
+          "recorded this call", file=sys.stderr)
 
 
 def lock_journal(stream, live):
@@ -503,7 +519,8 @@ def transcript(j):
             batch = {}
             for count, raw in enumerate(stream):
                 if count % 64 == 63:
-                    deadline_check()
+                    # Breaks, never raises: the cutoff sits DEADLINE_FINISH_RESERVE_S before the
+                    # deadline, and stopping here still saves the cursor so the next call resumes.
                     if time.monotonic() >= min(START + SCAN_UNTIL,
                                                DEADLINE_AT - DEADLINE_FINISH_RESERVE_S):
                         print("dialogue-stasis-sense: skipped the rest of the transcript scan — internal budget reached; it resumes next call",
@@ -593,7 +610,6 @@ def main():
     if payload.get("hook_event_name") == "SessionStart":
         control.set_hook_deadline(DEADLINE_AT)
         result = control.session_start(repo, root, session)
-        deadline_check()
         print(result)
         return
     if "--rewake" in sys.argv:
@@ -633,6 +649,7 @@ def main():
                 transcript(j)
                 output = relay(j)
         except InnerDeadlineExceeded:
+            say_deadline("before the journal commit")
             return
         except Exception:
             # Never persist the exception text: it can contain raw tool arguments.
@@ -644,21 +661,18 @@ def main():
     # Native decide may append to events.jsonl: never call it while holding
     # journal.lock. An inert result cannot deliver pending control context.
     try:
-        deadline_check()
+        if time.monotonic() >= DEADLINE_AT:
+            # Nothing is decided yet: skip the decision. The relay state above is committed,
+            # so its output still prints below.
+            raise InnerDeadlineExceeded()
+        # From here a decision may be recorded (a park, a stall closed by it) before it returns:
+        # whatever it returns must be printed, so no later check may raise.
+        disarm()
         action = (control.live_hook(repo, root, payload, normalized or {})
                   if not (normalized or {}).get("humanAnswering") and (
                       runtime == "claude-code" or payload.get("hook_event_name") in
                       {"PostToolUse", "UserPromptSubmit"}) else None)
         if action:
-            deadline_check()
-            if payload.get("hook_event_name") == "PermissionRequest":
-                iid = normalized["correlation"]["incidentId"]
-                with (directory / "journal.lock").open("a") as lock:
-                    lock_journal(lock, control.mode() == "live")
-                    j = Journal(directory, payload)
-                    j.gap("native-park-fold-pending")
-                    j.state["openPrompts"][j.agent] = [o for o in j.state["openPrompts"].get(j.agent, []) if o["incidentId"] != iid]
-                    j.save()
             if output and payload.get("hook_event_name") in {"PostToolUse", "UserPromptSubmit"}:
                 event = payload["hook_event_name"]
                 if event == "UserPromptSubmit":
@@ -667,18 +681,31 @@ def main():
                     old = json.loads(output)["hookSpecificOutput"]["additionalContext"]
                     current = json.loads(action)["hookSpecificOutput"]["additionalContext"]
                     action = control.context(event, old + "\n" + current)
+            # Set before the bookkeeping below: a busy journal lock there must not cost the decision.
             output = action
+            if payload.get("hook_event_name") == "PermissionRequest":
+                try:
+                    iid = normalized["correlation"]["incidentId"]
+                    with (directory / "journal.lock").open("a") as lock:
+                        lock_journal(lock, control.mode() == "live")
+                        j = Journal(directory, payload)
+                        j.gap("native-park-fold-pending")
+                        j.state["openPrompts"][j.agent] = [o for o in j.state["openPrompts"].get(j.agent, []) if o["incidentId"] != iid]
+                        j.save()
+                except Exception:
+                    pass
     except InnerDeadlineExceeded:
-        return
+        say_deadline("before the decision")
     except Exception:
         pass
     if output:
-        deadline_check()
         print(output)
 
 
 if __name__ == "__main__":
     try:
         main()
+    except InnerDeadlineExceeded:
+        say_deadline("before the journal opened")
     except Exception:
         pass  # Fail open even when no safe journal append is possible.
